@@ -14,7 +14,7 @@ No static credentials. No human bottlenecks. Just secure, scalable authenticatio
 
 ### 1. Register as a provider
 
-Before installing Authed, [register as a provider](https://getauthed.dev/). Save your provider ID and secret - you'll need these for configuration.
+Before installing Authed, [register as a provider](https://getauthed.dev/). Save your provider ID and secret - you'll need these for configuration. For detailed instructions, see our [registration guide](https://docs.getauthed.dev/platform).
 
 ### 2. Install Authed
 
