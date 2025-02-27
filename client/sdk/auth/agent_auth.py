@@ -23,6 +23,9 @@ def normalize_url(url: str) -> str:
     port = f":{parsed.port}" if parsed.port and parsed.port not in (80, 443) else ""
     # Always use HTTPS for registry URLs
     scheme = "https" if "getauthed.dev" in parsed.netloc else parsed.scheme
+    # Include query string in the normalized URL if it exists
+    if query:
+        return f"{scheme}://{parsed.netloc}{port}{parsed.path}?{query}"
     return f"{scheme}://{parsed.netloc}{port}{parsed.path}"
 
 class AgentAuth:
@@ -95,7 +98,7 @@ class AgentAuth:
             
         try:
             # Create DPoP proof for the token request
-            token_endpoint = f"{self.registry_url}/tokens/create"
+            token_endpoint = f"{registry_url or self.registry_url}/tokens/create"
             # Normalize URL (this will ensure HTTPS for registry URLs)
             token_endpoint = normalize_url(token_endpoint)
             logger.debug(f"Creating DPoP proof for token request to: {token_endpoint}")
