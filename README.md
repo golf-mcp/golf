@@ -7,6 +7,7 @@
 [![license MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/authed-dev/authed/pulls)
 [![support](https://img.shields.io/badge/support-contact%20author-purple.svg)](https://github.com/authed-dev/authed/issues)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/authed)](https://pypi.org/project/authed/)
 
 Authed | [Docs](https://docs.getauthed.dev)
 </div>
