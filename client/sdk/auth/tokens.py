@@ -5,26 +5,10 @@ from datetime import datetime, timezone
 import httpx
 from uuid import UUID
 import json
-from urllib.parse import urlparse, parse_qs, urlencode
 
 from ..models import TokenRequest, InteractionToken
 from ..exceptions import AuthenticationError, RegistryError
-
-def normalize_url(url: str) -> str:
-    """Normalize URL for comparison"""
-    parsed = urlparse(url)
-    # Sort query parameters
-    if parsed.query:
-        params = parse_qs(parsed.query)
-        sorted_params = {k: sorted(v) for k, v in params.items()}
-        query = urlencode(sorted_params, doseq=True)
-    else:
-        query = ""
-    # Normalize port
-    port = f":{parsed.port}" if parsed.port and parsed.port not in (80, 443) else ""
-    # Always use HTTPS for registry URLs
-    scheme = "https" if "getauthed.dev" in parsed.netloc else parsed.scheme
-    return f"{scheme}://{parsed.netloc}{port}{parsed.path}"
+from ..utils.url import ensure_https, normalize_url
 
 class UUIDEncoder(json.JSONEncoder):
     """Custom JSON encoder that converts UUID objects to strings."""
@@ -42,10 +26,7 @@ class TokenManager:
         Args:
             registry_url: Base URL of the registry service
         """
-        self.registry_url = registry_url.rstrip('/')
-        # Ensure HTTPS for registry URL
-        if self.registry_url.startswith("http://"):
-            self.registry_url = "https://" + self.registry_url[7:]
+        self.registry_url = ensure_https(registry_url.rstrip('/'))
         self._token_cache: Dict[str, InteractionToken] = {}
         
     def _get_cache_key(self, agent_id: str, target_agent_id: Union[str, UUID]) -> str:
@@ -143,11 +124,8 @@ class TokenManager:
                 retries=1
             )
             
-            # Ensure HTTPS for registry URLs
-            if "getauthed.dev" in self.registry_url:
-                base_url = self.registry_url.replace("http://", "https://")
-            else:
-                base_url = self.registry_url
+            # Use the normalized base URL
+            base_url = ensure_https(self.registry_url)
             
             async with httpx.AsyncClient(
                 transport=transport,
