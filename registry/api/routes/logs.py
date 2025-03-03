@@ -186,7 +186,7 @@ async def websocket_logs(
             is_internal = True
         # Check provider authentication
         elif provider_secret := headers.get("provider-secret"):
-            print(f"Checking provider secret: {provider_secret[:10]}...")  # Debug log
+            print("Checking provider secret...")  # Debug log
             try:
                 provider = provider_service.get_provider_by_secret(provider_secret)
                 if provider:
