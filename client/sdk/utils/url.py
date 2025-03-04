@@ -1,42 +1,39 @@
 from urllib.parse import urlparse, parse_qs, urlencode
 
-def normalize_url(url: str) -> str:
-    """Normalize URL for comparison"""
-    parsed = urlparse(url)
-    # Sort query parameters
-    if parsed.query:
-        params = parse_qs(parsed.query)
-        sorted_params = {k: sorted(v) for k, v in params.items()}
-        query = urlencode(sorted_params, doseq=True)
-    else:
-        query = ""
-    # Normalize port
-    port = f":{parsed.port}" if parsed.port and parsed.port not in (80, 443) else ""
-    # Always use HTTPS for registry URLs
-    scheme = "https" if "getauthed.dev" in parsed.netloc else parsed.scheme
-    # Include query string in the normalized URL if it exists
-    if query:
-        return f"{scheme}://{parsed.netloc}{port}{parsed.path}?{query}"
-    return f"{scheme}://{parsed.netloc}{port}{parsed.path}"
+def is_registry_url(url: str) -> bool:
+    """Check if URL is a registry URL"""
+    return "getauthed.dev" in urlparse(url).netloc
 
-def ensure_https(url: str) -> str:
-    """Ensure HTTPS for registry URLs
-    
-    This function ensures that registry URLs use HTTPS. It's a simpler version
-    of normalize_url that only handles the scheme without modifying other parts
-    of the URL.
+def normalize_url(url: str, force_https: bool = False) -> str:
+    """Normalize URL for consistent comparison
     
     Args:
-        url: The URL to ensure HTTPS for
-        
+        url: The URL to normalize
+        force_https: Whether to force HTTPS scheme (default False)
+    
     Returns:
-        str: The URL with HTTPS if it's a registry URL
+        Normalized URL with:
+        - Sorted query parameters
+        - Normalized ports (omitted if 80/443)
+        - HTTPS scheme if force_https=True or is registry URL
     """
     parsed = urlparse(url)
     
-    # Always use HTTPS for registry URLs
-    if "getauthed.dev" in parsed.netloc and parsed.scheme == "http":
-        # Reconstruct the URL with https scheme
-        return url.replace("http://", "https://", 1)
-        
-    return url 
+    # Determine scheme
+    scheme = parsed.scheme
+    if force_https or is_registry_url(url):
+        scheme = "https"
+    
+    # Normalize port
+    port = ""
+    if parsed.port and parsed.port not in (80, 443):
+        port = f":{parsed.port}"
+    
+    # Sort query parameters if present
+    query = ""
+    if parsed.query:
+        params = parse_qs(parsed.query)
+        sorted_params = {k: sorted(v) for k, v in params.items()}
+        query = f"?{urlencode(sorted_params, doseq=True)}"
+    
+    return f"{scheme}://{parsed.netloc}{port}{parsed.path}{query}"
