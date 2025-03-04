@@ -20,7 +20,23 @@ def normalize_url(url: str) -> str:
     return f"{scheme}://{parsed.netloc}{port}{parsed.path}"
 
 def ensure_https(url: str) -> str:
-    """Ensure HTTPS for registry URLs"""
-    if "getauthed.dev" in url and url.startswith("http://"):
-        return "https://" + url[7:]
+    """Ensure HTTPS for registry URLs
+    
+    This function ensures that registry URLs use HTTPS. It's a simpler version
+    of normalize_url that only handles the scheme without modifying other parts
+    of the URL.
+    
+    Args:
+        url: The URL to ensure HTTPS for
+        
+    Returns:
+        str: The URL with HTTPS if it's a registry URL
+    """
+    parsed = urlparse(url)
+    
+    # Always use HTTPS for registry URLs
+    if "getauthed.dev" in parsed.netloc and parsed.scheme == "http":
+        # Reconstruct the URL with https scheme
+        return url.replace("http://", "https://", 1)
+        
     return url 

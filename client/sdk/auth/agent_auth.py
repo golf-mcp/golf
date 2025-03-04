@@ -3,30 +3,11 @@
 from typing import Optional, Dict
 from uuid import UUID
 import httpx
-from urllib.parse import urlparse, parse_qs, urlencode
 from .dpop import DPoPHandler
 from .tokens import TokenManager
 from ..exceptions import AuthenticationError, RegistryError
 import logging
-
-def normalize_url(url: str) -> str:
-    """Normalize URL for comparison"""
-    parsed = urlparse(url)
-    # Sort query parameters
-    if parsed.query:
-        params = parse_qs(parsed.query)
-        sorted_params = {k: sorted(v) for k, v in params.items()}
-        query = urlencode(sorted_params, doseq=True)
-    else:
-        query = ""
-    # Normalize port
-    port = f":{parsed.port}" if parsed.port and parsed.port not in (80, 443) else ""
-    # Always use HTTPS for registry URLs
-    scheme = "https" if "getauthed.dev" in parsed.netloc else parsed.scheme
-    # Include query string in the normalized URL if it exists
-    if query:
-        return f"{scheme}://{parsed.netloc}{port}{parsed.path}?{query}"
-    return f"{scheme}://{parsed.netloc}{port}{parsed.path}"
+from ..utils.url import normalize_url
 
 class AgentAuth:
     """Main authentication handler for Agent Auth."""
@@ -52,8 +33,7 @@ class AgentAuth:
             ValueError: If the required credentials for either mode are missing
         """
         # Ensure HTTPS for registry URLs
-        if "getauthed.dev" in registry_url and registry_url.startswith("http://"):
-            registry_url = "https://" + registry_url[7:]
+        
         self.registry_url = registry_url.rstrip('/')
         self._agent_id = agent_id
         self._agent_secret = agent_secret

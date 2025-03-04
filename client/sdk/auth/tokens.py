@@ -8,7 +8,7 @@ import json
 
 from ..models import TokenRequest, InteractionToken
 from ..exceptions import AuthenticationError, RegistryError
-from ..utils.url import ensure_https, normalize_url
+from ..utils.url import ensure_https
 
 class UUIDEncoder(json.JSONEncoder):
     """Custom JSON encoder that converts UUID objects to strings."""
