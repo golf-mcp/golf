@@ -5,9 +5,11 @@ from uuid import UUID
 import httpx
 from .dpop import DPoPHandler
 from .tokens import TokenManager
-from ..exceptions import AuthenticationError, RegistryError
-import logging
+from ..exceptions import AuthenticationError, RegistryError, ConfigurationError
 from ..utils.url import normalize_url
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AgentAuth:
     """Main authentication handler for Agent Auth."""
@@ -32,9 +34,8 @@ class AgentAuth:
         Raises:
             ValueError: If the required credentials for either mode are missing
         """
-        # Ensure HTTPS for registry URLs
-        
-        self.registry_url = registry_url.rstrip('/')
+        # Always force HTTPS for registry URLs
+        self.registry_url = normalize_url(registry_url.rstrip('/'), force_https=True)
         self._agent_id = agent_id
         self._agent_secret = agent_secret
         self._private_key = private_key
@@ -42,7 +43,7 @@ class AgentAuth:
         
         # Initialize handlers
         self._dpop = DPoPHandler()
-        self._token_manager = TokenManager(registry_url)
+        self._token_manager = TokenManager(self.registry_url)
         
         # Validate initialization mode
         if (agent_id or agent_secret or private_key) and not all([agent_id, agent_secret, private_key]):
@@ -66,8 +67,7 @@ class AgentAuth:
             AuthenticationError: If agent credentials are missing or invalid
             RegistryError: If the registry service returns an error
         """
-        logger = logging.getLogger(__name__)
-        logger.debug(f"Getting interaction token for target agent: {target_agent_id}")
+
         
         if not self._agent_id or not self._agent_secret or not self._private_key:
             logger.error("Missing required credentials")
@@ -78,9 +78,8 @@ class AgentAuth:
             
         try:
             # Create DPoP proof for the token request
-            token_endpoint = f"{registry_url or self.registry_url}/tokens/create"
-            # Normalize URL (this will ensure HTTPS for registry URLs)
-            token_endpoint = normalize_url(token_endpoint)
+            base_url = normalize_url(registry_url or self.registry_url, force_https=True)
+            token_endpoint = f"{base_url}/tokens/create"
             logger.debug(f"Creating DPoP proof for token request to: {token_endpoint}")
             
             dpop_proof = self._dpop.create_proof(
@@ -98,9 +97,9 @@ class AgentAuth:
                 str(target_agent_id) if isinstance(target_agent_id, UUID) else target_agent_id,
                 dpop_proof,
                 self._public_key,
-                registry_url=token_endpoint.rsplit('/tokens/create', 1)[0]  # Pass the base URL with correct scheme
+                registry_url=base_url
             )
-            logger.debug(f"Token received successfully: {token[:20]}...")
+            logger.debug("Token received successfully")
             
             return token
             
@@ -135,12 +134,9 @@ class AgentAuth:
             AuthenticationError: If credentials are missing or invalid
             RegistryError: If the registry service returns an error
         """
-        logger = logging.getLogger(__name__)
         logger.debug(f"Protecting request - Method: {method}, URL: {url}")
         logger.debug(f"Target agent ID: {target_agent_id}")
         logger.debug(f"Existing headers: {existing_headers}")
-        logger.debug(f"Using agent ID: {self._agent_id}")
-        logger.debug(f"Registry URL: {self.registry_url}")
         
         if not self._private_key:
             logger.error("Missing private key")
@@ -156,20 +152,17 @@ class AgentAuth:
                 target_agent_id = UUID(target_agent_id)
                 logger.debug(f"Converted target_agent_id to UUID: {target_agent_id}")
             
-            # Add DPoP proof
-            logger.debug("Generating DPoP proof...")
-            logger.debug(f"DPoP proof method: {method}")
-            logger.debug(f"DPoP proof URL: {url}")
-            logger.debug("Private key present for DPoP proof generation")
+            # Normalize the request URL for the DPoP proof
+            normalized_url = normalize_url(url)
+            logger.debug(f"Normalized request URL: {normalized_url}")
             
             # Generate DPoP proof for the actual request URL
-            proof = self._dpop.create_proof(method, url, self._private_key)
-            logger.debug(f"Generated DPoP proof: {proof[:50]}...")
+            proof = self._dpop.create_proof(method, normalized_url, self._private_key)
+            logger.debug("DPoP proof created successfully")
             
-            # Get token for target agent (always use HTTPS for registry)
-            logger.debug(f"Getting interaction token for target agent: {target_agent_id}")
+            # Get token for target agent
             token = await self.get_interaction_token(target_agent_id)
-            logger.debug(f"Got interaction token: {token[:20]}...")
+            logger.debug("Got interaction token")
             
             # Add auth headers
             headers.update({
@@ -177,7 +170,7 @@ class AgentAuth:
                 "authorization": f"Bearer {token}",
                 "target-agent-id": str(target_agent_id)
             })
-            logger.debug(f"Final headers: {headers}")
+            logger.debug("Added authentication headers")
             
             return headers
             
@@ -209,7 +202,6 @@ class AgentAuth:
         Raises:
             AuthenticationError: If verification fails
         """
-        logger = logging.getLogger(__name__)
         logger.debug("Verifying request...")
         logger.debug(f"Method: {method}")
         logger.debug(f"URL: {url}")
@@ -238,13 +230,6 @@ class AgentAuth:
         try:
             # Call registry's verify endpoint
             logger.debug("Making request to registry verify endpoint...")
-            
-            # Configure client to enforce HTTPS for registry URLs
-            transport = httpx.AsyncHTTPTransport(
-                verify=True,
-                retries=1
-            )
-            
             verify_url = f"{self.registry_url}/tokens/verify"
             
             # Create a new DPoP proof specifically for the verification request
@@ -255,10 +240,10 @@ class AgentAuth:
             )
             
             async with httpx.AsyncClient(
-                transport=transport,
-                follow_redirects=False,
-                base_url="https://api.getauthed.dev" if "getauthed.dev" in self.registry_url else self.registry_url
+                base_url=self.registry_url,
+                follow_redirects=False
             ) as client:
+                # Set up verification headers
                 verify_headers = {
                     "authorization": f"Bearer {token}",
                     "dpop": verification_proof,  # Our new proof for this verification request
@@ -266,6 +251,7 @@ class AgentAuth:
                 }
                 logger.debug(f"Verify request headers: {verify_headers}")
                 
+                # Send verification request
                 response = await client.post(
                     "/tokens/verify",
                     headers=verify_headers

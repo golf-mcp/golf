@@ -6,9 +6,11 @@ import httpx
 from uuid import UUID
 import json
 
+
 from ..models import TokenRequest, InteractionToken
 from ..exceptions import AuthenticationError, RegistryError
-from ..utils.url import ensure_https
+from ..utils.url import normalize_url
+
 
 class UUIDEncoder(json.JSONEncoder):
     """Custom JSON encoder that converts UUID objects to strings."""
@@ -26,7 +28,8 @@ class TokenManager:
         Args:
             registry_url: Base URL of the registry service
         """
-        self.registry_url = ensure_https(registry_url.rstrip('/'))
+        # Always force HTTPS for registry URLs
+        self.registry_url = normalize_url(registry_url.rstrip('/'), force_https=True)
         self._token_cache: Dict[str, InteractionToken] = {}
         
     def _get_cache_key(self, agent_id: str, target_agent_id: Union[str, UUID]) -> str:
@@ -118,17 +121,9 @@ class TokenManager:
         }
         
         try:
-            # Configure client to enforce HTTPS for registry URLs
-            transport = httpx.AsyncHTTPTransport(
-                verify=True,
-                retries=1
-            )
-            
-            # Use the normalized base URL
-            base_url = ensure_https(self.registry_url)
-            
+            # Use the provided registry URL or default, ensuring HTTPS
+            base_url = normalize_url(registry_url or self.registry_url, force_https=True)
             async with httpx.AsyncClient(
-                transport=transport,
                 follow_redirects=False,
                 base_url=base_url
             ) as client:
@@ -156,7 +151,7 @@ class TokenManager:
                 token_data = response.json()
                 token = InteractionToken(
                     token=token_data["token"],
-                    target_agent_id=token_data["target_agent_id"],  # Will be converted by the model
+                    target_agent_id=token_data["target_agent_id"],
                     expires_at=datetime.fromisoformat(token_data["expires_at"])
                 )
                 
