@@ -21,6 +21,11 @@ def load_config():
 
 @click.group()
 @click.option(
+    '--debug',
+    is_flag=True,
+    help='Enable debug mode'
+)
+@click.option(
     '--registry-url',
     envvar='AUTHED_REGISTRY_URL',
     help='URL of the Agent Auth registry service'
@@ -36,7 +41,7 @@ def load_config():
     help='Provider secret for authentication'
 )
 @click.pass_context
-def cli(ctx, registry_url: str, provider_id: str, provider_secret: str):
+def cli(ctx, debug: bool, registry_url: str, provider_id: str, provider_secret: str):
     """Authed CLI - Manage agents and permissions for a provider.
     
     Configuration can be provided in three ways (in order of precedence):
@@ -67,12 +72,13 @@ def cli(ctx, registry_url: str, provider_id: str, provider_secret: str):
             "3. Run 'agent-auth init config' to configure"
         )
     
-    # Initialize auth handler
+    # Initialize auth
     try:
         auth = CLIAuth(
             registry_url=registry_url,
             provider_id=UUID(provider_id),
-            provider_secret=provider_secret
+            provider_secret=provider_secret,
+            debug=debug  # Pass debug flag to CLIAuth
         )
     except ValueError as e:
         raise click.UsageError(str(e))
@@ -81,6 +87,7 @@ def cli(ctx, registry_url: str, provider_id: str, provider_secret: str):
     ctx.ensure_object(dict)
     ctx.obj['auth'] = auth
     ctx.obj['provider_id'] = provider_id
+    ctx.obj['debug'] = debug  # Store debug flag in context
 
 # Add command groups
 cli.add_command(agents.group)

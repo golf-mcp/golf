@@ -5,7 +5,7 @@ from uuid import UUID
 import httpx
 from .dpop import DPoPHandler
 from .tokens import TokenManager
-from ..exceptions import AuthenticationError, RegistryError, ConfigurationError
+from ..exceptions import AuthenticationError, RegistryError
 from ..utils.url import normalize_url
 import logging
 

@@ -1,4 +1,4 @@
-"""Authentication handler for the CLI."""
+"""Authentication handler for CLI commands."""
 
 import httpx
 from typing import Dict
@@ -7,13 +7,14 @@ from uuid import UUID
 import click
 
 class CLIAuth:
-    """Handles authentication for provider operations via CLI."""
+    """Handles authentication for CLI commands."""
     
     def __init__(
         self,
         registry_url: str,
         provider_id: UUID,
-        provider_secret: str
+        provider_secret: str,
+        debug: bool = False,
     ):
         """Initialize CLI auth handler.
         
@@ -21,10 +22,12 @@ class CLIAuth:
             registry_url: Base URL of the registry
             provider_id: The provider's ID
             provider_secret: The provider's secret for authentication
+            debug: Whether to enable debug output
         """
         self.registry_url = registry_url.rstrip('/')
         self.provider_id = provider_id
-        self._provider_secret = provider_secret
+        self.provider_secret = provider_secret
+        self.debug = debug
         
         if not provider_secret:
             raise ValueError("Provider secret is required")
@@ -32,7 +35,7 @@ class CLIAuth:
     def get_headers(self) -> Dict[str, str]:
         """Get authentication headers for requests."""
         return {
-            "provider-secret": self._provider_secret
+            "provider-secret": self.provider_secret
         }
     
     async def request(
@@ -60,10 +63,6 @@ class CLIAuth:
         headers = kwargs.pop('headers', {})
         headers.update(self.get_headers())
         
-        # Debug logging
-        click.echo(f"Making request to: {url}", err=True)
-        click.echo(f"Headers: {headers}", err=True)
-        
         async with httpx.AsyncClient() as client:
             response = await client.request(
                 method,
@@ -72,8 +71,18 @@ class CLIAuth:
                 **kwargs
             )
             
-            # Debug logging
-            click.echo(f"Response status: {response.status_code}", err=True)
-            click.echo(f"Response body: {response.text}", err=True)
-            
             return response 
+
+    @property
+    def list_agents_url(self) -> str:
+        """Get URL for listing agents."""
+        return f"{self.registry_url}/providers/list-agents/{self.provider_id}"
+
+    def list_agents(self) -> httpx.Response:
+        """List all agents for the provider."""
+        response = httpx.get(
+            self.list_agents_url,
+            headers=self.get_headers()
+        )
+        
+        return response 

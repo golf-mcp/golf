@@ -12,27 +12,16 @@ def group():
     pass
 
 @group.command(name='list')
-@click.option('--include-inactive', is_flag=True, help='Include inactive agents')
 @click.option('--output', type=click.Path(dir_okay=False), help='Save output to JSON file')
 @click.pass_context
-@async_command
-async def list_agents(ctx, include_inactive: bool, output: Optional[str]):
+def list_agents(ctx, output: Optional[str]):
     """List all agents."""
     try:
-        # Build query parameters
-        params = {}
-        if include_inactive:
-            params['include_inactive'] = 'true'
-            
-        # Get provider ID from context
-        provider_id = ctx.obj['provider_id']
-            
+        # Get auth from context
+        auth = ctx.obj['auth']
+        
         # Make authenticated request to registry
-        response = await ctx.obj['auth'].request(
-            'GET',
-            f'/providers/list-agents/{provider_id}',
-            params=params
-        )
+        response = auth.list_agents()
         
         if response.status_code == 401:
             raise click.UsageError("Authentication failed")
@@ -174,11 +163,13 @@ async def create_agent(ctx, provider_id: Optional[str], name: Optional[str], key
             click.echo(f"Registry Public Key: {click.style(result.get('registry_public_key', 'N/A'), fg='bright_black')}")
             click.echo()
             
+            # Only print debug info if debug flag is set
+            if ctx.obj.get('debug', False):
+                click.echo(click.style("\n⚠️  Warning:", fg="yellow", bold=True))
+                click.echo(f"Response status: {response.status_code}")
+                click.echo(f"Response body: {response.text}")
         except Exception as e:
-            click.echo(click.style("\n⚠️  Warning:", fg="yellow", bold=True))
-            click.echo(f"Response status: {response.status_code}")
-            click.echo(f"Response body: {response.text}")
-            raise
+            click.echo(click.style("✗ Error: ", fg="red", bold=True) + str(e), err=True)
         
     except Exception as e:
         click.echo(click.style("✗ Error: ", fg="red", bold=True) + str(e), err=True)
