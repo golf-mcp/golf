@@ -146,10 +146,7 @@ We are working hard on new features!
 - **OpenID integration**: Adding OpenID identity binding for end users
 - **Enhanced permissions**: Expanding the permission engine to allow more fine-grained permissions
 
-## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=authed-dev/authed&type=Date)](https://star-history.com/#authed-dev/authed&Date)
-
-## License
-
-MIT License
+<div align="center">
+Made with ❤️ in Warsaw and SF
+</div>
