@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: <service-name>-config
+  namespace: <namespace>
+data:
+  ENV: "<environment>"
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  RATE_LIMIT_WINDOW: "60"
+  RATE_LIMIT_DEFAULT: "60"
+  RATE_LIMIT_TOKEN: "30"
+  RATE_LIMIT_VERIFY: "100"
+  RATE_LIMIT_REGISTER: "5"
+  DB_POOL_SIZE: "5"
+  DB_MAX_OVERFLOW: "10"
+  DB_POOL_TIMEOUT: "30"
+  DB_POOL_RECYCLE: "1800"
+  LOG_LEVEL: "INFO"
+  JSON_LOGS: "true"
+  CORS_ORIGINS: '["http://localhost:3000", "http://localhost", "http://127.0.0.1", "https://*.<domain>", "https://<domain>"]'
+  CORS_METHODS: '["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]'
+  CORS_HEADERS: '["Content-Type", "Authorization", "agent-id", "agent-secret", "dpop-proof", "original-method", "original-url", "x-api-key", "provider-secret"]'
+  CORS_CREDENTIALS: "true"
+  MIN_TLS_VERSION: "TLSv1.3"
+  ALLOWED_HOSTS: '["localhost", "127.0.0.1", "*.<domain>"]'
+  KEY_ROTATION_DAYS: "30"
+  DB_ENCRYPTION_ENABLED: "true"
+  DB_ENCRYPTION_ALGORITHM: "AES256"
+  TOKEN_EXPIRY_MINUTES: "30"
+  REDIS_DB: "0"
+  NONCE_TTL_SECONDS: "300"
+  MIN_KEY_SIZE: "2048" 
+  HEALTH_CPU_THRESHOLD: "70"    # Matches HPA CPU target
+  HEALTH_MEMORY_THRESHOLD: "80" # Matches HPA memory target
