@@ -2,5 +2,4 @@
 __pycache__/
 *.egg-info/
 dist/
-pyproject.toml
 .VSCodeCounter/
