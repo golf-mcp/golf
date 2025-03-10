@@ -1,29 +1,22 @@
-name: OSV-Scanner
+name: OSV-Scanner PR Scan
 
+# Change "main" to your default branch if you use a different name, i.e. "master"
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: "0 12 * * *"
   pull_request:
-    branches:
-      - main
+    branches: [main]
+  merge_group:
+    branches: [main]
+
+permissions:
+  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
+  actions: read
+  # Require writing security events to upload SARIF file to security tab
+  security-events: write
+  # Only need to read contents
+  contents: read
 
 jobs:
-  scan:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run OSV Scanner
-        run: osv-scanner --json > results.json
-
-      - name: Upload scan results
-        uses: actions/upload-artifact@v4
-        with:
-          name: scan-results
-          path: results.json
+  scan-pr:
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v1.9.1"
