@@ -1,7 +1,8 @@
 """Global manager for Authed SDK."""
 
-from typing import Optional
 import logging
+from typing import Optional
+
 from .config import AuthedConfig
 from .auth import AgentAuth
 from .channel.manager import ChannelManager
@@ -97,5 +98,8 @@ class Authed:
         """Get the channel manager for agent communication."""
         if self._channel_manager is None:
             logger.debug("Creating new ChannelManager")
-            self._channel_manager = ChannelManager(self)
+            self._channel_manager = ChannelManager(
+                agent_id=self._auth._agent_id,
+                auth_handler=self._auth
+            )
         return self._channel_manager 

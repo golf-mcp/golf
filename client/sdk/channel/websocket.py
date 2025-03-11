@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 import websockets
 from uuid import UUID
 
-from ..exceptions import ChannelError, ConnectionError, MessageError
+from ..exceptions import ConnectionError, MessageError
 from .base import AgentChannel
 from .protocol import MessageType, ChannelState
 
@@ -17,23 +17,18 @@ class WebSocketChannel(AgentChannel):
     """WebSocket-based agent communication channel."""
     
     def __init__(self, 
-                agent_id: str, 
-                auth_handler, 
-                config=None,
-                heartbeat_interval: int = 30):
+                agent_id: str = None, 
+                auth_handler = None):
         """Initialize WebSocket channel.
         
         Args:
             agent_id: ID of this agent
             auth_handler: Authentication handler for token operations
-            config: Optional configuration object
-            heartbeat_interval: Seconds between heartbeat messages (0 to disable)
         """
         super().__init__()
         self._agent_id = agent_id
         self._auth = auth_handler
-        self._config = config
-        self.heartbeat_interval = heartbeat_interval
+        self.heartbeat_interval = 30
         self.ws_connection = None
         self._target_agent_id = None
         self._heartbeat_task = None
@@ -41,13 +36,24 @@ class WebSocketChannel(AgentChannel):
         self._message_queue = asyncio.Queue()
         self._receiver_task = None
         
-    async def connect(self, target_agent_id: str, websocket_url: str) -> None:
+    async def connect(self, target_agent_id: str, **kwargs) -> None:
         """Establish WebSocket connection to target agent.
         
         Args:
             target_agent_id: ID of the target agent
-            websocket_url: WebSocket URL for the target agent
+            **kwargs: Additional parameters:
+                - websocket_url: WebSocket URL for the target agent (required)
+                - heartbeat_interval: Seconds between heartbeat messages (optional)
         """
+        # Extract parameters
+        websocket_url = kwargs.get('websocket_url')
+        if not websocket_url:
+            raise ValueError("websocket_url is required for WebSocket connection")
+            
+        # Update heartbeat interval if provided
+        if 'heartbeat_interval' in kwargs:
+            self.heartbeat_interval = kwargs['heartbeat_interval']
+            
         if self.is_connected:
             raise ConnectionError("Already connected to an agent")
             
@@ -61,45 +67,50 @@ class WebSocketChannel(AgentChannel):
             
             logger.debug(f"Connecting to WebSocket URL: {websocket_url}")
             
-            # Connect with authentication
-            self.ws_connection = await websockets.connect(
-                websocket_url,
-                extra_headers={"Authorization": f"Bearer {token}"}
-            )
-            
-            self._target_agent_id = target_agent_id
-            
-            # Start message receiver task
-            self._start_receiver()
-            
-            # Send channel open message
-            await self.send_message(
-                MessageType.CHANNEL_OPEN,
-                {
-                    "protocol_version": "1.0",
-                    "capabilities": ["json"]
-                }
-            )
-            
-            # Wait for channel accept message
-            accept_message = await self._wait_for_message_type(MessageType.CHANNEL_ACCEPT, timeout=10)
-            if not accept_message:
-                await self.close("accept_timeout")
-                raise ConnectionError("Timeout waiting for channel acceptance")
-            
-            self._state = ChannelState.CONNECTED
-            
-            # Start heartbeat if enabled
-            if self.heartbeat_interval > 0:
-                self._start_heartbeat()
+            try:
+                # Connect with authentication
+                self.ws_connection = await websockets.connect(
+                    websocket_url,
+                    extra_headers={"Authorization": f"Bearer {token}"}
+                )
                 
-            logger.info(f"Connected to agent {target_agent_id} via WebSocket")
-            
+                self._target_agent_id = target_agent_id
+                
+                # Start message receiver task
+                self._start_receiver()
+                
+                # Send channel open message
+                await self.send_message(
+                    MessageType.CHANNEL_OPEN,
+                    {
+                        "protocol_version": "1.0",
+                        "capabilities": ["json"]
+                    }
+                )
+                
+                # Wait for channel accept message
+                accept_message = await self._wait_for_message_type(MessageType.CHANNEL_ACCEPT, timeout=10)
+                if not accept_message:
+                    await self.close("accept_timeout")
+                    raise ConnectionError("Timeout waiting for channel acceptance")
+                
+                self._state = ChannelState.CONNECTED
+                
+                # Start heartbeat if enabled
+                if self.heartbeat_interval > 0:
+                    self._start_heartbeat()
+                    
+                logger.info(f"Connected to agent {target_agent_id} via WebSocket")
+                
+            except Exception as e:
+                logger.error(f"Failed to connect to agent {target_agent_id}: {str(e)}")
+                self.ws_connection = None
+                self._state = ChannelState.DISCONNECTED
+                raise ConnectionError(f"Failed to connect: {str(e)}")
+                
         except Exception as e:
-            logger.error(f"Failed to connect to agent {target_agent_id}: {str(e)}")
-            self.ws_connection = None
             self._state = ChannelState.DISCONNECTED
-            raise ConnectionError(f"Failed to connect: {str(e)}")
+            raise ConnectionError(f"Connection setup failed: {str(e)}")
             
     async def send_message(self, 
                           content_type: str, 
@@ -183,29 +194,6 @@ class WebSocketChannel(AgentChannel):
         return (self.ws_connection is not None and 
                 self.ws_connection.open and 
                 self._state == ChannelState.CONNECTED)
-    
-    def _get_target_url(self, target_agent_id: str) -> str:
-        """Get the WebSocket URL for the target agent.
-        
-        Args:
-            target_agent_id: ID of the target agent
-            
-        Returns:
-            WebSocket URL for the target agent
-        """
-        # Default values
-        protocol = "wss"
-        url_template = "{agent_id}.agents.example.com/ws"
-        
-        # Try to get from config if available
-        if self._config:
-            if hasattr(self._config, "agent_ws_protocol"):
-                protocol = self._config.agent_ws_protocol
-            if hasattr(self._config, "agent_ws_url_template"):
-                url_template = self._config.agent_ws_url_template
-                
-        # Format the URL
-        return f"{protocol}://{url_template.format(agent_id=target_agent_id)}"
                 
     def _start_heartbeat(self) -> None:
         """Start heartbeat task."""

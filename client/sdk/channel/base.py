@@ -7,12 +7,21 @@ from datetime import datetime, timezone
 class AgentChannel:
     """Interface for agent communication channels.
     
-    All channel implementations must implement these methods.
+    This class defines the interface that all channel implementations must follow.
+    It provides:
+    1. Common functionality (message envelope creation, sequence tracking)
+    2. Default implementations that can be overridden by subclasses
+    3. Connection state tracking
+    
+    Subclasses should override methods like connect(), send_message(), 
+    receive_message(), and close() with their specific implementations.
     """
     
     def __init__(self):
+        """Initialize the channel with basic tracking attributes."""
         self._channel_id = str(uuid.uuid4())
         self._sequence = 0
+        self._connected = False
         
     @property
     def channel_id(self) -> str:
@@ -30,26 +39,28 @@ class AgentChannel:
                                recipient_id: str,
                                sender_id: str,
                                reply_to: Optional[str] = None) -> Dict[str, Any]:
-        """Create a standard message envelope.
+        """Create a message envelope.
         
         Args:
-            content_type: Type of message to send
-            content_data: Message data
+            content_type: Type of message content
+            content_data: Message content data
             recipient_id: ID of the recipient agent
             sender_id: ID of the sender agent
-            reply_to: Optional message ID to reply to
+            reply_to: Optional message ID this is replying to
             
         Returns:
-            A message envelope dictionary
+            Message envelope dictionary
         """
+        message_id = str(uuid.uuid4())
+        
         return {
             "meta": {
-                "message_id": str(uuid.uuid4()),
-                "sender_id": sender_id,
-                "recipient_id": recipient_id,
-                "timestamp": self._get_iso_timestamp(),
-                "sequence": self.next_sequence(),
+                "message_id": message_id,
                 "channel_id": self.channel_id,
+                "sequence": self.next_sequence(),
+                "timestamp": self._get_iso_timestamp(),
+                "sender": sender_id,
+                "recipient": recipient_id,
                 "reply_to": reply_to
             },
             "content": {
@@ -58,62 +69,82 @@ class AgentChannel:
             }
         }
         
-    async def connect(self, target_agent_id: str) -> None:
-        """Establish connection to target agent.
+    async def connect(self, target_agent_id: str, **kwargs) -> None:
+        """Connect to a target agent.
+        
+        This is a base implementation that subclasses should override
+        with their specific connection logic.
         
         Args:
-            target_agent_id: ID of the target agent to connect to
-            
-        Raises:
-            ConnectionError: If connection fails
+            target_agent_id: ID of the target agent
+            **kwargs: Additional connection parameters specific to the channel type
         """
-        raise NotImplementedError("Subclasses must implement connect()")
+        # Base implementation just tracks connection state
+        # Subclasses should override with actual connection logic
+        self._connected = True
         
     async def send_message(self, 
                           content_type: str, 
                           content_data: Dict[str, Any],
                           reply_to: Optional[str] = None) -> str:
-        """Send message to connected agent.
+        """Send a message to the connected agent.
+        
+        This is a base implementation that subclasses should override
+        with their specific message sending logic.
         
         Args:
-            content_type: Type of message to send
-            content_data: Message data
-            reply_to: Optional message ID to reply to
+            content_type: Type of message content
+            content_data: Message content data
+            reply_to: Optional message ID this is replying to
             
         Returns:
-            The message_id of the sent message
-            
-        Raises:
-            ConnectionError: If not connected
-            MessageError: If sending fails
+            Message ID of the sent message
         """
-        raise NotImplementedError("Subclasses must implement send_message()")
+        # Base implementation just checks connection state
+        # Subclasses should override with actual message sending logic
+        if not self.is_connected:
+            raise ConnectionError("Not connected to agent")
+        return str(uuid.uuid4())  # Placeholder message ID
         
     async def receive_message(self) -> Dict[str, Any]:
-        """Receive message from connected agent.
+        """Receive a message from the connected agent.
+        
+        This is a base implementation that subclasses should override
+        with their specific message receiving logic.
         
         Returns:
-            The received message
-            
-        Raises:
-            ConnectionError: If not connected
-            MessageError: If receiving fails
+            Received message envelope
         """
-        raise NotImplementedError("Subclasses must implement receive_message()")
+        # Base implementation just checks connection state
+        # Subclasses should override with actual message receiving logic
+        if not self.is_connected:
+            raise ConnectionError("Not connected to agent")
+        return {}  # Placeholder empty message
         
     async def close(self, reason: str = "normal") -> None:
-        """Close the connection.
+        """Close the connection to the agent.
+        
+        This is a base implementation that subclasses should override
+        with their specific connection closing logic.
         
         Args:
             reason: Reason for closing the connection
         """
-        raise NotImplementedError("Subclasses must implement close()")
+        # Base implementation just updates connection state
+        # Subclasses should override with actual connection closing logic
+        self._connected = False
         
     @property
     def is_connected(self) -> bool:
-        """Check if channel is currently connected."""
-        raise NotImplementedError("Subclasses must implement is_connected")
+        """Check if connected to an agent.
+        
+        Subclasses may override this with more specific connection state checking.
+        
+        Returns:
+            True if connected, False otherwise
+        """
+        return self._connected
         
     def _get_iso_timestamp(self) -> str:
-        """Get current time as ISO 8601 string."""
+        """Get current ISO 8601 timestamp with timezone."""
         return datetime.now(timezone.utc).isoformat() 
