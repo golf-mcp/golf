@@ -3,11 +3,11 @@
 from functools import wraps
 from typing import Optional, Callable
 import requests
-from ...manager import AgentAuthManager
+from ...manager import Authed
 
 def protect_requests():
     """Decorator to protect requests with agent authentication."""
-    auth = AgentAuthManager.get_instance().auth
+    auth = Authed.get_instance().auth
     
     def decorator(func: Callable) -> Callable:
         @wraps(func)

@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import os
 from typing import Optional
+from dotenv import load_dotenv, find_dotenv, set_key
+from ..utils import async_command
 
 CONFIG_DIR = Path.home() / '.authed'
 CONFIG_FILE = CONFIG_DIR / 'config.json'
@@ -161,4 +163,97 @@ def clear_config(force: bool):
     
     CONFIG_FILE.unlink()
     click.echo("\n" + click.style("✓", fg="green", bold=True) + " Configuration cleared successfully")
-    click.echo() 
+    click.echo()
+
+@group.command(name='setup')
+@click.option('--provider-id', required=True, help='Provider ID from registration')
+@click.option('--provider-secret', required=True, help='Provider secret from registration')
+@click.pass_context
+@async_command
+async def setup(ctx, provider_id: str, provider_secret: str):
+    """Quick setup: configure provider, create agent, and set up environment."""
+    # Save provider config
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    config = {
+        'registry_url': 'https://api.getauthed.dev',
+        'provider_id': provider_id,
+        'provider_secret': provider_secret
+    }
+    with CONFIG_FILE.open('w') as f:
+        json.dump(config, f, indent=2)
+
+    # Generate keys
+    from ..commands.keys import generate_keypair
+    public_key, private_key = generate_keypair()
+
+    # Initialize auth with saved config
+    from ..auth import CLIAuth
+    auth = CLIAuth(
+        registry_url=config['registry_url'],
+        provider_id=provider_id,
+        provider_secret=provider_secret
+    )
+
+    # Create first agent
+    response = await auth.request(
+        'POST',
+        '/agents/register',
+        json={
+            "provider_id": provider_id,
+            "name": "default-agent",
+            "dpop_public_key": public_key
+        }
+    )
+
+    if response.status_code != 200:
+        raise click.UsageError(f"Failed to create agent: {response.text}")
+
+    result = response.json()
+    agent_id = result['agent_id']
+    agent_secret = result['agent_secret']
+
+    # Create or update .env file
+    env_file = Path('.env')
+    
+    # Load existing env file content
+    existing_env = {}
+    if env_file.exists():
+        with env_file.open('r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    existing_env[key.strip()] = value.strip()
+    
+    # Update with new values
+    new_env = {
+        'AUTHED_REGISTRY_URL': '"https://api.getauthed.dev"',
+        'AUTHED_AGENT_ID': f'"{agent_id}"',
+        'AUTHED_AGENT_SECRET': f'"{agent_secret}"',
+        'AUTHED_PRIVATE_KEY': f'"{private_key}"',
+        'AUTHED_PUBLIC_KEY': f'"{public_key}"'
+    }
+    
+    # Merge existing and new values
+    existing_env.update(new_env)
+    
+    # Write back to .env file
+    with env_file.open('w') as f:
+        f.write("# Authed Environment Variables\n\n")
+        # Write non-Authed variables first
+        for key, value in existing_env.items():
+            if not key.startswith('AUTHED_'):
+                f.write(f"{key}={value}\n")
+        # Write Authed variables
+        f.write("\n# Authed Configuration\n")
+        for key, value in existing_env.items():
+            if key.startswith('AUTHED_'):
+                f.write(f"{key}={value}\n")
+
+    # Success output
+    click.echo("\n" + "=" * 60)
+    click.echo(click.style("✓ Setup Complete!", fg="green", bold=True))
+    click.echo("=" * 60)
+    click.echo(f"\n{click.style('Agent ID:', bold=True)}     {click.style(agent_id, fg='yellow')}")
+    click.echo(f"{click.style('Environment:', bold=True)}  {click.style('.env', fg='blue')} file created")
+    click.echo(f"\n{click.style('Note:', fg='yellow', bold=True)} Add .env to your .gitignore file") 
