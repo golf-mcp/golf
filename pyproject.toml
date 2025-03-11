@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "authed"
-version = "0.1.4"
+version = "0.1.5"
 description = "Agent authentication SDK for secure service-to-service communication"
 authors = [{name = "Antoni Gmitruk", email = "antoni@getauthed.com"}]
 readme = "README.md"

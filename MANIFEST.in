@@ -1,0 +1,6 @@
+include README.md
+include pyproject.toml
+recursive-include client *
+prune registry
+prune tests
+exclude LICENSE 
