@@ -28,40 +28,28 @@ Authed is a developer-first, open-source protocol that:
 
 ## Quick start
 
-> **Note**: While Authed is open source, we currently only support our hosted registry (https://api.getauthed.dev). Self-hosted registries are possible but not officially supported yet.
+Get up and running with Authed in three simple steps:
 
 ### 1. Register as a Provider
+Head over to [getauthed.dev](https://getauthed.dev) and create an account. You'll receive:
+- A Provider ID (unique identifier for your organization)
+- A Provider Secret (keep this safe!)
 
-Before installing Authed, register as a provider. Save your provider ID and secret - you'll need these for configuration. For detailed instructions, see our registration guide.
-
-### 2. Install Authed
-
+### 2. Install the SDK
 ```bash
 pip install authed
 ```
 
-### 3. Generate keys
-
+### 3. Initialize Your First Agent
 ```bash
-authed keys generate --output agent_keys.json
+# This command will:
+# - Generate a secure key pair for your agent
+# - Create a new agent under your provider
+# - Set up your .env with all required configuration
+authed init setup --provider-id "your-provider-id" --provider-secret "your-provider-secret"
 ```
 
-### 4. Initialize configuration
-
-```bash
-authed init config
-```
-
-This will prompt you for:
-- Registry URL (https://api.getauthed.dev)
-- Provider ID
-- Provider secret
-
-### 5. Create Your First Agent ID
-
-```bash
-authed agents create --name my-first-agent
-```
+That's it! Your agent is ready to authenticate. Check out the Basic Integration section below for usage examples.
 
 ## Basic integration
 
@@ -74,14 +62,8 @@ import httpx
 
 app = FastAPI()
 
-# Initialize Authed
-auth = Authed.initialize(
-    registry_url="https://api.getauthed.dev",
-    agent_id="your-agent-id",
-    agent_secret="your-agent-secret",
-    private_key="your-private-key",
-    public_key="your-public-key"
-)
+# Initialize Authed from environment variables (configured by `authed init setup`)
+auth = Authed.from_env()
 
 # Protected endpoint
 @app.post("/secure-endpoint")
