@@ -22,7 +22,8 @@ class WebSocketHandler:
             authed_sdk: Reference to the Authed SDK instance
         """
         self.authed = authed_sdk
-        self.message_handlers: Dict[str, Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]]] = {}
+        self.message_handlers = {}
+        self.active_connections = {}  # Map of channel_id to connection info
         
     def register_handler(self, 
                         message_type: str, 
@@ -55,7 +56,15 @@ class WebSocketHandler:
             await websocket.close(1008, "Authentication error")
             return
             
-        # Handle messages
+        # Connection info
+        connection_info = {
+            "websocket": websocket,
+            "remote_addr": websocket.remote_address,
+            "connected_at": datetime.now(timezone.utc),
+            "agent_id": None,  # Will be set when we receive the first message
+            "channel_id": None  # Will be set when we receive channel.open
+        }
+        
         try:
             async for message_data in websocket:
                 try:
@@ -73,12 +82,31 @@ class WebSocketHandler:
                     # Handle channel management messages
                     if content_type == MessageType.CHANNEL_OPEN:
                         await self._handle_channel_open(websocket, message)
+                        connection_info["agent_id"] = message["meta"]["sender_id"]
+                        connection_info["channel_id"] = message["meta"]["channel_id"]
+                        self.active_connections[message["meta"]["channel_id"]] = connection_info
                         continue
                     elif content_type == MessageType.CHANNEL_CLOSE:
                         await self._handle_channel_close(websocket, message)
                         continue
                     elif content_type == MessageType.HEARTBEAT:
-                        # Just acknowledge heartbeats
+                        # Respond to heartbeats
+                        response = {
+                            "meta": {
+                                "message_id": str(uuid.uuid4()),
+                                "sender_id": self.authed.agent_id,
+                                "recipient_id": message["meta"]["sender_id"],
+                                "timestamp": self._get_iso_timestamp(),
+                                "sequence": 0,
+                                "channel_id": message["meta"]["channel_id"],
+                                "reply_to": message["meta"]["message_id"]
+                            },
+                            "content": {
+                                "type": MessageType.HEARTBEAT,
+                                "data": {}
+                            }
+                        }
+                        await websocket.send(json.dumps(response))
                         continue
                         
                     # Dispatch to registered handler
@@ -100,6 +128,9 @@ class WebSocketHandler:
                     await self._send_error(websocket, f"Internal error: {str(e)}")
                     
         except websockets.exceptions.ConnectionClosed:
+            # Clean up connection
+            if connection_info["channel_id"]:
+                self.active_connections.pop(connection_info["channel_id"], None)
             logger.info("WebSocket connection closed")
         except Exception as e:
             logger.error(f"WebSocket handler error: {str(e)}")
@@ -130,16 +161,56 @@ class WebSocketHandler:
         
     async def _handle_channel_close(self, websocket, message):
         """Handle channel close request."""
-        # Just acknowledge - connection will be closed after this
-        pass
+        # Extract information
+        channel_id = message["meta"]["channel_id"]
+        sender_id = message["meta"]["sender_id"]
+        reason = message["content"]["data"].get("reason", "normal")
         
-    async def _send_error(self, websocket, error_message, reply_to=None):
-        """Send an error message."""
+        # Log the close event
+        logger.info(f"Channel {channel_id} close requested by {sender_id} with reason: {reason}")
+        
+        # Send acknowledgment
+        response = {
+            "meta": {
+                "message_id": str(uuid.uuid4()),
+                "sender_id": self.authed.agent_id,
+                "recipient_id": sender_id,
+                "timestamp": self._get_iso_timestamp(),
+                "sequence": 1,
+                "channel_id": channel_id,
+                "reply_to": message["meta"]["message_id"]
+            },
+            "content": {
+                "type": MessageType.CHANNEL_CLOSE,
+                "data": {
+                    "acknowledged": True,
+                    "reason": reason
+                }
+            }
+        }
+        
+        try:
+            await websocket.send(json.dumps(response))
+            logger.debug(f"Sent close acknowledgment for channel {channel_id}")
+        except Exception as e:
+            logger.warning(f"Failed to send close acknowledgment: {str(e)}")
+        
+        # The connection will be closed after this method returns
+        
+    async def _send_error(self, websocket, error_message, reply_to=None, sender_id=None):
+        """Send an error message.
+        
+        Args:
+            websocket: The WebSocket connection
+            error_message: The error message to send
+            reply_to: Optional message ID to reply to
+            sender_id: Optional sender ID if known
+        """
         error = {
             "meta": {
                 "message_id": str(uuid.uuid4()),
                 "sender_id": self.authed.agent_id,
-                "recipient_id": "unknown",  # May not know the sender
+                "recipient_id": sender_id or "anonymous",  # Use sender_id if available
                 "timestamp": self._get_iso_timestamp(),
                 "sequence": 0,
                 "channel_id": "error",
