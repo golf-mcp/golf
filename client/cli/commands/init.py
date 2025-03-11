@@ -212,15 +212,43 @@ async def setup(ctx, provider_id: str, provider_secret: str):
     agent_id = result['agent_id']
     agent_secret = result['agent_secret']
 
-    # Create .env file
+    # Create or update .env file
     env_file = Path('.env')
+    
+    # Load existing env file content
+    existing_env = {}
+    if env_file.exists():
+        with env_file.open('r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    existing_env[key.strip()] = value.strip()
+    
+    # Update with new values
+    new_env = {
+        'AUTHED_REGISTRY_URL': '"https://api.getauthed.dev"',
+        'AUTHED_AGENT_ID': f'"{agent_id}"',
+        'AUTHED_AGENT_SECRET': f'"{agent_secret}"',
+        'AUTHED_PRIVATE_KEY': f'"{private_key}"',
+        'AUTHED_PUBLIC_KEY': f'"{public_key}"'
+    }
+    
+    # Merge existing and new values
+    existing_env.update(new_env)
+    
+    # Write back to .env file
     with env_file.open('w') as f:
         f.write("# Authed Environment Variables\n\n")
-        f.write(f'AUTHED_REGISTRY_URL="https://api.getauthed.dev"\n')
-        f.write(f'AUTHED_AGENT_ID="{agent_id}"\n')
-        f.write(f'AUTHED_AGENT_SECRET="{agent_secret}"\n')
-        f.write(f'AUTHED_PRIVATE_KEY="{private_key}"\n')
-        f.write(f'AUTHED_PUBLIC_KEY="{public_key}"\n')
+        # Write non-Authed variables first
+        for key, value in existing_env.items():
+            if not key.startswith('AUTHED_'):
+                f.write(f"{key}={value}\n")
+        # Write Authed variables
+        f.write("\n# Authed Configuration\n")
+        for key, value in existing_env.items():
+            if key.startswith('AUTHED_'):
+                f.write(f"{key}={value}\n")
 
     # Success output
     click.echo("\n" + "=" * 60)
