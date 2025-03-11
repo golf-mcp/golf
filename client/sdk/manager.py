@@ -15,6 +15,7 @@ class Authed:
     _instance = None
     _auth: Optional[AgentAuth] = None
     _channel_manager: Optional[ChannelManager] = None
+    _config: Optional[AuthedConfig] = None
     
     def __init__(self):
         raise RuntimeError("Use initialize() or get_instance()")
@@ -27,6 +28,7 @@ class Authed:
         agent_secret: Optional[str] = None,
         private_key: Optional[str] = None,
         public_key: Optional[str] = None,
+        config: Optional[AuthedConfig] = None,
     ) -> 'Authed':
         """Initialize the SDK with configuration."""
         logger.debug("Authed.initialize called")

@@ -15,7 +15,7 @@ class AuthedConfig(BaseModel):
     
     # For incoming requests (verification mode)
     public_key: Optional[str] = None
-    
+       
     class Config:
         env_prefix = "AUTHED_"
         

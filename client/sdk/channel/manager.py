@@ -1,6 +1,6 @@
 """Channel manager for agent communication."""
 
-from typing import Dict, Optional
+from typing import Dict
 import logging
 from .base import AgentChannel
 
@@ -18,11 +18,12 @@ class ChannelManager:
         self.authed = authed_sdk
         self._active_channels: Dict[str, AgentChannel] = {}
         
-    async def connect_to_agent(self, target_agent_id: str) -> AgentChannel:
+    async def connect_to_agent(self, target_agent_id: str, websocket_url: str) -> AgentChannel:
         """Connect to another agent using WebSocket.
         
         Args:
             target_agent_id: ID of the target agent
+            websocket_url: WebSocket URL for the target agent
             
         Returns:
             An established communication channel to the target agent
@@ -38,8 +39,12 @@ class ChannelManager:
             
         # Create new channel
         logger.debug(f"Creating new channel to {target_agent_id}")
-        channel = WebSocketChannel(self.authed)
-        await channel.connect(target_agent_id)
+        channel = WebSocketChannel(
+            agent_id=self.authed.agent_id,
+            auth_handler=self.authed.auth
+        )
+        
+        await channel.connect(target_agent_id, websocket_url)
         
         # Store in active channels
         self._active_channels[channel_key] = channel
