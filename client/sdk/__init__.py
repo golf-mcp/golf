@@ -18,9 +18,19 @@ from .exceptions import (
     AuthenticationError,
     ValidationError,
     DPoPError,
-    RegistryError
+    RegistryError,
+    # Channel exceptions
+    ChannelError,
+    ConnectionError,
+    MessageError,
+    ProtocolError
 )
 from .config import AuthedConfig
+# Channel imports
+from .channel.base import AgentChannel
+from .channel.protocol import MessageType
+from .channel.manager import ChannelManager
+from .server.websocket import WebSocketHandler
 
 __version__ = "0.1.0"
 __all__ = [
@@ -45,7 +55,17 @@ __all__ = [
     "ValidationError",
     "DPoPError",
     "RegistryError",
+    "ChannelError",
+    "ConnectionError",
+    "MessageError",
+    "ProtocolError",
     
     # Configuration
-    "AuthedConfig"
+    "AuthedConfig",
+    
+    # Channel functionality
+    "AgentChannel",
+    "MessageType",
+    "ChannelManager",
+    "WebSocketHandler"
 ] 

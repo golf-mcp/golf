@@ -4,6 +4,7 @@ from typing import Optional
 import logging
 from .config import AuthedConfig
 from .auth import AgentAuth
+from .channel.manager import ChannelManager
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -13,6 +14,7 @@ class Authed:
     
     _instance = None
     _auth: Optional[AgentAuth] = None
+    _channel_manager: Optional[ChannelManager] = None
     
     def __init__(self):
         raise RuntimeError("Use initialize() or get_instance()")
@@ -81,4 +83,17 @@ class Authed:
     @property
     def auth(self) -> AgentAuth:
         """Get the auth handler."""
-        return self._auth 
+        return self._auth
+        
+    @property
+    def agent_id(self) -> str:
+        """Get the agent ID."""
+        return self._auth._agent_id
+        
+    @property
+    def channels(self) -> ChannelManager:
+        """Get the channel manager for agent communication."""
+        if self._channel_manager is None:
+            logger.debug("Creating new ChannelManager")
+            self._channel_manager = ChannelManager(self)
+        return self._channel_manager 
