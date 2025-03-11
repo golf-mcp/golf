@@ -2,6 +2,7 @@
 
 from typing import Optional
 from pydantic import BaseModel
+from dotenv import load_dotenv
 
 class AuthedConfig(BaseModel):
     """Configuration for Authed SDK."""
@@ -20,8 +21,14 @@ class AuthedConfig(BaseModel):
         
     @classmethod
     def from_env(cls) -> "AuthedConfig":
-        """Create config from environment variables."""
+        """Create config from environment variables.
+        
+        Automatically loads variables from .env file if present.
+        """
         import os
+        
+        # Load environment variables from .env file if it exists
+        load_dotenv()
         
         return cls(
             registry_url=os.getenv("AUTHED_REGISTRY_URL", ""),

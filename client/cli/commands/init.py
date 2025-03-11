@@ -216,11 +216,11 @@ async def setup(ctx, provider_id: str, provider_secret: str):
     env_file = Path('.env')
     with env_file.open('w') as f:
         f.write("# Authed Environment Variables\n\n")
-        f.write(f"AUTHED_REGISTRY_URL=https://api.getauthed.dev\n")
-        f.write(f"AUTHED_AGENT_ID={agent_id}\n")
-        f.write(f"AUTHED_AGENT_SECRET={agent_secret}\n")
-        f.write(f"AUTHED_PRIVATE_KEY={private_key}\n")
-        f.write(f"AUTHED_PUBLIC_KEY={public_key}\n")
+        f.write(f'AUTHED_REGISTRY_URL="https://api.getauthed.dev"\n')
+        f.write(f'AUTHED_AGENT_ID="{agent_id}"\n')
+        f.write(f'AUTHED_AGENT_SECRET="{agent_secret}"\n')
+        f.write(f'AUTHED_PRIVATE_KEY="{private_key}"\n')
+        f.write(f'AUTHED_PUBLIC_KEY="{public_key}"\n')
 
     # Success output
     click.echo("\n" + "=" * 60)
