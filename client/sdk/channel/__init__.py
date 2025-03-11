@@ -1,6 +1,6 @@
 """Channel package for agent-to-agent communication."""
 
-from .base import AgentChannel
+from .utils import AgentChannel
 from .protocol import MessageType
 from .manager import ChannelManager
 

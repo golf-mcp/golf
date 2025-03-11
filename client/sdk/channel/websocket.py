@@ -8,13 +8,16 @@ import websockets
 from uuid import UUID
 
 from ..exceptions import ConnectionError, MessageError
-from .base import AgentChannel
+from .utils import ChannelUtilities
 from .protocol import MessageType, ChannelState
 
 logger = logging.getLogger(__name__)
 
-class WebSocketChannel(AgentChannel):
-    """WebSocket-based agent communication channel."""
+class WebSocketChannel(ChannelUtilities):
+    """WebSocket-based agent communication channel.
+    
+    Implements the AgentChannelProtocol using WebSocket as the transport.
+    """
     
     def __init__(self, 
                 agent_id: str = None, 

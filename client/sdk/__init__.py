@@ -27,7 +27,7 @@ from .exceptions import (
 )
 from .config import AuthedConfig
 # Channel imports
-from .channel.base import AgentChannel
+from .channel.utils import AgentChannel
 from .channel.protocol import MessageType
 from .channel.manager import ChannelManager
 from .server.websocket import WebSocketHandler

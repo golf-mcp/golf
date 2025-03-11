@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Optional
 from uuid import UUID
 
-from .base import AgentChannel
+from .protocol import AgentChannelProtocol
 from .websocket import WebSocketChannel
 from ..exceptions import ChannelError
 
@@ -22,13 +22,13 @@ class ChannelManager:
         """
         self._agent_id = agent_id
         self._auth_handler = auth_handler
-        self._active_channels: Dict[str, AgentChannel] = {}
+        self._active_channels: Dict[str, AgentChannelProtocol] = {}
         self._websocket_urls: Dict[str, str] = {}
         
     async def connect_to_agent(self, 
                               target_agent_id: str, 
                               channel_type: str = "websocket",
-                              **kwargs) -> AgentChannel:
+                              **kwargs) -> AgentChannelProtocol:
         """Connect to an agent using the specified channel type.
         
         Args:
@@ -40,6 +40,9 @@ class ChannelManager:
                 
         Returns:
             Connected agent channel
+            
+        Raises:
+            ChannelError: If the channel type is not supported or connection fails
         """
         # Normalize UUID to string
         if isinstance(target_agent_id, UUID):
@@ -96,7 +99,7 @@ class ChannelManager:
             finally:
                 del self._active_channels[target_agent_id]
                 
-    def get_channel(self, target_agent_id: str) -> Optional[AgentChannel]:
+    def get_channel(self, target_agent_id: str) -> Optional[AgentChannelProtocol]:
         """Get the channel for an agent.
         
         Args:
