@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 _TESTING = os.environ.get("AUTHED_TESTING", "0") == "1"
 if _TESTING:
     try:
-        from ..examples.test_agents.message_recorder import record_outgoing, record_incoming
+        from ..testing.test_agents.message_recorder import record_outgoing, record_incoming
         logger.info("Message recording enabled for WebSocketHandler")
     except ImportError:
         logger.warning("Message recorder not found, recording disabled")
