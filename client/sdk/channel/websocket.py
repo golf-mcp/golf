@@ -122,6 +122,7 @@ class WebSocketChannel(ChannelUtilities):
                           reply_to: Optional[str] = None) -> str:
         """Send message to connected agent."""
         if not self.is_connected and self._state != ChannelState.CONNECTING:
+            logger.error(f"Cannot send message: state={self._state}, is_connected={self.is_connected}")
             raise ConnectionError("Not connected to agent")
             
         envelope = self.create_message_envelope(
@@ -195,10 +196,9 @@ class WebSocketChannel(ChannelUtilities):
     @property
     def is_connected(self) -> bool:
         """Check if WebSocket is connected."""
-        return (self.ws_connection is not None and 
-                hasattr(self.ws_connection, 'open') and
-                self.ws_connection.open and 
-                self._state == ChannelState.CONNECTED)
+        connection_open = (self.ws_connection is not None and 
+                          (not hasattr(self.ws_connection, 'open') or self.ws_connection.open))
+        return connection_open and self._state == ChannelState.CONNECTED
                 
     def _start_heartbeat(self) -> None:
         """Start heartbeat task."""
@@ -237,7 +237,7 @@ class WebSocketChannel(ChannelUtilities):
     async def _receiver_loop(self) -> None:
         """Receive messages and put them in the queue."""
         try:
-            while self.ws_connection and (hasattr(self.ws_connection, 'open') and self.ws_connection.open or not hasattr(self.ws_connection, 'open')):
+            while self.ws_connection and (not hasattr(self.ws_connection, 'open') or self.ws_connection.open):
                 try:
                     data = await self.ws_connection.recv()
                     message = json.loads(data)

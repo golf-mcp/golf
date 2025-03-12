@@ -114,9 +114,22 @@ class WebSocketHandler:
                         await self._process_message(websocket, message, connection_info)
                     except json.JSONDecodeError:
                         await self._send_error(websocket, "Invalid JSON")
+                    except RuntimeError as e:
+                        # Handle WebSocket disconnection
+                        if "Cannot call" in str(e) and "disconnect message" in str(e):
+                            logger.info("WebSocket client disconnected")
+                            break
+                        else:
+                            logger.error(f"WebSocket runtime error: {str(e)}")
+                            break
                     except Exception as e:
                         logger.error(f"Error processing message: {str(e)}")
-                        await self._send_error(websocket, f"Internal error: {str(e)}")
+                        try:
+                            await self._send_error(websocket, f"Internal error: {str(e)}")
+                        except Exception:
+                            # If sending the error fails, just log it and continue
+                            logger.error("Failed to send error message after processing error")
+                            break
             else:
                 # Standard websockets WebSocket
                 async for message_data in websocket:
@@ -130,7 +143,12 @@ class WebSocketHandler:
                         await self._send_error(websocket, "Invalid JSON")
                     except Exception as e:
                         logger.error(f"Error processing message: {str(e)}")
-                        await self._send_error(websocket, f"Internal error: {str(e)}")
+                        try:
+                            await self._send_error(websocket, f"Internal error: {str(e)}")
+                        except Exception:
+                            # If sending the error fails, just log it and continue
+                            logger.error("Failed to send error message after processing error")
+                            break
                     
         except websockets.exceptions.ConnectionClosed:
             logger.info("WebSocket connection closed")
@@ -156,7 +174,7 @@ class WebSocketHandler:
             # Update connection info when we get sender info
             # Handle both 'sender_id' and 'sender' fields for compatibility
             meta = message.get("meta", {})
-            sender_id = meta.get("sender_id", meta.get("sender", None))
+            sender_id = meta.get("sender_id", meta.get("sender", "anonymous"))
             if sender_id:
                 connection_info["agent_id"] = sender_id
                 
@@ -164,7 +182,7 @@ class WebSocketHandler:
             if "content" in message and "type" in message["content"]:
                 content_type = message["content"]["type"]
             else:
-                await self._send_error(websocket, "Invalid message content")
+                await self._send_error(websocket, "Invalid message content", None, sender_id)
                 return
             
             # Handle channel management messages
@@ -177,7 +195,7 @@ class WebSocketHandler:
                     
                     await self._handle_channel_open(websocket, message)
                 else:
-                    await self._send_error(websocket, "Missing channel_id in message")
+                    await self._send_error(websocket, "Missing channel_id in message", None, sender_id)
                 return
             elif content_type == MessageType.CHANNEL_CLOSE:
                 await self._handle_channel_close(websocket, message)
@@ -206,7 +224,15 @@ class WebSocketHandler:
                             },
                             "content": response_data
                         }
-                        await websocket.send(json.dumps(response))
+                        
+                        # Check if this is a FastAPI WebSocket (has send_json method)
+                        if hasattr(websocket, 'send_json'):
+                            await websocket.send_json(response)
+                        elif hasattr(websocket, 'send_text'):
+                            await websocket.send_text(json.dumps(response))
+                        else:
+                            # Fallback to standard WebSocket
+                            await websocket.send(json.dumps(response))
                 except Exception as e:
                     logger.error(f"Error in message handler: {str(e)}", exc_info=True)
                     await self._send_error(
@@ -217,7 +243,6 @@ class WebSocketHandler:
                     )
             else:
                 # Make sure we have the required fields for the error message
-                sender_id = meta.get("sender_id", meta.get("sender", "anonymous"))
                 message_id = meta.get("message_id", None)
                 
                 await self._send_error(
@@ -228,7 +253,13 @@ class WebSocketHandler:
                 )
         except Exception as e:
             logger.error(f"Error processing message: {str(e)}", exc_info=True)
-            await self._send_error(websocket, f"Internal error: {str(e)}")
+            try:
+                meta = message.get("meta", {})
+                sender_id = meta.get("sender_id", meta.get("sender", "anonymous"))
+                message_id = meta.get("message_id", None)
+                await self._send_error(websocket, f"Internal error: {str(e)}", message_id, sender_id)
+            except Exception as inner_e:
+                logger.error(f"Error sending error message: {str(inner_e)}", exc_info=True)
         
     async def _handle_channel_open(self, websocket, message):
         """Handle channel open request."""
@@ -262,7 +293,16 @@ class WebSocketHandler:
             }
             
             logger.debug(f"Sending channel accept response: {json.dumps(response, indent=2)}")
-            await websocket.send(json.dumps(response))
+            
+            # Check if this is a FastAPI WebSocket (has send_json method)
+            if hasattr(websocket, 'send_json'):
+                await websocket.send_json(response)
+            elif hasattr(websocket, 'send_text'):
+                await websocket.send_text(json.dumps(response))
+            else:
+                # Fallback to standard WebSocket
+                await websocket.send(json.dumps(response))
+                
             logger.debug(f"Sent channel accept for channel {channel_id}")
         except Exception as e:
             logger.error(f"Error in _handle_channel_open: {str(e)}", exc_info=True)
@@ -270,100 +310,131 @@ class WebSocketHandler:
         
     async def _handle_channel_close(self, websocket, message):
         """Handle channel close request."""
-        # Extract information
-        meta = message.get("meta", {})
-        channel_id = meta.get("channel_id", "unknown")
-        sender_id = meta.get("sender_id", meta.get("sender", "anonymous"))
-        recipient_id = meta.get("recipient_id", meta.get("recipient", self.authed.agent_id))
-        reason = message.get("content", {}).get("data", {}).get("reason", "normal")
-        
-        # Log the close event
-        logger.info(f"Channel {channel_id} close requested by {sender_id} with reason: {reason}")
-        
-        # Send acknowledgment
-        response = {
-            "meta": {
-                "message_id": str(uuid.uuid4()),
-                "sender": self.authed.agent_id,
-                "recipient": sender_id,
-                "timestamp": self._get_iso_timestamp(),
-                "sequence": 1,
-                "channel_id": channel_id,
-                "reply_to": meta.get("message_id", "")
-            },
-            "content": {
-                "type": MessageType.CHANNEL_CLOSE,
-                "data": {
-                    "acknowledged": True,
-                    "reason": reason
+        try:
+            # Extract information
+            meta = message.get("meta", {})
+            channel_id = meta.get("channel_id", "unknown")
+            sender_id = meta.get("sender_id", meta.get("sender", "anonymous"))
+            reason = message.get("content", {}).get("data", {}).get("reason", "normal")
+            
+            # Log the close event
+            logger.info(f"Channel {channel_id} close requested by {sender_id} with reason: {reason}")
+            
+            # Send acknowledgment
+            response = {
+                "meta": {
+                    "message_id": str(uuid.uuid4()),
+                    "sender": self.authed.agent_id,
+                    "recipient": sender_id,
+                    "timestamp": self._get_iso_timestamp(),
+                    "sequence": 1,
+                    "channel_id": channel_id,
+                    "reply_to": meta.get("message_id", "")
+                },
+                "content": {
+                    "type": MessageType.CHANNEL_CLOSE,
+                    "data": {
+                        "acknowledged": True,
+                        "reason": reason
+                    }
                 }
             }
-        }
-        
-        try:
-            await websocket.send(json.dumps(response))
-            logger.debug(f"Sent close acknowledgment for channel {channel_id}")
+            
+            try:
+                # Check if this is a FastAPI WebSocket (has send_json method)
+                if hasattr(websocket, 'send_json'):
+                    await websocket.send_json(response)
+                elif hasattr(websocket, 'send_text'):
+                    await websocket.send_text(json.dumps(response))
+                else:
+                    # Fallback to standard WebSocket
+                    await websocket.send(json.dumps(response))
+                    
+                logger.debug(f"Sent close acknowledgment for channel {channel_id}")
+            except Exception as e:
+                logger.warning(f"Failed to send close acknowledgment: {str(e)}")
+            
+            # Remove from active connections
+            self.active_connections.pop(channel_id, None)
         except Exception as e:
-            logger.warning(f"Failed to send close acknowledgment: {str(e)}")
-        
-        # Remove from active connections
-        self.active_connections.pop(channel_id, None)
+            logger.error(f"Error in _handle_channel_close: {str(e)}", exc_info=True)
+            raise
         
     async def _handle_heartbeat(self, websocket, message):
         """Handle heartbeat message."""
-        # Extract information
-        meta = message.get("meta", {})
-        channel_id = meta.get("channel_id", "unknown")
-        sender_id = meta.get("sender_id", meta.get("sender", "anonymous"))
-        recipient_id = meta.get("recipient_id", meta.get("recipient", self.authed.agent_id))
-        
-        # Create response
-        response = {
-            "meta": {
-                "message_id": str(uuid.uuid4()),
-                "sender": self.authed.agent_id,
-                "recipient": sender_id,
-                "timestamp": self._get_iso_timestamp(),
-                "sequence": 0,
-                "channel_id": channel_id,
-                "reply_to": meta.get("message_id", "")
-            },
-            "content": {
-                "type": MessageType.HEARTBEAT,
-                "data": {}
-            }
-        }
-        
-        await websocket.send(json.dumps(response))
-        
-    async def _send_error(self, websocket, error_message, reply_to=None, sender_id=None):
-        """Send an error message.
-        
-        Args:
-            websocket: The WebSocket connection
-            error_message: The error message to send
-            reply_to: Optional message ID to reply to
-            sender_id: Optional sender ID if known
-        """
-        error = {
-            "meta": {
-                "message_id": str(uuid.uuid4()),
-                "sender": self.authed.agent_id,
-                "recipient": sender_id or "anonymous",  # Use sender_id if available
-                "timestamp": self._get_iso_timestamp(),
-                "sequence": 0,
-                "channel_id": "error",
-                "reply_to": reply_to
-            },
-            "content": {
-                "type": MessageType.ERROR,
-                "data": {
-                    "message": error_message
+        try:
+            # Extract information
+            meta = message.get("meta", {})
+            channel_id = meta.get("channel_id", "unknown")
+            sender_id = meta.get("sender_id", meta.get("sender", "anonymous"))
+            
+            # Create response
+            response = {
+                "meta": {
+                    "message_id": str(uuid.uuid4()),
+                    "sender": self.authed.agent_id,
+                    "recipient": sender_id,
+                    "timestamp": self._get_iso_timestamp(),
+                    "sequence": 0,
+                    "channel_id": channel_id,
+                    "reply_to": meta.get("message_id", "")
+                },
+                "content": {
+                    "type": MessageType.HEARTBEAT,
+                    "data": {}
                 }
             }
-        }
+            
+            # Check if this is a FastAPI WebSocket (has send_json method)
+            if hasattr(websocket, 'send_json'):
+                await websocket.send_json(response)
+            elif hasattr(websocket, 'send_text'):
+                await websocket.send_text(json.dumps(response))
+            else:
+                # Fallback to standard WebSocket
+                await websocket.send(json.dumps(response))
+        except Exception as e:
+            logger.error(f"Error in _handle_heartbeat: {str(e)}", exc_info=True)
+            raise
         
-        await websocket.send(json.dumps(error))
+    async def _send_error(self, websocket, error_message, reply_to=None, sender_id="anonymous"):
+        """Send an error message to the client."""
+        try:
+            # Check if the WebSocket is still open before sending
+            if hasattr(websocket, 'client_state'):
+                from starlette.websockets import WebSocketState
+                if websocket.client_state == WebSocketState.DISCONNECTED:
+                    logger.debug("WebSocket is already disconnected, not sending error message")
+                    return
+            
+            error = {
+                "meta": {
+                    "message_id": str(uuid.uuid4()),
+                    "sender": self.authed.agent_id,
+                    "recipient": sender_id,
+                    "timestamp": self._get_iso_timestamp(),
+                    "sequence": 0,
+                    "channel_id": "error",
+                    "reply_to": reply_to
+                },
+                "content": {
+                    "type": MessageType.ERROR,
+                    "data": {
+                        "message": error_message
+                    }
+                }
+            }
+            
+            # Check if this is a FastAPI WebSocket (has send_json method)
+            if hasattr(websocket, 'send_json'):
+                await websocket.send_json(error)
+            elif hasattr(websocket, 'send_text'):
+                await websocket.send_text(json.dumps(error))
+            else:
+                # Fallback to standard WebSocket
+                await websocket.send(json.dumps(error))
+        except Exception as e:
+            logger.error(f"Error sending error message: {str(e)}", exc_info=True)
         
     def _get_iso_timestamp(self):
         """Get current time as ISO 8601 string."""
