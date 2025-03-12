@@ -26,9 +26,11 @@ from .exceptions import (
     ProtocolError
 )
 from .config import AuthedConfig
+
 # Channel imports
-from .channel.utils import AgentChannel
-from .channel.protocol import MessageType
+from .channel.protocol import MessageType, ChannelState, AgentChannelProtocol
+from .channel.utils import ChannelUtilities
+from .channel.websocket import WebSocketChannel
 from .channel.manager import ChannelManager
 from .server.websocket import WebSocketHandler
 
@@ -64,8 +66,11 @@ __all__ = [
     "AuthedConfig",
     
     # Channel functionality
-    "AgentChannel",
     "MessageType",
+    "ChannelState",
+    "AgentChannelProtocol",
+    "ChannelUtilities",
+    "WebSocketChannel",
     "ChannelManager",
     "WebSocketHandler"
 ] 
