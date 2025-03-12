@@ -72,9 +72,10 @@ class WebSocketChannel(ChannelUtilities):
             
             try:
                 # Connect with authentication
+                headers = {"Authorization": f"Bearer {token}"}
                 self.ws_connection = await websockets.connect(
                     websocket_url,
-                    extra_headers={"Authorization": f"Bearer {token}"}
+                    additional_headers=headers
                 )
                 
                 self._target_agent_id = target_agent_id
@@ -167,7 +168,7 @@ class WebSocketChannel(ChannelUtilities):
             
             try:
                 # Send close message if connection is still open
-                if self.ws_connection and self.ws_connection.open:
+                if self.ws_connection and (hasattr(self.ws_connection, 'open') and self.ws_connection.open):
                     try:
                         await self.send_message(
                             MessageType.CHANNEL_CLOSE,
@@ -195,6 +196,7 @@ class WebSocketChannel(ChannelUtilities):
     def is_connected(self) -> bool:
         """Check if WebSocket is connected."""
         return (self.ws_connection is not None and 
+                hasattr(self.ws_connection, 'open') and
                 self.ws_connection.open and 
                 self._state == ChannelState.CONNECTED)
                 
@@ -235,7 +237,7 @@ class WebSocketChannel(ChannelUtilities):
     async def _receiver_loop(self) -> None:
         """Receive messages and put them in the queue."""
         try:
-            while self.ws_connection and self.ws_connection.open:
+            while self.ws_connection and (hasattr(self.ws_connection, 'open') and self.ws_connection.open or not hasattr(self.ws_connection, 'open')):
                 try:
                     data = await self.ws_connection.recv()
                     message = json.loads(data)
