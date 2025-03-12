@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Callable, Awaitable, Optional
@@ -11,6 +12,16 @@ from ..channel.protocol import MessageType
 from ..exceptions import AuthenticationError
 
 logger = logging.getLogger(__name__)
+
+# Import message recorder only if in test mode
+_TESTING = os.environ.get("AUTHED_TESTING", "0") == "1"
+if _TESTING:
+    try:
+        from ..examples.test_agents.message_recorder import record_outgoing, record_incoming
+        logger.info("Message recording enabled for WebSocketHandler")
+    except ImportError:
+        logger.warning("Message recorder not found, recording disabled")
+        record_outgoing = record_incoming = lambda *args, **kwargs: None
 
 class WebSocketHandler:
     """Handler for incoming WebSocket connections."""
@@ -165,6 +176,11 @@ class WebSocketHandler:
         # Debug log the message structure
         logger.debug(f"Received message: {json.dumps(message, indent=2)}")
         
+        # Record incoming message if in test mode
+        if _TESTING:
+            sender_id = message.get("meta", {}).get("sender_id", message.get("meta", {}).get("sender", "unknown"))
+            record_incoming(message, sender_id, self.authed.agent_id)
+        
         try:
             # Validate message format
             if "meta" not in message or "content" not in message:
@@ -224,6 +240,10 @@ class WebSocketHandler:
                             },
                             "content": response_data
                         }
+                        
+                        # Record outgoing message if in test mode
+                        if _TESTING:
+                            record_outgoing(response, self.authed.agent_id, sender_id)
                         
                         # Check if this is a FastAPI WebSocket (has send_json method)
                         if hasattr(websocket, 'send_json'):
@@ -294,6 +314,10 @@ class WebSocketHandler:
             
             logger.debug(f"Sending channel accept response: {json.dumps(response, indent=2)}")
             
+            # Record outgoing message if in test mode
+            if _TESTING:
+                record_outgoing(response, self.authed.agent_id, sender_id)
+            
             # Check if this is a FastAPI WebSocket (has send_json method)
             if hasattr(websocket, 'send_json'):
                 await websocket.send_json(response)
@@ -340,6 +364,10 @@ class WebSocketHandler:
                 }
             }
             
+            # Record outgoing message if in test mode
+            if _TESTING:
+                record_outgoing(response, self.authed.agent_id, sender_id)
+            
             try:
                 # Check if this is a FastAPI WebSocket (has send_json method)
                 if hasattr(websocket, 'send_json'):
@@ -385,6 +413,10 @@ class WebSocketHandler:
                 }
             }
             
+            # Record outgoing message if in test mode
+            if _TESTING:
+                record_outgoing(response, self.authed.agent_id, sender_id)
+            
             # Check if this is a FastAPI WebSocket (has send_json method)
             if hasattr(websocket, 'send_json'):
                 await websocket.send_json(response)
@@ -424,6 +456,10 @@ class WebSocketHandler:
                     }
                 }
             }
+            
+            # Record outgoing message if in test mode
+            if _TESTING:
+                record_outgoing(error, self.authed.agent_id, sender_id)
             
             # Check if this is a FastAPI WebSocket (has send_json method)
             if hasattr(websocket, 'send_json'):

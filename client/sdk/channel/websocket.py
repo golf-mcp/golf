@@ -3,6 +3,7 @@
 import json
 import asyncio
 import logging
+import os
 from typing import Dict, Any, Optional
 import websockets
 from uuid import UUID
@@ -12,6 +13,16 @@ from .utils import ChannelUtilities
 from .protocol import MessageType, ChannelState
 
 logger = logging.getLogger(__name__)
+
+# Import message recorder only if in test mode
+_TESTING = os.environ.get("AUTHED_TESTING", "0") == "1"
+if _TESTING:
+    try:
+        from ..examples.test_agents.message_recorder import record_outgoing, record_incoming
+        logger.info("Message recording enabled for WebSocketChannel")
+    except ImportError:
+        logger.warning("Message recorder not found, recording disabled")
+        record_outgoing = record_incoming = lambda *args, **kwargs: None
 
 class WebSocketChannel(ChannelUtilities):
     """WebSocket-based agent communication channel.
@@ -134,6 +145,10 @@ class WebSocketChannel(ChannelUtilities):
         )
         
         try:
+            # Record outgoing message if in test mode
+            if _TESTING:
+                record_outgoing(envelope, self._agent_id, self._target_agent_id)
+                
             await self.ws_connection.send(json.dumps(envelope))
             return envelope["meta"]["message_id"]
         except Exception as e:
@@ -246,6 +261,11 @@ class WebSocketChannel(ChannelUtilities):
                     if "meta" not in message or "content" not in message:
                         logger.warning("Received invalid message format")
                         continue
+                    
+                    # Record incoming message if in test mode
+                    if _TESTING:
+                        sender_id = message.get("meta", {}).get("sender", "unknown")
+                        record_incoming(message, sender_id, self._agent_id)
                         
                     # Put message in queue
                     await self._message_queue.put(message)
