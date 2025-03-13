@@ -10,9 +10,9 @@ import logging
 from typing import Dict, Any, Optional, Callable, Awaitable
 from datetime import datetime, timezone
 
-from ..manager import Authed
-from .protocol import MessageType
+# Import WebSocketHandler directly to avoid circular import
 from ..server.websocket import WebSocketHandler
+from .protocol import MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,9 @@ class ChannelAgent:
         self.registry_url = registry_url
         self.private_key = private_key
         self.public_key = public_key
+        
+        # Import Authed here to avoid circular import
+        from ..manager import Authed
         
         # Initialize the SDK
         self.sdk = Authed.initialize(

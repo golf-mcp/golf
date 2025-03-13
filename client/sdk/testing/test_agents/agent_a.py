@@ -1,6 +1,5 @@
 """Test Agent A for WebSocket channel testing."""
 
-import asyncio
 import logging
 import os
 import sys
