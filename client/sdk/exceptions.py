@@ -21,4 +21,21 @@ class RegistryError(AgentAuthError):
 
 class DPoPError(AgentAuthError):
     """Raised when DPoP operations fail."""
+    pass
+
+# Channel-specific exceptions
+class ChannelError(AgentAuthError):
+    """Base exception for all channel-related errors."""
+    pass
+
+class ConnectionError(ChannelError):
+    """Raised when connection operations fail."""
+    pass
+
+class MessageError(ChannelError):
+    """Raised when message operations fail."""
+    pass
+
+class ProtocolError(ChannelError):
+    """Raised when protocol violations occur."""
     pass 
