@@ -7,7 +7,7 @@ minimal boilerplate.
 
 import asyncio
 import logging
-from typing import Dict, Any, Optional, Callable, Awaitable
+from typing import Dict, Any, Optional, Callable, Awaitable, ClassVar
 from datetime import datetime, timezone
 
 # Import WebSocketHandler directly to avoid circular import
@@ -24,7 +24,14 @@ class ChannelAgent:
     
     This class provides a high-level interface for setting up an agent that can
     communicate with other agents via WebSocket channels.
+    
+    The ChannelAgent uses a persistent Authed instance to maintain connections
+    across multiple operations, ensuring that channels remain active even when
+    the agent is processing messages or calling other tools.
     """
+    
+    # Class variable to store Authed instances by registry URL and agent ID
+    _authed_instances: ClassVar[Dict[str, Any]] = {}
     
     def __init__(
         self,
@@ -54,14 +61,25 @@ class ChannelAgent:
         # Import Authed here to avoid circular import
         from ..manager import Authed
         
-        # Initialize the SDK
-        self.sdk = Authed.initialize(
-            registry_url=registry_url,
-            agent_id=agent_id,
-            agent_secret=agent_secret,
-            private_key=private_key,
-            public_key=public_key
-        )
+        # Create a unique key for this agent's Authed instance
+        instance_key = f"{registry_url}:{agent_id}"
+        
+        # Check if we already have an Authed instance for this agent
+        if instance_key in self._authed_instances:
+            logger.debug(f"Reusing existing Authed instance for agent {agent_id}")
+            self.sdk = self._authed_instances[instance_key]
+        else:
+            # Initialize a new SDK instance
+            logger.debug(f"Creating new Authed instance for agent {agent_id}")
+            self.sdk = Authed.initialize(
+                registry_url=registry_url,
+                agent_id=agent_id,
+                agent_secret=agent_secret,
+                private_key=private_key,
+                public_key=public_key
+            )
+            # Store the instance for future use
+            self._authed_instances[instance_key] = self.sdk
         
         # Create WebSocket handler
         self.ws_handler = WebSocketHandler(authed_sdk=self.sdk)
