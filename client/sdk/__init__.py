@@ -33,7 +33,7 @@ from .channel.utils import ChannelUtilities
 from .channel.websocket import WebSocketChannel
 from .channel.manager import ChannelManager
 from .server.websocket import WebSocketHandler
-from .channel.agent import ChannelAgent, FastAPIAgen
+from .channel.agent import ChannelAgent
 
 __version__ = "0.1.0"
 __all__ = [

@@ -13,9 +13,7 @@ from typing import Dict, Any
 # Make sure the local development version takes precedence
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
-from client.sdk.manager import Authed
-from client.sdk.channel.protocol import MessageType
-from client.sdk.server.websocket import WebSocketHandler
+from client.sdk import ChannelAgent, MessageType
 
 # Configure logging
 logging.basicConfig(
@@ -52,49 +50,24 @@ if not PRIVATE_KEY or not PUBLIC_KEY:
         key_size=2048
     )
     
-    # Get the public key
-    public_key = private_key.public_key()
-    
-    # Serialize the private key to PEM format
+    # Get the private key in PEM format
     PRIVATE_KEY = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     ).decode('utf-8')
     
-    # Serialize the public key to PEM format
-    PUBLIC_KEY = public_key.public_bytes(
+    # Get the public key in PEM format
+    PUBLIC_KEY = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     ).decode('utf-8')
     
-    logger.info("Key pair generated successfully")
+    logger.info("Generated new key pair for Agent B")
 
-# Initialize the SDK
-logger.info(f"Initializing SDK for Agent B with ID: {AGENT_ID}")
-logger.info(f"Using registry URL: {REGISTRY_URL}")
-
-try:
-    sdk = Authed.initialize(
-        registry_url=REGISTRY_URL,
-        agent_id=AGENT_ID,
-        agent_secret=AGENT_SECRET,
-        private_key=PRIVATE_KEY,
-        public_key=PUBLIC_KEY
-    )
-    logger.info("SDK initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize SDK: {str(e)}")
-    sys.exit(1)
-
-# Create WebSocket handler
-ws_handler = WebSocketHandler(authed_sdk=sdk)
-
-# Message handlers
+# Create a custom message handler
 async def handle_text_message(message: Dict[str, Any]) -> Dict[str, Any]:
     """Handle text messages."""
-    logger.info(f"Received text message: {message}")
-    
     # Extract message content
     content_data = message["content"]["data"]
     text = content_data.get("text", "No text provided")
@@ -102,7 +75,7 @@ async def handle_text_message(message: Dict[str, Any]) -> Dict[str, Any]:
     # Create response
     response_data = {
         "text": f"Agent B received: {text}",
-        "timestamp": ws_handler._get_iso_timestamp()
+        "timestamp": agent.get_iso_timestamp()
     }
     
     return {
@@ -110,9 +83,19 @@ async def handle_text_message(message: Dict[str, Any]) -> Dict[str, Any]:
         "data": response_data
     }
 
-# Register message handlers
-ws_handler.register_handler(MessageType.REQUEST, handle_text_message)
+# Create the agent using ChannelAgent
+agent = ChannelAgent(
+    agent_id=AGENT_ID,
+    agent_secret=AGENT_SECRET,
+    registry_url=REGISTRY_URL,
+    private_key=PRIVATE_KEY,
+    public_key=PUBLIC_KEY,
+    handlers={
+        MessageType.REQUEST: handle_text_message
+    }
+)
 
+# Set up the WebSocket endpoint
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for agent communication."""
@@ -121,7 +104,7 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         # Handle the WebSocket connection
-        await ws_handler.handle_connection(websocket, "/ws")
+        await agent.handle_websocket(websocket, "/ws")
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
     except Exception as e:
@@ -144,62 +127,28 @@ async def connect_to_agent_a():
         
         logger.info(f"Connecting to Agent A ({target_agent_id}) at {websocket_url}")
         
-        # Connect to Agent A
-        channel = await sdk.channels.connect_to_agent(
+        # Send a text message to Agent A
+        response = await agent.send_text_message(
             target_agent_id=target_agent_id,
-            channel_type="websocket",
-            websocket_url=websocket_url
+            websocket_url=websocket_url,
+            text="Hello from Agent B!"
         )
         
-        logger.info(f"Connected to Agent A ({target_agent_id})")
-        
-        # Send a message
-        message_content = {
-            "text": f"Hello from Agent B ({AGENT_ID})!",
-            "timestamp": channel._get_iso_timestamp()
-        }
-        
-        message_id = await channel.send_message(
-            content_type=MessageType.REQUEST,
-            content_data=message_content
-        )
-        
-        logger.info(f"Sent message to Agent A with ID: {message_id}")
-        
-        # Wait for a response with timeout
-        logger.info("Waiting for response from Agent A...")
-        try:
-            response = await asyncio.wait_for(
-                channel.receive_message(),
-                timeout=10.0
-            )
+        # Process the response
+        if response and "content" in response:
+            content_type = response["content"].get("type")
+            content_data = response["content"].get("data", {})
             
-            logger.info(f"Received response from Agent A: {response}")
-            
-            # Process the response
-            if response and "content" in response:
-                content_type = response["content"].get("type")
-                content_data = response["content"].get("data", {})
-                
-                # Close the channel
-                await channel.close("test_complete")
-                logger.info("Channel to Agent A closed")
-                
-                # Return the response
-                return {
-                    "status": "success",
-                    "message_sent": message_content,
-                    "response_received": {
-                        "type": content_type,
-                        "data": content_data
-                    }
-                }
-                
-        except asyncio.TimeoutError:
-            await channel.close("timeout")
+            return {
+                "status": "success",
+                "message_sent": "Hello from Agent B!",
+                "response_type": content_type,
+                "response_data": content_data
+            }
+        else:
             return {
                 "status": "error",
-                "error": "Timeout waiting for response from Agent A"
+                "error": "No valid response received"
             }
             
     except Exception as e:
@@ -215,8 +164,7 @@ async def health_check():
     return {
         "status": "healthy",
         "agent_id": AGENT_ID,
-        "service": "Agent B",
-        "registry_url": REGISTRY_URL
+        "service": "Test Agent B"
     }
 
 if __name__ == "__main__":
