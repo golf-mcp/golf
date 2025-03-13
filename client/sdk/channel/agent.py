@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # Type for message handlers
 MessageHandler = Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]
 
-class Agent:
+class ChannelAgent:
     """Simplified agent wrapper for WebSocket channel communication.
     
     This class provides a high-level interface for setting up an agent that can

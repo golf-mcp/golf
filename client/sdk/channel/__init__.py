@@ -13,7 +13,7 @@ from .websocket import WebSocketChannel
 from .manager import ChannelManager
 
 # Import agent wrapper
-from .agent import Agent, FastAPIAgent
+from .agent import ChannelAgent
 
 __all__ = [
     "MessageType",
@@ -22,6 +22,5 @@ __all__ = [
     "ChannelUtilities",
     "WebSocketChannel",
     "ChannelManager",
-    "Agent",
-    "FastAPIAgent"
+    "ChannelAgent"
 ] 
