@@ -35,54 +35,83 @@ class ChannelAgent:
     
     def __init__(
         self,
-        agent_id: str,
-        agent_secret: str,
+        agent_id: str = None,
+        agent_secret: str = None,
         registry_url: str = "https://api.getauthed.dev",
         private_key: Optional[str] = None,
         public_key: Optional[str] = None,
-        handlers: Optional[Dict[str, MessageHandler]] = None
+        handlers: Optional[Dict[str, MessageHandler]] = None,
+        authed_sdk: Optional[Any] = None
     ):
         """Initialize the agent.
         
         Args:
-            agent_id: ID of this agent
-            agent_secret: Secret for this agent
+            agent_id: ID of this agent (required if authed_sdk not provided)
+            agent_secret: Secret for this agent (required if authed_sdk not provided)
             registry_url: URL of the registry service (default: production)
             private_key: Optional private key for this agent
             public_key: Optional public key for this agent
             handlers: Optional dictionary of message type to handler functions
+            authed_sdk: Optional existing Authed SDK instance to use
         """
-        self.agent_id = agent_id
-        self.agent_secret = agent_secret
         self.registry_url = registry_url
-        self.private_key = private_key
-        self.public_key = public_key
         
-        # Import Authed here to avoid circular import
-        from ..manager import Authed
-        
-        # Create a unique key for this agent's Authed instance
-        instance_key = f"{registry_url}:{agent_id}"
-        
-        # Check if we already have an Authed instance for this agent
-        if instance_key in self._authed_instances:
-            logger.debug(f"Reusing existing Authed instance for agent {agent_id}")
-            self.sdk = self._authed_instances[instance_key]
+        # Set up the SDK instance
+        if authed_sdk:
+            # Use the provided SDK instance
+            logger.debug("Using provided Authed instance")
+            self.sdk = authed_sdk
+            self.agent_id = self.sdk.agent_id
+            self.agent_secret = None  # Don't store the secret if using existing instance
+            self.private_key = None   # Don't store the keys if using existing instance
+            self.public_key = None
         else:
-            # Initialize a new SDK instance
-            logger.debug(f"Creating new Authed instance for agent {agent_id}")
-            self.sdk = Authed.initialize(
-                registry_url=registry_url,
-                agent_id=agent_id,
-                agent_secret=agent_secret,
-                private_key=private_key,
-                public_key=public_key
-            )
-            # Store the instance for future use
-            self._authed_instances[instance_key] = self.sdk
+            # Validate required parameters
+            if not agent_id or not agent_secret:
+                raise ValueError("agent_id and agent_secret are required when authed_sdk is not provided")
+                
+            self.agent_id = agent_id
+            self.agent_secret = agent_secret
+            self.private_key = private_key
+            self.public_key = public_key
+            
+            # Import Authed here to avoid circular import
+            from ..manager import Authed
+            
+            # Create a unique key for this agent's Authed instance
+            instance_key = f"{registry_url}:{agent_id}"
+            
+            # Check if we already have an Authed instance for this agent
+            if instance_key in self._authed_instances:
+                logger.debug(f"Reusing existing Authed instance for agent {agent_id}")
+                self.sdk = self._authed_instances[instance_key]
+            else:
+                # Initialize a new SDK instance
+                logger.debug(f"Creating new Authed instance for agent {agent_id}")
+                self.sdk = Authed.initialize(
+                    registry_url=registry_url,
+                    agent_id=agent_id,
+                    agent_secret=agent_secret,
+                    private_key=private_key,
+                    public_key=public_key
+                )
+                # Store the instance for future use
+                self._authed_instances[instance_key] = self.sdk
         
         # Create WebSocket handler
         self.ws_handler = WebSocketHandler(authed_sdk=self.sdk)
+        
+        # Dictionary to store active channels
+        self._channels: Dict[str, Any] = {}
+        
+        # Register default text message handler if none is provided for REQUEST type
+        if not handlers or MessageType.REQUEST not in handlers:
+            default_handler = self.create_text_message_handler()
+            if not handlers:
+                handlers = {MessageType.REQUEST: default_handler}
+            else:
+                handlers[MessageType.REQUEST] = default_handler
+            logger.debug("Registered default text message handler")
         
         # Register message handlers
         if handlers:
@@ -98,13 +127,13 @@ class ChannelAgent:
         """
         self.ws_handler.register_handler(message_type, handler)
     
-    async def connect_to_agent(
+    async def open_channel(
         self,
         target_agent_id: str,
         websocket_url: str,
         **kwargs
     ) -> Any:
-        """Connect to another agent.
+        """Open a channel to another agent.
         
         Args:
             target_agent_id: ID of the target agent
@@ -114,12 +143,51 @@ class ChannelAgent:
         Returns:
             Channel object for communication
         """
-        return await self.sdk.channels.connect_to_agent(
+        # Create a channel key
+        channel_key = f"{target_agent_id}:{websocket_url}"
+        
+        # Check if we already have this channel
+        if channel_key in self._channels:
+            channel = self._channels[channel_key]
+            if channel.is_connected:
+                logger.debug(f"Reusing existing channel to {target_agent_id}")
+                return channel
+            else:
+                logger.debug(f"Existing channel to {target_agent_id} is disconnected")
+                # Remove the disconnected channel
+                del self._channels[channel_key]
+        
+        # Connect to the agent
+        logger.debug(f"Opening new channel to {target_agent_id}")
+        channel = await self.sdk.channels.connect_to_agent(
             target_agent_id=target_agent_id,
             channel_type="websocket",
             websocket_url=websocket_url,
             **kwargs
         )
+        
+        # Store the channel
+        self._channels[channel_key] = channel
+        
+        return channel
+    
+    def get_channel(self, target_agent_id: str, websocket_url: str) -> Optional[Any]:
+        """Get an existing channel if it exists.
+        
+        Args:
+            target_agent_id: ID of the target agent
+            websocket_url: WebSocket URL of the target agent
+            
+        Returns:
+            Channel object or None if not found
+        """
+        channel_key = f"{target_agent_id}:{websocket_url}"
+        channel = self._channels.get(channel_key)
+        
+        if channel and channel.is_connected:
+            return channel
+        
+        return None
     
     async def send_message(
         self,
@@ -139,6 +207,9 @@ class ChannelAgent:
         Returns:
             ID of the sent message
         """
+        if not content_data.get("timestamp"):
+            content_data["timestamp"] = self.get_iso_timestamp()
+            
         return await channel.send_message(
             content_type=content_type,
             content_data=content_data,
@@ -148,13 +219,13 @@ class ChannelAgent:
     async def receive_message(
         self,
         channel,
-        timeout: float = 10.0
+        timeout: Optional[float] = None
     ) -> Optional[Dict[str, Any]]:
-        """Receive a message on a channel with timeout.
+        """Receive a message on a channel.
         
         Args:
             channel: Channel to receive the message on
-            timeout: Timeout in seconds
+            timeout: Optional timeout in seconds (None for no timeout)
             
         Returns:
             Received message or None if timeout
@@ -162,10 +233,13 @@ class ChannelAgent:
         Raises:
             asyncio.TimeoutError: If no message is received within the timeout
         """
-        return await asyncio.wait_for(
-            channel.receive_message(),
-            timeout=timeout
-        )
+        if timeout is not None:
+            return await asyncio.wait_for(
+                channel.receive_message(),
+                timeout=timeout
+            )
+        else:
+            return await channel.receive_message()
     
     async def close_channel(
         self,
@@ -178,99 +252,27 @@ class ChannelAgent:
             channel: Channel to close
             reason: Reason for closing the channel
         """
+        # Remove from channels dict
+        for key, value in list(self._channels.items()):
+            if value == channel:
+                del self._channels[key]
+                break
+                
         await channel.close(reason)
     
-    async def send_and_receive(
-        self,
-        target_agent_id: str,
-        websocket_url: str,
-        content_type: str,
-        content_data: Dict[str, Any],
-        timeout: float = 10.0,
-        auto_close: bool = True
-    ) -> Dict[str, Any]:
-        """Send a message to an agent and wait for a response.
-        
-        This is a convenience method that combines connect, send, receive, and close.
+    async def close_all_channels(self, reason: str = "agent_shutdown") -> None:
+        """Close all open channels.
         
         Args:
-            target_agent_id: ID of the target agent
-            websocket_url: WebSocket URL of the target agent
-            content_type: Type of message to send
-            content_data: Message content data
-            timeout: Timeout in seconds for receiving the response
-            auto_close: Whether to automatically close the channel after receiving
-            
-        Returns:
-            Response message
-            
-        Raises:
-            ConnectionError: If connection fails
-            TimeoutError: If no response is received within the timeout
+            reason: Reason for closing the channels
         """
-        # Connect to the agent
-        channel = await self.connect_to_agent(
-            target_agent_id=target_agent_id,
-            websocket_url=websocket_url
-        )
+        for channel in list(self._channels.values()):
+            try:
+                await channel.close(reason)
+            except Exception as e:
+                logger.error(f"Error closing channel: {e}")
         
-        try:
-            # Send the message
-            await self.send_message(
-                channel=channel,
-                content_type=content_type,
-                content_data=content_data
-            )
-            
-            # Wait for a response
-            response = await self.receive_message(
-                channel=channel,
-                timeout=timeout
-            )
-            
-            return response
-        finally:
-            # Close the channel if auto_close is True
-            if auto_close:
-                await self.close_channel(channel, "send_and_receive_complete")
-    
-    async def send_text_message(
-        self,
-        target_agent_id: str,
-        websocket_url: str,
-        text: str,
-        timeout: float = 10.0,
-        auto_close: bool = True
-    ) -> Dict[str, Any]:
-        """Send a simple text message to an agent and wait for a response.
-        
-        This is a convenience method for sending text messages.
-        
-        Args:
-            target_agent_id: ID of the target agent
-            websocket_url: WebSocket URL of the target agent
-            text: Text message to send
-            timeout: Timeout in seconds for receiving the response
-            auto_close: Whether to automatically close the channel after receiving
-            
-        Returns:
-            Response message
-        """
-        # Create message content
-        content_data = {
-            "text": text,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-        
-        # Send and receive
-        return await self.send_and_receive(
-            target_agent_id=target_agent_id,
-            websocket_url=websocket_url,
-            content_type=MessageType.REQUEST,
-            content_data=content_data,
-            timeout=timeout,
-            auto_close=auto_close
-        )
+        self._channels.clear()
     
     def get_iso_timestamp(self) -> str:
         """Get current ISO 8601 timestamp with timezone.
@@ -292,27 +294,22 @@ class ChannelAgent:
         await self.ws_handler.handle_connection(websocket, path)
     
     @staticmethod
-    def create_text_message_handler(
-        response_prefix: str = "Received: "
-    ) -> MessageHandler:
+    def create_text_message_handler() -> MessageHandler:
         """Create a simple text message handler.
         
-        This is a convenience method for creating a handler for text messages.
+        This handler echoes back the received text message.
         
-        Args:
-            response_prefix: Prefix to add to the response text
-            
         Returns:
             Message handler function
         """
         async def handle_text_message(message: Dict[str, Any]) -> Dict[str, Any]:
-            # Extract message content
+            # Extract text from the message
             content_data = message["content"]["data"]
-            text = content_data.get("text", "No text provided")
+            text = content_data.get("text", "")
             
-            # Create response
+            # Create a simple echo response
             response_data = {
-                "text": f"{response_prefix}{text}",
+                "text": text,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             
@@ -322,3 +319,26 @@ class ChannelAgent:
             }
         
         return handle_text_message
+    
+    @classmethod
+    def from_authed(
+        cls,
+        authed_sdk: Any,
+        handlers: Optional[Dict[str, MessageHandler]] = None
+    ) -> "ChannelAgent":
+        """Create a ChannelAgent from an existing Authed instance.
+        
+        This is a convenience method for creating a ChannelAgent from an existing
+        Authed instance.
+        
+        Args:
+            authed_sdk: Existing Authed SDK instance
+            handlers: Optional dictionary of message type to handler functions
+            
+        Returns:
+            ChannelAgent instance
+        """
+        return cls(
+            authed_sdk=authed_sdk,
+            handlers=handlers
+        )
