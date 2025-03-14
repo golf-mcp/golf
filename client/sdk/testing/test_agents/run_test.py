@@ -309,7 +309,8 @@ def load_credentials(file_path: str) -> dict:
     try:
         with open(file_path, 'r') as f:
             creds = json.load(f)
-            # Return credentials in the expected format
+            
+            # Transform the credentials into the expected format
             return {
                 "agent_a_id": creds.get("agent_a_id"),
                 "agent_a_secret": creds.get("agent_a_secret"),

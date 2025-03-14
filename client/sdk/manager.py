@@ -1,7 +1,7 @@
 """Global manager for Authed SDK."""
 
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .config import AuthedConfig
 from .auth import AgentAuth
@@ -102,4 +102,27 @@ class Authed:
                 agent_id=self._auth._agent_id,
                 auth_handler=self._auth
             )
-        return self._channel_manager 
+        return self._channel_manager
+        
+    def create_channel_agent(
+        self,
+        handlers: Optional[Dict[str, Any]] = None
+    ) -> Any:
+        """Create a ChannelAgent instance from this Authed instance.
+        
+        This is a convenience method for creating a ChannelAgent that uses
+        this Authed instance for communication.
+        
+        Args:
+            handlers: Optional dictionary of message type to handler functions
+            
+        Returns:
+            ChannelAgent instance
+        """
+        # Import here to avoid circular import
+        from .channel.agent import ChannelAgent
+        
+        return ChannelAgent.from_authed(
+            authed_sdk=self,
+            handlers=handlers
+        ) 
