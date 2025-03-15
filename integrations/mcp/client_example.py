@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import pathlib
+import sys
 
 from adapter import AuthedMCPClient
 
@@ -51,26 +52,38 @@ async def main():
     )
     
     # Define server command and args
-    server_command = "python"
+    server_command = sys.executable  # Use the current Python interpreter
     
-    # Get the absolute path to the server_example.py file
-    server_script = str(pathlib.Path(__file__).parent / "server_example.py")
-    server_args = [server_script]
+    # Get the absolute path to the run_server.py file
+    server_script = str(pathlib.Path(__file__).parent / "run_server.py")
+    server_args = [server_script]  # This must be a list
     
     try:
         # List resources
         logger.info("Listing resources...")
-        resources = await client.list_resources(server_command, server_args, server_agent_id)
+        resources = await client.list_resources(
+            server_command=server_command,
+            server_args=server_args,
+            server_agent_id=server_agent_id
+        )
         logger.info(f"Resources: {resources}")
         
         # List tools
         logger.info("Listing tools...")
-        tools = await client.list_tools(server_command, server_args, server_agent_id)
+        tools = await client.list_tools(
+            server_command=server_command,
+            server_args=server_args,
+            server_agent_id=server_agent_id
+        )
         logger.info(f"Tools: {tools}")
         
         # List prompts
         logger.info("Listing prompts...")
-        prompts = await client.list_prompts(server_command, server_args, server_agent_id)
+        prompts = await client.list_prompts(
+            server_command=server_command,
+            server_args=server_args,
+            server_agent_id=server_agent_id
+        )
         logger.info(f"Prompts: {prompts}")
         
         # Call a tool

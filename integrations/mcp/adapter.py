@@ -96,11 +96,10 @@ class AuthedMCPServer:
         """
         return self.mcp.prompt(name)
     
-    async def run(self):
-        """Run the MCP server using stdio transport."""
-        # Run the MCP server with stdio transport
-        async with stdio.stdio_server() as (read_stream, write_stream):
-            await self.mcp.run(read_stream, write_stream)
+    def run(self):
+        """Run the MCP server."""
+        # Don't use async here, let the MCP server handle its own event loop
+        return self.mcp.run()
 
 
 class AuthedMCPClient:
