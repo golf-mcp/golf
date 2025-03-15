@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 # Make sure the local development version takes precedence
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
-from client.sdk.channel import ChannelAgent
+from client.sdk.channel import Channel
 from client.sdk.channel.protocol import MessageType
 
 # Configure logging
@@ -86,7 +86,7 @@ async def handle_text_message(message: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 # Create the agent
-agent = ChannelAgent(
+agent = Channel(
     agent_id=AGENT_ID,
     agent_secret=AGENT_SECRET,
     registry_url=REGISTRY_URL,

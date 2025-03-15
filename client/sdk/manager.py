@@ -104,25 +104,25 @@ class Authed:
             )
         return self._channel_manager
         
-    def create_channel_agent(
+    def create_channel(
         self,
         handlers: Optional[Dict[str, Any]] = None
     ) -> Any:
-        """Create a ChannelAgent instance from this Authed instance.
+        """Create a Channel instance from this Authed instance.
         
-        This is a convenience method for creating a ChannelAgent that uses
+        This is a convenience method for creating a Channel that uses
         this Authed instance for communication.
         
         Args:
             handlers: Optional dictionary of message type to handler functions
             
         Returns:
-            ChannelAgent instance
+            Channel instance
         """
         # Import here to avoid circular import
-        from .channel.agent import ChannelAgent
+        from .channel.channel import Channel
         
-        return ChannelAgent.from_authed(
+        return Channel.from_authed(
             authed_sdk=self,
             handlers=handlers
         ) 

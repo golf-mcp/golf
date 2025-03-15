@@ -12,8 +12,8 @@ from .websocket import WebSocketChannel
 # Import channel manager
 from .manager import ChannelManager
 
-# Import agent wrapper
-from .agent import ChannelAgent
+# Import channel wrapper
+from .channel import Channel
 
 __all__ = [
     "MessageType",
@@ -22,5 +22,5 @@ __all__ = [
     "ChannelUtilities",
     "WebSocketChannel",
     "ChannelManager",
-    "ChannelAgent"
+    "Channel"
 ] 

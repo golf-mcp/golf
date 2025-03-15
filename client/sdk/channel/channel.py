@@ -1,4 +1,4 @@
-"""Simplified agent wrapper for WebSocket channel communication.
+"""Simplified channel wrapper for WebSocket communication.
 
 This module provides a high-level wrapper around the Authed SDK's WebSocket
 channel functionality, making it easy to set up agent communication with
@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 # Type for message handlers
 MessageHandler = Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]
 
-class ChannelAgent:
-    """Simplified agent wrapper for WebSocket channel communication.
+class Channel:
+    """Simplified channel wrapper for WebSocket communication.
     
-    This class provides a high-level interface for setting up an agent that can
-    communicate with other agents via WebSocket channels.
+    This class provides a high-level interface for setting up a channel that can
+    communicate with other agents via WebSocket connections.
     
-    The ChannelAgent uses a persistent Authed instance to maintain connections
+    The Channel uses a persistent Authed instance to maintain connections
     across multiple operations, ensuring that channels remain active even when
     the agent is processing messages or calling other tools.
     """
@@ -43,7 +43,7 @@ class ChannelAgent:
         handlers: Optional[Dict[str, MessageHandler]] = None,
         authed_sdk: Optional[Any] = None
     ):
-        """Initialize the agent.
+        """Initialize the channel.
         
         Args:
             agent_id: ID of this agent (required if authed_sdk not provided)
@@ -325,10 +325,10 @@ class ChannelAgent:
         cls,
         authed_sdk: Any,
         handlers: Optional[Dict[str, MessageHandler]] = None
-    ) -> "ChannelAgent":
-        """Create a ChannelAgent from an existing Authed instance.
+    ) -> "Channel":
+        """Create a Channel from an existing Authed instance.
         
-        This is a convenience method for creating a ChannelAgent from an existing
+        This is a convenience method for creating a Channel from an existing
         Authed instance.
         
         Args:
@@ -336,7 +336,7 @@ class ChannelAgent:
             handlers: Optional dictionary of message type to handler functions
             
         Returns:
-            ChannelAgent instance
+            Channel instance
         """
         return cls(
             authed_sdk=authed_sdk,
