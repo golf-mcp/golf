@@ -35,16 +35,16 @@ class AuthedMCPServerMiddleware(BaseHTTPMiddleware):
     before forwarding requests to the MCP server.
     """
     
-    def __init__(self, app, authed: Authed):
+    def __init__(self, app, authed_auth):
         """
-        Initialize the middleware with an Authed client.
+        Initialize the middleware with an Authed auth handler.
         
         Args:
             app: The FastAPI/Starlette app
-            authed: Initialized Authed client
+            authed_auth: Initialized Authed auth handler
         """
         super().__init__(app)
-        self.authed = authed
+        self.authed_auth = authed_auth
     
     async def authenticate_request(self, request: Request) -> Optional[str]:
         """
@@ -56,20 +56,32 @@ class AuthedMCPServerMiddleware(BaseHTTPMiddleware):
         Returns:
             Agent ID if authentication is successful, None otherwise
         """
-        # Extract token from Authorization header
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            logger.warning("Missing or invalid Authorization header")
-            return None
-            
-        token = auth_header.replace("Bearer ", "")
-        
         try:
-            # Verify the token using Authed
-            # The actual method depends on Authed's API
-            # This is a placeholder - adjust based on actual API
-            agent_id = await self.authed.verify_interaction_token(token)
-            return agent_id
+            # Get the request method and URL
+            method = request.method
+            url = str(request.url)
+            
+            # Verify the request using Authed
+            result = await self.authed_auth.verify_request(
+                method=method,
+                url=url,
+                headers=dict(request.headers)
+            )
+            
+            # If verification is successful, extract the agent ID from the token
+            if result:
+                # The agent ID should be available in the token claims
+                # This is a simplified implementation - in a real scenario,
+                # you would extract the agent ID from the token claims
+                auth_header = request.headers.get("Authorization", "")
+                if auth_header.startswith("Bearer "):
+                    token = auth_header.replace("Bearer ", "")
+                    # In a real implementation, you would decode the token
+                    # and extract the agent ID from the claims
+                    # For now, we'll use a placeholder
+                    return "agent_id_from_token"
+                
+            return None
         except AuthenticationError as e:
             logger.warning(f"Authentication error: {str(e)}")
             return None
@@ -117,20 +129,34 @@ class AuthedMCPServer:
     This class wraps an MCP server with Authed authentication.
     """
     
-    def __init__(self, name: str, authed: Authed):
+    def __init__(self, name: str, registry_url: str, agent_id: str, agent_secret: str, private_key: str, public_key: str):
         """
-        Initialize the server with an Authed client.
+        Initialize the server with Authed credentials.
         
         Args:
             name: Name of the MCP server
-            authed: Initialized Authed client
+            registry_url: URL of the Authed registry
+            agent_id: ID of the agent
+            agent_secret: Secret of the agent
+            private_key: Private key of the agent
+            public_key: Public key of the agent
         """
         self.name = name
-        self.authed = authed
+        
+        # Initialize Authed SDK
+        self.authed = Authed.initialize(
+            registry_url=registry_url,
+            agent_id=agent_id,
+            agent_secret=agent_secret,
+            private_key=private_key,
+            public_key=public_key
+        )
+        
+        # Create MCP server
         self.mcp = FastMCP(name)
         
         # Add authentication middleware to the FastAPI app
-        self.mcp.app.add_middleware(AuthedMCPServerMiddleware, authed=authed)
+        self.mcp.app.add_middleware(AuthedMCPServerMiddleware, authed_auth=self.authed.auth)
     
     def resource(self, path: str = None):
         """
@@ -176,22 +202,6 @@ class AuthedMCPServer:
             host: Host to bind to
             port: Port to bind to
         """
-        # Register the server with Authed
-        server_info = await register_mcp_server(
-            authed=self.authed,
-            name=self.name,
-            description=f"MCP server: {self.name}",
-            capabilities=self.mcp.get_capabilities()
-        )
-        
-        logger.info(f"Registered MCP server with Authed: {server_info['agent_id']}")
-        
-        # Save server credentials to .env file for future use
-        with open(f".env.mcp_server.{self.name}", "w") as f:
-            f.write(f"MCP_SERVER_AGENT_ID={server_info['agent_id']}\n")
-            f.write(f"MCP_SERVER_PRIVATE_KEY={server_info['private_key']}\n")
-            f.write(f"MCP_SERVER_PUBLIC_KEY={server_info['public_key']}\n")
-        
         # Run the MCP server
         await self.mcp.run(host=host, port=port)
 
@@ -203,14 +213,26 @@ class AuthedMCPClient:
     This class provides a client for making authenticated requests to MCP servers.
     """
     
-    def __init__(self, authed: Authed):
+    def __init__(self, registry_url: str, agent_id: str, agent_secret: str, private_key: str, public_key: str = None):
         """
-        Initialize the client with an Authed client.
+        Initialize the client with Authed credentials.
         
         Args:
-            authed: Initialized Authed client
+            registry_url: URL of the Authed registry
+            agent_id: ID of the agent
+            agent_secret: Secret of the agent
+            private_key: Private key of the agent
+            public_key: Public key of the agent (optional)
         """
-        self.authed = authed
+        # Initialize Authed SDK
+        self.authed = Authed.initialize(
+            registry_url=registry_url,
+            agent_id=agent_id,
+            agent_secret=agent_secret,
+            private_key=private_key,
+            public_key=public_key
+        )
+        
         self._token_cache = {}  # Simple token cache
     
     async def get_token(self, target_server_id: Union[str, UUID]) -> str:
@@ -232,8 +254,7 @@ class AuthedMCPClient:
             return self._token_cache[cache_key]
         
         # Get new token
-        # The actual method depends on Authed's API
-        token = await self.authed.create_interaction_token(str(target_server_id))
+        token = await self.authed.auth.get_interaction_token(target_server_id)
         
         # Cache token
         self._token_cache[cache_key] = token

@@ -11,9 +11,7 @@ def test_imports():
         from integrations.mcp import (
             AuthedMCPServer,
             AuthedMCPClient,
-            AuthedMCPServerMiddleware,
-            register_mcp_server,
-            grant_mcp_access
+            AuthedMCPServerMiddleware
         )
         
         # Import MCP SDK components to verify they're accessible
@@ -25,6 +23,9 @@ def test_imports():
         from starlette.middleware.base import BaseHTTPMiddleware
         from starlette.requests import Request
         from starlette.responses import JSONResponse
+        
+        # Import Authed SDK
+        from client.sdk import Authed
         
         print("✅ All imports successful!")
         return True

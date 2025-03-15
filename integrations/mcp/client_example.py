@@ -7,10 +7,10 @@ This example demonstrates how to create an MCP client with Authed authentication
 import asyncio
 import logging
 import os
+import json
 from dotenv import load_dotenv
 
-from client.sdk import Authed
-from integrations.mcp import AuthedMCPClient, grant_mcp_access
+from integrations.mcp import AuthedMCPClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,71 +21,51 @@ async def main():
     # Load environment variables
     load_dotenv()
     
-    # Load server environment variables
-    server_env_file = ".env.mcp_server.example-server"
-    if os.path.exists(server_env_file):
-        with open(server_env_file, "r") as f:
-            for line in f:
-                if "=" in line:
-                    key, value = line.strip().split("=", 1)
-                    os.environ[key] = value
+    # Get Authed credentials
+    registry_url = os.getenv("AUTHED_REGISTRY_URL", "https://api.getauthed.dev")
+    agent_id = os.getenv("AGENT_ID")
+    agent_secret = os.getenv("AGENT_SECRET")
     
-    # Initialize Authed client
-    authed = Authed(
-        api_key=os.getenv("AUTHED_API_KEY"),
-        base_url=os.getenv("AUTHED_API_URL", "https://api.getauthed.dev")
-    )
+    # Load keys from environment or files
+    private_key = os.getenv("AGENT_PRIVATE_KEY")
+    public_key = os.getenv("AGENT_PUBLIC_KEY")
+    
+    # If keys are not in environment, try to load from files
+    if not private_key and os.path.exists("private_key.pem"):
+        with open("private_key.pem", "r") as f:
+            private_key = f.read()
+    
+    if not public_key and os.path.exists("public_key.pem"):
+        with open("public_key.pem", "r") as f:
+            public_key = f.read()
+    
+    # Check if we have all required credentials
+    if not all([agent_id, agent_secret, private_key]):
+        logger.error("Missing required Authed credentials")
+        logger.info("Please set the following environment variables:")
+        logger.info("  AUTHED_REGISTRY_URL - URL of the Authed registry")
+        logger.info("  AGENT_ID - ID of the agent")
+        logger.info("  AGENT_SECRET - Secret of the agent")
+        logger.info("  AGENT_PRIVATE_KEY - Private key of the agent")
+        return
     
     # Create MCP client with Authed authentication
-    client = AuthedMCPClient(authed)
-    
-    # Register client as an agent if needed
-    client_agent_id = os.getenv("MCP_CLIENT_AGENT_ID")
-    if not client_agent_id:
-        # Generate key pair
-        key_pair = await authed.create_key_pair()
-        private_key = key_pair["private_key"]
-        public_key = key_pair["public_key"]
-        
-        # Register client as an agent
-        client_agent = await authed.register_agent(
-            name="Example MCP Client",
-            description="A simple MCP client with Authed authentication",
-            public_key=public_key,
-            metadata='{"type": "mcp_client"}'
-        )
-        
-        client_agent_id = client_agent["id"]
-        
-        # Save client credentials to .env file for future use
-        with open(".env.mcp_client", "w") as f:
-            f.write(f"MCP_CLIENT_AGENT_ID={client_agent_id}\n")
-            f.write(f"MCP_CLIENT_PRIVATE_KEY={private_key}\n")
-            f.write(f"MCP_CLIENT_PUBLIC_KEY={public_key}\n")
-        
-        logger.info(f"Registered MCP client with Authed: {client_agent_id}")
+    client = AuthedMCPClient(
+        registry_url=registry_url,
+        agent_id=agent_id,
+        agent_secret=agent_secret,
+        private_key=private_key,
+        public_key=public_key
+    )
     
     # Get server agent ID
     server_agent_id = os.getenv("MCP_SERVER_AGENT_ID")
     if not server_agent_id:
-        logger.error("Server agent ID not found. Please run the server example first.")
+        logger.error("Server agent ID not found. Please set MCP_SERVER_AGENT_ID environment variable.")
         return
     
-    # Grant client access to server if needed
-    logger.info(f"Granting client {client_agent_id} access to server {server_agent_id}...")
-    granted = await grant_mcp_access(
-        authed=authed,
-        client_agent_id=client_agent_id,
-        server_agent_id=server_agent_id
-    )
-    
-    if granted:
-        logger.info("Access granted successfully.")
-    else:
-        logger.warning("Failed to grant access or access already granted.")
-    
     # Define server URL
-    server_url = "http://localhost:8000"
+    server_url = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
     
     try:
         # List resources
