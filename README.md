@@ -102,6 +102,14 @@ AUTHED_PUBLIC_KEY="your-public-key"
 ## Documentation
 For more detailed documentation, visit our [official documentation](https://docs.getauthed.dev).
 
+## Integrations
+
+Authed provides integrations with various external systems and protocols:
+
+### Model Context Protocol (MCP)
+
+Authed can be used as an authentication layer for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), enabling secure access to MCP servers and resources. See the [MCP integration documentation](integrations/mcp/README.md) for details.
+
 ## Why choose Authed?
 
 #### Designed for agent interactions

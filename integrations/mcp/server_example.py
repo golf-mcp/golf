@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 from client.sdk import Authed
 
 # Import our adapter
-from mcp_authed_adapter import AuthedMCPServerAdapter, register_mcp_server
+from integrations.mcp.adapter import AuthedMCPServerAdapter, register_mcp_server
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

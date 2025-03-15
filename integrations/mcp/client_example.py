@@ -15,7 +15,7 @@ from uuid import UUID
 from client.sdk import Authed
 
 # Import our adapter
-from mcp_authed_adapter import AuthedMCPClientAdapter, grant_mcp_access
+from integrations.mcp.adapter import AuthedMCPClientAdapter, grant_mcp_access
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -99,7 +99,7 @@ async def load_mcp_server_info():
             "public_key": server_info.get("MCP_SERVER_PUBLIC_KEY")
         }
     except FileNotFoundError:
-        logger.error("MCP server info file (.env.mcp_server) not found. Run mcp_server_example.py first.")
+        logger.error("MCP server info file (.env.mcp_server) not found. Run server_example.py first.")
         return None
     except Exception as e:
         logger.error(f"Error loading MCP server info: {str(e)}")

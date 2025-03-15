@@ -1,0 +1,25 @@
+from setuptools import setup, find_namespace_packages
+
+setup(
+    name="authed-mcp",
+    version="0.1.0",
+    description="Authed integration with Model Context Protocol (MCP)",
+    author="Authed Team",
+    author_email="contact@getauthed.dev",
+    url="https://github.com/authed-dev/authed",
+    packages=find_namespace_packages(include=["integrations.mcp*"]),
+    install_requires=[
+        "authed>=0.1.0",
+    ],
+    python_requires=">=3.8",
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+    ],
+) 
