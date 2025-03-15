@@ -6,31 +6,33 @@ This module provides adapters for integrating Authed authentication with Model C
 
 import json
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, List, Callable, Awaitable
 from uuid import UUID
 
 # Import Authed SDK
 from client.sdk import Authed
 from client.sdk.exceptions import AuthenticationError
 
-# MCP types (these would typically come from MCP SDK)
-MCPRequest = Dict[str, Any]
-MCPResponse = Dict[str, Any]
-MCPError = Dict[str, Any]
+# Import MCP SDK
+from mcp.server import Server
+from mcp.server.fastmcp import FastMCP
+from mcp.types import Resource, Tool, Prompt
+from mcp.server.models import InitializationOptions
 
+# Configure logging
 logger = logging.getLogger(__name__)
 
-class AuthedMCPServerAdapter:
+class AuthedMCPServerMiddleware:
     """
-    Adapter for MCP servers to use Authed for authentication.
+    Middleware for MCP servers to use Authed for authentication.
     
-    This adapter sits between MCP clients and servers, verifying Authed tokens
+    This middleware sits between MCP clients and servers, verifying Authed tokens
     before forwarding requests to the MCP server.
     """
     
     def __init__(self, authed: Authed):
         """
-        Initialize the adapter with an Authed client.
+        Initialize the middleware with an Authed client.
         
         Args:
             authed: Initialized Authed client
@@ -68,21 +70,20 @@ class AuthedMCPServerAdapter:
             logger.error(f"Unexpected error during authentication: {str(e)}")
             return None
     
-    async def process_mcp_request(self, 
-                                 mcp_server_handler, 
-                                 request: MCPRequest, 
-                                 headers: Dict[str, str]) -> Union[MCPResponse, MCPError]:
+    async def __call__(self, request, call_next):
         """
-        Process an MCP request with authentication.
+        Process a request with authentication.
         
         Args:
-            mcp_server_handler: Function to handle MCP requests
-            request: The MCP request to process
-            headers: Request headers
+            request: The request to process
+            call_next: Function to call next in the middleware chain
             
         Returns:
-            MCP response or error
+            Response
         """
+        # Get headers from request
+        headers = dict(request.headers)
+        
         # Authenticate the request
         agent_id = await self.authenticate_request(headers)
         if not agent_id:
@@ -92,40 +93,113 @@ class AuthedMCPServerAdapter:
                     "code": 401,
                     "message": "Authentication failed"
                 },
-                "id": request.get("id")
+                "id": None
             }
         
-        # Add agent_id to request context
-        if "context" not in request:
-            request["context"] = {}
-        request["context"]["agent_id"] = agent_id
+        # Add agent_id to request state
+        request.state.agent_id = agent_id
         
-        # Forward to MCP server handler
-        try:
-            return await mcp_server_handler(request)
-        except Exception as e:
-            logger.error(f"Error processing MCP request: {str(e)}")
-            return {
-                "jsonrpc": "2.0",
-                "error": {
-                    "code": 500,
-                    "message": f"Internal server error: {str(e)}"
-                },
-                "id": request.get("id")
-            }
+        # Call next middleware
+        return await call_next(request)
 
 
-class AuthedMCPClientAdapter:
+class AuthedMCPServer:
     """
-    Adapter for MCP clients to use Authed for authentication.
+    MCP server with Authed authentication.
     
-    This adapter prepares MCP requests with Authed authentication tokens
-    before sending them to MCP servers.
+    This class wraps an MCP server with Authed authentication.
+    """
+    
+    def __init__(self, name: str, authed: Authed):
+        """
+        Initialize the server with an Authed client.
+        
+        Args:
+            name: Name of the MCP server
+            authed: Initialized Authed client
+        """
+        self.name = name
+        self.authed = authed
+        self.mcp = FastMCP(name)
+        self.auth_middleware = AuthedMCPServerMiddleware(authed)
+        
+        # Add authentication middleware
+        self.mcp.app.middleware("http")(self.auth_middleware)
+    
+    def resource(self, path: str = None):
+        """
+        Register a resource handler.
+        
+        Args:
+            path: Resource path pattern
+            
+        Returns:
+            Decorator function
+        """
+        return self.mcp.resource(path)
+    
+    def tool(self, name: str = None):
+        """
+        Register a tool handler.
+        
+        Args:
+            name: Tool name
+            
+        Returns:
+            Decorator function
+        """
+        return self.mcp.tool(name)
+    
+    def prompt(self, name: str = None):
+        """
+        Register a prompt handler.
+        
+        Args:
+            name: Prompt name
+            
+        Returns:
+            Decorator function
+        """
+        return self.mcp.prompt(name)
+    
+    async def run(self, host: str = "localhost", port: int = 8000):
+        """
+        Run the MCP server.
+        
+        Args:
+            host: Host to bind to
+            port: Port to bind to
+        """
+        # Register the server with Authed
+        server_info = await register_mcp_server(
+            authed=self.authed,
+            name=self.name,
+            description=f"MCP server: {self.name}",
+            capabilities=self.mcp.get_capabilities()
+        )
+        
+        logger.info(f"Registered MCP server with Authed: {server_info['agent_id']}")
+        
+        # Save server credentials to .env file for future use
+        with open(f".env.mcp_server.{self.name}", "w") as f:
+            f.write(f"MCP_SERVER_AGENT_ID={server_info['agent_id']}\n")
+            f.write(f"MCP_SERVER_PRIVATE_KEY={server_info['private_key']}\n")
+            f.write(f"MCP_SERVER_PUBLIC_KEY={server_info['public_key']}\n")
+        
+        # Run the MCP server
+        await self.mcp.run(host=host, port=port)
+
+
+class AuthedMCPClient:
+    """
+    MCP client with Authed authentication.
+    
+    This class provides a client for making authenticated requests to MCP servers.
     """
     
     def __init__(self, authed: Authed):
         """
-        Initialize the adapter with an Authed client.
+        Initialize the client with an Authed client.
         
         Args:
             authed: Initialized Authed client
@@ -159,35 +233,123 @@ class AuthedMCPClientAdapter:
         
         return token
     
-    async def prepare_request(self, 
-                             request: MCPRequest, 
-                             target_server_id: Union[str, UUID],
-                             headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    async def connect(self, server_url: str, server_agent_id: Union[str, UUID]):
         """
-        Prepare an MCP request with authentication.
+        Connect to an MCP server.
         
         Args:
-            request: The MCP request to prepare
-            target_server_id: ID of the target MCP server
-            headers: Optional additional headers
+            server_url: URL of the MCP server
+            server_agent_id: ID of the MCP server agent
             
         Returns:
-            Prepared request with authentication
+            MCP client session
         """
-        # Get token for target server
-        token = await self.get_token(target_server_id)
+        from mcp import ClientSession, HttpServerParameters
         
-        # Prepare headers
-        if headers is None:
-            headers = {}
+        # Get authentication token
+        token = await self.get_token(server_agent_id)
         
-        headers["Authorization"] = f"Bearer {token}"
+        # Create server parameters
+        server_params = HttpServerParameters(
+            url=server_url,
+            headers={"Authorization": f"Bearer {token}"}
+        )
         
-        # Return prepared request with headers
-        return {
-            "request": request,
-            "headers": headers
-        }
+        # Create client session
+        from mcp.client.http import http_client
+        async with http_client(server_params) as (read, write):
+            session = ClientSession(read, write)
+            await session.initialize()
+            return session
+    
+    async def list_resources(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Resource]:
+        """
+        List resources from an MCP server.
+        
+        Args:
+            server_url: URL of the MCP server
+            server_agent_id: ID of the MCP server agent
+            
+        Returns:
+            List of resources
+        """
+        session = await self.connect(server_url, server_agent_id)
+        return await session.list_resources()
+    
+    async def list_tools(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Tool]:
+        """
+        List tools from an MCP server.
+        
+        Args:
+            server_url: URL of the MCP server
+            server_agent_id: ID of the MCP server agent
+            
+        Returns:
+            List of tools
+        """
+        session = await self.connect(server_url, server_agent_id)
+        return await session.list_tools()
+    
+    async def list_prompts(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Prompt]:
+        """
+        List prompts from an MCP server.
+        
+        Args:
+            server_url: URL of the MCP server
+            server_agent_id: ID of the MCP server agent
+            
+        Returns:
+            List of prompts
+        """
+        session = await self.connect(server_url, server_agent_id)
+        return await session.list_prompts()
+    
+    async def read_resource(self, server_url: str, server_agent_id: Union[str, UUID], resource_id: str) -> tuple:
+        """
+        Read a resource from an MCP server.
+        
+        Args:
+            server_url: URL of the MCP server
+            server_agent_id: ID of the MCP server agent
+            resource_id: ID of the resource to read
+            
+        Returns:
+            Tuple of (content, mime_type)
+        """
+        session = await self.connect(server_url, server_agent_id)
+        return await session.read_resource(resource_id)
+    
+    async def call_tool(self, server_url: str, server_agent_id: Union[str, UUID], tool_name: str, arguments: Dict[str, Any] = None) -> Any:
+        """
+        Call a tool on an MCP server.
+        
+        Args:
+            server_url: URL of the MCP server
+            server_agent_id: ID of the MCP server agent
+            tool_name: Name of the tool to call
+            arguments: Arguments for the tool
+            
+        Returns:
+            Tool result
+        """
+        session = await self.connect(server_url, server_agent_id)
+        return await session.call_tool(tool_name, arguments or {})
+    
+    async def get_prompt(self, server_url: str, server_agent_id: Union[str, UUID], prompt_name: str, arguments: Dict[str, str] = None) -> Any:
+        """
+        Get a prompt from an MCP server.
+        
+        Args:
+            server_url: URL of the MCP server
+            server_agent_id: ID of the MCP server agent
+            prompt_name: Name of the prompt to get
+            arguments: Arguments for the prompt
+            
+        Returns:
+            Prompt result
+        """
+        session = await self.connect(server_url, server_agent_id)
+        return await session.get_prompt(prompt_name, arguments or {})
 
 
 async def register_mcp_server(authed: Authed, 

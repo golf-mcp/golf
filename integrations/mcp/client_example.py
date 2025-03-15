@@ -1,216 +1,137 @@
 """
-Example MCP Client with Authed Authentication
+Example MCP client with Authed authentication.
 
-This example demonstrates how to use an MCP client with Authed authentication.
+This example demonstrates how to create an MCP client with Authed authentication.
 """
 
 import asyncio
-import json
 import logging
 import os
-from typing import Any, Dict, Optional
-from uuid import UUID
+from dotenv import load_dotenv
 
-# Import Authed SDK
 from client.sdk import Authed
-
-# Import our adapter
-from integrations.mcp.adapter import AuthedMCPClientAdapter, grant_mcp_access
+from integrations.mcp import AuthedMCPClient, grant_mcp_access
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class SimpleMCPClient:
-    """
-    A simple MCP client implementation for demonstration purposes.
-    """
-    
-    def __init__(self):
-        """Initialize the MCP client."""
-        pass
-    
-    async def send_request(self, request: Dict[str, Any], url: str, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """
-        Send an MCP request to a server.
-        
-        In a real implementation, this would use HTTP to send the request.
-        For this example, we'll simulate the request/response cycle.
-        
-        Args:
-            request: The MCP request to send
-            url: The URL of the MCP server
-            headers: Optional request headers
-            
-        Returns:
-            MCP response
-        """
-        logger.info(f"Sending request to {url}:")
-        logger.info(f"  Headers: {headers}")
-        logger.info(f"  Request: {json.dumps(request, indent=2)}")
-        
-        # In a real implementation, this would be an HTTP request
-        # For this example, we'll just return a simulated response
-        return {
-            "jsonrpc": "2.0",
-            "result": {
-                "simulated": True,
-                "message": "This is a simulated response. In a real implementation, this would be the response from the MCP server."
-            },
-            "id": request.get("id")
-        }
-
-
-async def setup_mcp_client_with_authed():
-    """
-    Set up an MCP client with Authed authentication.
-    
-    Returns:
-        Tuple of (client, adapter)
-    """
-    # Initialize Authed from environment variables
-    authed = Authed.from_env()
-    
-    # Create MCP client
-    mcp_client = SimpleMCPClient()
-    
-    # Create Authed adapter for MCP client
-    adapter = AuthedMCPClientAdapter(authed)
-    
-    return mcp_client, adapter, authed
-
-
-async def load_mcp_server_info():
-    """
-    Load MCP server information from .env.mcp_server file.
-    
-    Returns:
-        Dictionary with server information
-    """
-    try:
-        server_info = {}
-        with open(".env.mcp_server", "r") as f:
-            for line in f:
-                key, value = line.strip().split("=", 1)
-                server_info[key] = value
-        
-        return {
-            "agent_id": server_info.get("MCP_SERVER_AGENT_ID"),
-            "public_key": server_info.get("MCP_SERVER_PUBLIC_KEY")
-        }
-    except FileNotFoundError:
-        logger.error("MCP server info file (.env.mcp_server) not found. Run server_example.py first.")
-        return None
-    except Exception as e:
-        logger.error(f"Error loading MCP server info: {str(e)}")
-        return None
-
-
-async def make_authenticated_request(client, adapter, server_agent_id, request):
-    """
-    Make an authenticated request to an MCP server.
-    
-    Args:
-        client: The MCP client
-        adapter: The Authed adapter
-        server_agent_id: The ID of the MCP server
-        request: The request to send
-        
-    Returns:
-        MCP response
-    """
-    # Prepare request with authentication
-    prepared = await adapter.prepare_request(
-        request=request,
-        target_server_id=server_agent_id
-    )
-    
-    # Send request
-    response = await client.send_request(
-        request=prepared["request"],
-        url=f"https://mcp-server/{server_agent_id}",  # Simulated URL
-        headers=prepared["headers"]
-    )
-    
-    return response
-
-
 async def main():
-    """Main function to demonstrate the MCP client with Authed authentication."""
-    # Set up MCP client with Authed
-    mcp_client, adapter, authed = await setup_mcp_client_with_authed()
+    """Run the example MCP client."""
+    # Load environment variables
+    load_dotenv()
     
-    # Load MCP server info
-    server_info = await load_mcp_server_info()
-    if not server_info or not server_info.get("agent_id"):
-        logger.error("Failed to load MCP server info. Exiting.")
-        return
+    # Load server environment variables
+    server_env_file = ".env.mcp_server.example-server"
+    if os.path.exists(server_env_file):
+        with open(server_env_file, "r") as f:
+            for line in f:
+                if "=" in line:
+                    key, value = line.strip().split("=", 1)
+                    os.environ[key] = value
     
-    server_agent_id = server_info["agent_id"]
-    logger.info(f"Using MCP server with agent ID: {server_agent_id}")
+    # Initialize Authed client
+    authed = Authed(
+        api_key=os.getenv("AUTHED_API_KEY"),
+        api_url=os.getenv("AUTHED_API_URL", "https://api.authed.ai")
+    )
     
-    # Grant access to the MCP server (in a real scenario, this would be done during setup)
-    client_agent_id = os.environ.get("AUTHED_AGENT_ID")
-    if client_agent_id:
-        logger.info(f"Granting access from client agent {client_agent_id} to server agent {server_agent_id}")
-        success = await grant_mcp_access(
-            authed=authed,
-            client_agent_id=client_agent_id,
-            server_agent_id=server_agent_id
+    # Create MCP client with Authed authentication
+    client = AuthedMCPClient(authed)
+    
+    # Register client as an agent if needed
+    client_agent_id = os.getenv("MCP_CLIENT_AGENT_ID")
+    if not client_agent_id:
+        # Generate key pair
+        private_key, public_key = authed.generate_key_pair()
+        
+        # Register client as an agent
+        client_agent = await authed.register_agent(
+            name="Example MCP Client",
+            description="A simple MCP client with Authed authentication",
+            public_key=public_key,
+            metadata='{"type": "mcp_client"}'
         )
         
-        if success:
-            logger.info("Access granted successfully")
-        else:
-            logger.warning("Failed to grant access")
+        client_agent_id = client_agent.id
+        
+        # Save client credentials to .env file for future use
+        with open(".env.mcp_client", "w") as f:
+            f.write(f"MCP_CLIENT_AGENT_ID={client_agent_id}\n")
+            f.write(f"MCP_CLIENT_PRIVATE_KEY={private_key}\n")
+            f.write(f"MCP_CLIENT_PUBLIC_KEY={public_key}\n")
+        
+        logger.info(f"Registered MCP client with Authed: {client_agent_id}")
+    
+    # Get server agent ID
+    server_agent_id = os.getenv("MCP_SERVER_AGENT_ID")
+    if not server_agent_id:
+        logger.error("Server agent ID not found. Please run the server example first.")
+        return
+    
+    # Grant client access to server if needed
+    logger.info(f"Granting client {client_agent_id} access to server {server_agent_id}...")
+    granted = await grant_mcp_access(
+        authed=authed,
+        client_agent_id=client_agent_id,
+        server_agent_id=server_agent_id
+    )
+    
+    if granted:
+        logger.info("Access granted successfully.")
     else:
-        logger.warning("AUTHED_AGENT_ID not found in environment variables")
+        logger.warning("Failed to grant access or access already granted.")
     
-    # Example request
-    example_request = {
-        "jsonrpc": "2.0",
-        "method": "resources/get",
-        "params": {
-            "id": "sample_doc"
-        },
-        "id": "client-request-1"
-    }
+    # Define server URL
+    server_url = "http://localhost:8000"
     
-    # Make authenticated request
-    logger.info("Making authenticated request to MCP server:")
-    response = await make_authenticated_request(
-        client=mcp_client,
-        adapter=adapter,
-        server_agent_id=server_agent_id,
-        request=example_request
-    )
-    
-    logger.info(f"Response: {json.dumps(response, indent=2)}")
-    
-    # Example tool execution request
-    tool_request = {
-        "jsonrpc": "2.0",
-        "method": "tools/execute",
-        "params": {
-            "id": "echo",
-            "params": {
-                "message": "Hello from authenticated MCP client!"
-            }
-        },
-        "id": "client-request-2"
-    }
-    
-    # Make authenticated tool request
-    logger.info("\nMaking authenticated tool request to MCP server:")
-    tool_response = await make_authenticated_request(
-        client=mcp_client,
-        adapter=adapter,
-        server_agent_id=server_agent_id,
-        request=tool_request
-    )
-    
-    logger.info(f"Response: {json.dumps(tool_response, indent=2)}")
-
+    try:
+        # List resources
+        logger.info("Listing resources...")
+        resources = await client.list_resources(server_url, server_agent_id)
+        logger.info(f"Resources: {resources}")
+        
+        # List tools
+        logger.info("Listing tools...")
+        tools = await client.list_tools(server_url, server_agent_id)
+        logger.info(f"Tools: {tools}")
+        
+        # List prompts
+        logger.info("Listing prompts...")
+        prompts = await client.list_prompts(server_url, server_agent_id)
+        logger.info(f"Prompts: {prompts}")
+        
+        # Call a tool
+        logger.info("Calling echo tool...")
+        result = await client.call_tool(
+            server_url=server_url,
+            server_agent_id=server_agent_id,
+            tool_name="echo",
+            arguments={"message": "Hello from MCP client!"}
+        )
+        logger.info(f"Echo result: {result}")
+        
+        # Get a prompt
+        logger.info("Getting greeting prompt...")
+        prompt = await client.get_prompt(
+            server_url=server_url,
+            server_agent_id=server_agent_id,
+            prompt_name="greeting",
+            arguments={"name": "MCP Client"}
+        )
+        logger.info(f"Greeting prompt: {prompt}")
+        
+        # Read a resource
+        logger.info("Reading hello resource...")
+        content, mime_type = await client.read_resource(
+            server_url=server_url,
+            server_agent_id=server_agent_id,
+            resource_id="/hello/MCP"
+        )
+        logger.info(f"Resource content: {content} ({mime_type})")
+        
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main()) 

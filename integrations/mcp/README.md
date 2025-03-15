@@ -1,154 +1,139 @@
-# Authed Integration with Model Context Protocol (MCP)
+# Authed MCP Integration
 
-This integration provides authentication and identity management for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) using Authed.
+This package provides integration between [Authed](https://authed.ai) authentication and the [Model Context Protocol (MCP)](https://github.com/mcp-sdk/mcp).
 
 ## Overview
 
-The Model Context Protocol (MCP) is an open protocol that enables seamless integration between LLM applications and external data sources and tools. Authed is an identity and authentication system built specifically for AI agents. This integration allows Authed to serve as the authentication layer for MCP servers and clients.
+The Authed MCP integration allows you to:
 
-## Features
-
-- **Secure Authentication**: Use Authed's cryptographic signatures to verify agent identities
-- **Permission Management**: Control which agents can access which MCP servers
-- **Token-based Access**: Generate and verify interaction tokens for secure communication
-- **Adapter Pattern**: Non-invasive integration that works with existing MCP implementations
+1. Create MCP servers with Authed authentication
+2. Create MCP clients that can authenticate with Authed
+3. Register MCP servers as Authed agents
+4. Grant access permissions between MCP clients and servers
 
 ## Installation
 
 ```bash
-# Install Authed
-pip install authed
+pip install authed-mcp
 ```
 
 ## Usage
 
-### Server Integration
-
-To integrate Authed with your MCP server:
+### Server Example
 
 ```python
+import asyncio
+import os
+from dotenv import load_dotenv
+
 from client.sdk import Authed
-from integrations.mcp import AuthedMCPServerAdapter
+from integrations.mcp import AuthedMCPServer
 
-# Initialize Authed
-authed = Authed.from_env()
-
-# Create adapter
-adapter = AuthedMCPServerAdapter(authed)
-
-# Process authenticated requests
-async def handle_request(request_data, headers):
-    request = json.loads(request_data)
-    response = await adapter.process_mcp_request(
-        your_mcp_handler,  # Your existing MCP request handler
-        request,
-        headers
-    )
-    return json.dumps(response)
-```
-
-### Client Integration
-
-To integrate Authed with your MCP client:
-
-```python
-from client.sdk import Authed
-from integrations.mcp import AuthedMCPClientAdapter
-
-# Initialize Authed
-authed = Authed.from_env()
-
-# Create adapter
-adapter = AuthedMCPClientAdapter(authed)
-
-# Make authenticated requests
-async def send_request(request, server_agent_id):
-    # Prepare request with authentication
-    prepared = await adapter.prepare_request(
-        request=request,
-        target_server_id=server_agent_id
+async def main():
+    # Load environment variables
+    load_dotenv()
+    
+    # Initialize Authed client
+    authed = Authed(
+        api_key=os.getenv("AUTHED_API_KEY"),
+        api_url=os.getenv("AUTHED_API_URL", "https://api.authed.ai")
     )
     
-    # Send request using your existing MCP client
-    return await your_mcp_client.send_request(
-        request=prepared["request"],
-        headers=prepared["headers"]
+    # Create MCP server with Authed authentication
+    server = AuthedMCPServer("example-server", authed)
+    
+    # Register a resource handler
+    @server.resource("/hello/{name}")
+    async def hello_resource(name: str):
+        return f"Hello, {name}!", "text/plain"
+    
+    # Register a tool handler
+    @server.tool("echo")
+    async def echo_tool(message: str):
+        return {"message": message}
+    
+    # Register a prompt handler
+    @server.prompt("greeting")
+    async def greeting_prompt(name: str = "World"):
+        return f"Hello, {name}! Welcome to the MCP server."
+    
+    # Run the server
+    await server.run(host="localhost", port=8000)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Client Example
+
+```python
+import asyncio
+import os
+from dotenv import load_dotenv
+
+from client.sdk import Authed
+from integrations.mcp import AuthedMCPClient, grant_mcp_access
+
+async def main():
+    # Load environment variables
+    load_dotenv()
+    
+    # Initialize Authed client
+    authed = Authed(
+        api_key=os.getenv("AUTHED_API_KEY"),
+        api_url=os.getenv("AUTHED_API_URL", "https://api.authed.ai")
     )
+    
+    # Create MCP client with Authed authentication
+    client = AuthedMCPClient(authed)
+    
+    # Get server agent ID (from running the server example)
+    server_agent_id = os.getenv("MCP_SERVER_AGENT_ID")
+    
+    # Define server URL
+    server_url = "http://localhost:8000"
+    
+    # Call a tool
+    result = await client.call_tool(
+        server_url=server_url,
+        server_agent_id=server_agent_id,
+        tool_name="echo",
+        arguments={"message": "Hello from MCP client!"}
+    )
+    print(f"Echo result: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Server Registration
+## Components
 
-Register an MCP server as an agent in Authed:
+### AuthedMCPServer
 
-```python
-from integrations.mcp import register_mcp_server
+A wrapper around the MCP server that adds Authed authentication.
 
-# Register server
-server_info = await register_mcp_server(
-    authed=authed,
-    name="My MCP Server",
-    description="An MCP server with Authed authentication",
-    capabilities={"resources": True, "tools": True}
-)
+### AuthedMCPClient
 
-# Save server credentials
-agent_id = server_info["agent_id"]
-private_key = server_info["private_key"]
-public_key = server_info["public_key"]
-```
+A client for making authenticated requests to MCP servers.
 
-### Permission Management
+### AuthedMCPServerMiddleware
 
-Grant access from one agent to an MCP server:
+Middleware for MCP servers to use Authed for authentication.
 
-```python
-from integrations.mcp import grant_mcp_access
+### register_mcp_server
 
-# Grant access
-success = await grant_mcp_access(
-    authed=authed,
-    client_agent_id="client-agent-id",
-    server_agent_id="server-agent-id",
-    permissions=["read", "execute"]  # Optional custom permissions
-)
-```
+Function to register an MCP server as an agent in Authed.
 
-## Examples
+### grant_mcp_access
 
-This integration includes two example implementations:
+Function to grant an MCP client access to an MCP server.
 
-- `server_example.py`: A simple MCP server with Authed authentication
-- `client_example.py`: A simple MCP client that makes authenticated requests to an MCP server
+## Requirements
 
-To run the examples:
-
-1. Set up Authed environment variables:
-   ```bash
-   export AUTHED_REGISTRY_URL="https://api.getauthed.dev"
-   export AUTHED_AGENT_ID="your-agent-id"
-   export AUTHED_AGENT_SECRET="your-agent-secret"
-   export AUTHED_PRIVATE_KEY="your-private-key"
-   export AUTHED_PUBLIC_KEY="your-public-key"
-   ```
-
-2. Run the server example:
-   ```bash
-   python -m integrations.mcp.server_example
-   ```
-
-3. Run the client example:
-   ```bash
-   python -m integrations.mcp.client_example
-   ```
-
-## Security Considerations
-
-- Always use HTTPS for production deployments
-- Implement token expiration and refresh mechanisms
-- Validate all cryptographic signatures
-- Maintain audit logs of authentication events
-- Implement rate limiting to prevent abuse
+- Python 3.8+
+- Authed SDK
+- MCP SDK
 
 ## License
 
-This integration is licensed under the MIT License. 
+MIT 
