@@ -7,7 +7,6 @@ This example demonstrates how to create an MCP client with Authed authentication
 import asyncio
 import logging
 import os
-import json
 from dotenv import load_dotenv
 
 from integrations.mcp import AuthedMCPClient

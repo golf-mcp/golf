@@ -7,7 +7,7 @@ This module provides adapters for integrating Authed authentication with Model C
 import json
 import logging
 import httpx
-from typing import Any, Dict, Optional, Union, List, Callable, Awaitable
+from typing import Any, Dict, Optional, Union, List
 from uuid import UUID
 
 # Import Authed SDK
@@ -15,7 +15,7 @@ from client.sdk import Authed
 from client.sdk.exceptions import AuthenticationError
 
 # Import MCP SDK
-from mcp.server import Server, FastMCP
+from mcp.server import FastMCP
 from mcp.types import Resource, Tool, Prompt
 from mcp import ClientSession
 
