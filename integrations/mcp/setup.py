@@ -12,6 +12,10 @@ setup(
         "authed>=0.1.0",
         "mcp>=0.1.0",
         "python-dotenv>=1.0.0",
+        "fastapi>=0.68.0",
+        "uvicorn>=0.15.0",
+        "starlette>=0.14.2",
+        "httpx>=0.24.0",
     ],
     python_requires=">=3.8",
     classifiers=[

@@ -21,6 +21,11 @@ def test_imports():
         from mcp.server.fastmcp import FastMCP
         from mcp.types import Resource, Tool, Prompt
         
+        # Import FastAPI/Starlette components
+        from starlette.middleware.base import BaseHTTPMiddleware
+        from starlette.requests import Request
+        from starlette.responses import JSONResponse
+        
         print("✅ All imports successful!")
         return True
     except ImportError as e:

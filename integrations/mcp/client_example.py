@@ -33,7 +33,7 @@ async def main():
     # Initialize Authed client
     authed = Authed(
         api_key=os.getenv("AUTHED_API_KEY"),
-        api_url=os.getenv("AUTHED_API_URL", "https://api.authed.ai")
+        base_url=os.getenv("AUTHED_API_URL", "https://api.getauthed.dev")
     )
     
     # Create MCP client with Authed authentication
@@ -43,7 +43,9 @@ async def main():
     client_agent_id = os.getenv("MCP_CLIENT_AGENT_ID")
     if not client_agent_id:
         # Generate key pair
-        private_key, public_key = authed.generate_key_pair()
+        key_pair = await authed.create_key_pair()
+        private_key = key_pair["private_key"]
+        public_key = key_pair["public_key"]
         
         # Register client as an agent
         client_agent = await authed.register_agent(
@@ -53,7 +55,7 @@ async def main():
             metadata='{"type": "mcp_client"}'
         )
         
-        client_agent_id = client_agent.id
+        client_agent_id = client_agent["id"]
         
         # Save client credentials to .env file for future use
         with open(".env.mcp_client", "w") as f:

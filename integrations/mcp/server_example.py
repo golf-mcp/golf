@@ -24,7 +24,7 @@ async def main():
     # Initialize Authed client
     authed = Authed(
         api_key=os.getenv("AUTHED_API_KEY"),
-        api_url=os.getenv("AUTHED_API_URL", "https://api.authed.ai")
+        base_url=os.getenv("AUTHED_API_URL", "https://api.getauthed.dev")
     )
     
     # Create MCP server with Authed authentication
@@ -33,17 +33,35 @@ async def main():
     # Register a resource handler
     @server.resource("/hello/{name}")
     async def hello_resource(name: str):
-        return f"Hello, {name}!", "text/plain"
+        # Get the agent_id from the request state
+        from starlette.requests import Request
+        request = Request.scope.get("request")
+        agent_id = request.state.agent_id if request else "unknown"
+        
+        logger.info(f"Resource request from agent: {agent_id}")
+        return f"Hello, {name}! You are authenticated as agent {agent_id}.", "text/plain"
     
     # Register a tool handler
     @server.tool("echo")
     async def echo_tool(message: str):
-        return {"message": message}
+        # Get the agent_id from the request state
+        from starlette.requests import Request
+        request = Request.scope.get("request")
+        agent_id = request.state.agent_id if request else "unknown"
+        
+        logger.info(f"Tool request from agent: {agent_id}")
+        return {"message": message, "from_agent": agent_id}
     
     # Register a prompt handler
     @server.prompt("greeting")
     async def greeting_prompt(name: str = "World"):
-        return f"Hello, {name}! Welcome to the MCP server."
+        # Get the agent_id from the request state
+        from starlette.requests import Request
+        request = Request.scope.get("request")
+        agent_id = request.state.agent_id if request else "unknown"
+        
+        logger.info(f"Prompt request from agent: {agent_id}")
+        return f"Hello, {name}! Welcome to the MCP server. You are authenticated as agent {agent_id}."
     
     # Run the server
     logger.info("Starting MCP server...")

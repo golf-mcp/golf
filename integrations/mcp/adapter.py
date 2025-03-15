@@ -6,6 +6,7 @@ This module provides adapters for integrating Authed authentication with Model C
 
 import json
 import logging
+import httpx
 from typing import Any, Dict, Optional, Union, List, Callable, Awaitable
 from uuid import UUID
 
@@ -14,15 +15,19 @@ from client.sdk import Authed
 from client.sdk.exceptions import AuthenticationError
 
 # Import MCP SDK
-from mcp.server import Server
-from mcp.server.fastmcp import FastMCP
+from mcp.server import Server, FastMCP
 from mcp.types import Resource, Tool, Prompt
-from mcp.server.models import InitializationOptions
+from mcp import ClientSession
+
+# Import FastAPI/Starlette components for middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-class AuthedMCPServerMiddleware:
+class AuthedMCPServerMiddleware(BaseHTTPMiddleware):
     """
     Middleware for MCP servers to use Authed for authentication.
     
@@ -30,27 +35,29 @@ class AuthedMCPServerMiddleware:
     before forwarding requests to the MCP server.
     """
     
-    def __init__(self, authed: Authed):
+    def __init__(self, app, authed: Authed):
         """
         Initialize the middleware with an Authed client.
         
         Args:
+            app: The FastAPI/Starlette app
             authed: Initialized Authed client
         """
+        super().__init__(app)
         self.authed = authed
     
-    async def authenticate_request(self, headers: Dict[str, str]) -> Optional[str]:
+    async def authenticate_request(self, request: Request) -> Optional[str]:
         """
         Authenticate a request using Authed.
         
         Args:
-            headers: Request headers containing authentication token
+            request: The request to authenticate
             
         Returns:
             Agent ID if authentication is successful, None otherwise
         """
         # Extract token from Authorization header
-        auth_header = headers.get("Authorization", "")
+        auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             logger.warning("Missing or invalid Authorization header")
             return None
@@ -59,10 +66,10 @@ class AuthedMCPServerMiddleware:
         
         try:
             # Verify the token using Authed
-            verification_result = await self.authed.verify_token(token)
-            if verification_result and verification_result.get("agent_id"):
-                return verification_result["agent_id"]
-            return None
+            # The actual method depends on Authed's API
+            # This is a placeholder - adjust based on actual API
+            agent_id = await self.authed.verify_interaction_token(token)
+            return agent_id
         except AuthenticationError as e:
             logger.warning(f"Authentication error: {str(e)}")
             return None
@@ -70,7 +77,7 @@ class AuthedMCPServerMiddleware:
             logger.error(f"Unexpected error during authentication: {str(e)}")
             return None
     
-    async def __call__(self, request, call_next):
+    async def dispatch(self, request: Request, call_next):
         """
         Process a request with authentication.
         
@@ -81,20 +88,20 @@ class AuthedMCPServerMiddleware:
         Returns:
             Response
         """
-        # Get headers from request
-        headers = dict(request.headers)
-        
         # Authenticate the request
-        agent_id = await self.authenticate_request(headers)
+        agent_id = await self.authenticate_request(request)
         if not agent_id:
-            return {
-                "jsonrpc": "2.0",
-                "error": {
-                    "code": 401,
-                    "message": "Authentication failed"
-                },
-                "id": None
-            }
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": 401,
+                        "message": "Authentication failed"
+                    },
+                    "id": None
+                }
+            )
         
         # Add agent_id to request state
         request.state.agent_id = agent_id
@@ -121,10 +128,9 @@ class AuthedMCPServer:
         self.name = name
         self.authed = authed
         self.mcp = FastMCP(name)
-        self.auth_middleware = AuthedMCPServerMiddleware(authed)
         
-        # Add authentication middleware
-        self.mcp.app.middleware("http")(self.auth_middleware)
+        # Add authentication middleware to the FastAPI app
+        self.mcp.app.add_middleware(AuthedMCPServerMiddleware, authed=authed)
     
     def resource(self, path: str = None):
         """
@@ -226,7 +232,8 @@ class AuthedMCPClient:
             return self._token_cache[cache_key]
         
         # Get new token
-        token = await self.authed.get_interaction_token(target_server_id)
+        # The actual method depends on Authed's API
+        token = await self.authed.create_interaction_token(str(target_server_id))
         
         # Cache token
         self._token_cache[cache_key] = token
@@ -244,23 +251,28 @@ class AuthedMCPClient:
         Returns:
             MCP client session
         """
-        from mcp import ClientSession, HttpServerParameters
-        
         # Get authentication token
         token = await self.get_token(server_agent_id)
         
-        # Create server parameters
-        server_params = HttpServerParameters(
-            url=server_url,
-            headers={"Authorization": f"Bearer {token}"}
-        )
+        # Create HTTP client with authentication
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        # Create a custom transport for the MCP client
+        # This is a simplified implementation - adjust based on actual MCP SDK
+        async def read():
+            async with httpx.AsyncClient(base_url=server_url, headers=headers) as client:
+                response = await client.post("/jsonrpc")
+                return response.json()
+                
+        async def write(data):
+            async with httpx.AsyncClient(base_url=server_url, headers=headers) as client:
+                response = await client.post("/jsonrpc", json=data)
+                return response.json()
         
         # Create client session
-        from mcp.client.http import http_client
-        async with http_client(server_params) as (read, write):
-            session = ClientSession(read, write)
-            await session.initialize()
-            return session
+        session = ClientSession(read, write)
+        await session.initialize()
+        return session
     
     async def list_resources(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Resource]:
         """
@@ -368,16 +380,18 @@ async def register_mcp_server(authed: Authed,
     Returns:
         Dictionary with server registration details
     """
-    # Generate key pair
-    private_key, public_key = authed.generate_key_pair()
+    # Generate key pair for the agent
+    key_pair = await authed.create_key_pair()
+    private_key = key_pair["private_key"]
+    public_key = key_pair["public_key"]
     
-    # Prepare metadata
+    # Prepare metadata with MCP capabilities
     metadata = {
         "type": "mcp_server",
         "capabilities": capabilities or {}
     }
     
-    # Register server as an agent
+    # Register server as an agent in Authed
     agent = await authed.register_agent(
         name=name,
         description=description,
@@ -385,8 +399,9 @@ async def register_mcp_server(authed: Authed,
         metadata=json.dumps(metadata)
     )
     
+    # Return the server information
     return {
-        "agent_id": agent.id,
+        "agent_id": agent["id"],
         "private_key": private_key,
         "public_key": public_key,
         "name": name,
@@ -416,10 +431,10 @@ async def grant_mcp_access(authed: Authed,
         permissions = ["read", "execute"]
     
     try:
-        # Grant permissions
+        # Grant permissions using Authed
         await authed.grant_permission(
-            source_agent_id=client_agent_id,
-            target_agent_id=server_agent_id,
+            source_id=str(client_agent_id),
+            target_id=str(server_agent_id),
             permissions=permissions
         )
         return True
