@@ -5,9 +5,10 @@ This example demonstrates how to create an MCP server with Authed authentication
 """
 
 import asyncio
+import json
 import logging
 import os
-from dotenv import load_dotenv
+import pathlib
 
 from adapter import AuthedMCPServer
 
@@ -17,36 +18,23 @@ logger = logging.getLogger(__name__)
 
 async def main():
     """Run the example MCP server."""
-    # Load environment variables
-    load_dotenv()
+    # Load credentials from JSON file
+    creds_path = pathlib.Path(__file__).parent / "credentials.json"
     
-    # Get Authed credentials
-    registry_url = os.getenv("AUTHED_REGISTRY_URL", "https://api.getauthed.dev")
-    agent_id = os.getenv("AGENT_ID")
-    agent_secret = os.getenv("AGENT_SECRET")
-    
-    # Load keys from environment or files
-    private_key = os.getenv("AGENT_PRIVATE_KEY")
-    public_key = os.getenv("AGENT_PUBLIC_KEY")
-    
-    # If keys are not in environment, try to load from files
-    if not private_key and os.path.exists("private_key.pem"):
-        with open("private_key.pem", "r") as f:
-            private_key = f.read()
-    
-    if not public_key and os.path.exists("public_key.pem"):
-        with open("public_key.pem", "r") as f:
-            public_key = f.read()
-    
-    # Check if we have all required credentials
-    if not all([agent_id, agent_secret, private_key, public_key]):
-        logger.error("Missing required Authed credentials")
-        logger.info("Please set the following environment variables:")
-        logger.info("  AUTHED_REGISTRY_URL - URL of the Authed registry")
-        logger.info("  AGENT_ID - ID of the agent")
-        logger.info("  AGENT_SECRET - Secret of the agent")
-        logger.info("  AGENT_PRIVATE_KEY - Private key of the agent")
-        logger.info("  AGENT_PUBLIC_KEY - Public key of the agent")
+    try:
+        with open(creds_path, "r") as f:
+            creds = json.load(f)
+            
+        # Use agent_a as the server
+        registry_url = os.getenv("AUTHED_REGISTRY_URL", "https://api.getauthed.dev")
+        agent_id = creds["agent_a_id"]
+        agent_secret = creds["agent_a_secret"]
+        private_key = creds["agent_a_private_key"]
+        public_key = creds["agent_a_public_key"]
+        
+        logger.info(f"Loaded credentials for agent: {agent_id}")
+    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error loading credentials: {str(e)}")
         return
     
     # Create MCP server with Authed authentication
