@@ -2,6 +2,7 @@
 Test script for MCP-Authed integration.
 
 This script runs both a server and client to test the integration.
+Run with --server-only to start the server, then in another terminal run with --client-only.
 """
 
 import asyncio
@@ -183,15 +184,13 @@ async def run_server():
         return f"Hello, {name}! Welcome to the MCP server."
     
     # Run the server
+    logger.info(f"Server starting on {SERVER_HOST}:{SERVER_PORT}")
     await server.run(host=SERVER_HOST, port=SERVER_PORT)
 
 # Client implementation
 async def run_client():
     """Run the MCP client."""
     logger.info("Starting MCP client...")
-    
-    # Wait for server to start
-    await asyncio.sleep(2)
     
     # Create a client with test credentials
     client_creds = TEST_CREDENTIALS["client"]
@@ -258,25 +257,20 @@ async def main():
     parser.add_argument("--client-only", action="store_true", help="Run only the client")
     args = parser.parse_args()
     
-    # Run server and client
+    # Run server or client based on arguments
     if args.server_only:
+        logger.info("Running server only. Start the client in another terminal with --client-only")
         await run_server()
     elif args.client_only:
+        logger.info("Running client only. Make sure the server is running in another terminal.")
         success = await run_client()
         sys.exit(0 if success else 1)
     else:
-        # Run both server and client
-        server_task = asyncio.create_task(run_server())
-        client_task = asyncio.create_task(run_client())
-        
-        # Wait for client to finish
-        try:
-            success = await client_task
-            # Cancel server task
-            server_task.cancel()
-            sys.exit(0 if success else 1)
-        except asyncio.CancelledError:
-            pass
+        logger.info("Please specify either --server-only or --client-only")
+        logger.info("Example:")
+        logger.info("  Terminal 1: python -m integrations.mcp.tests.test_integration --server-only")
+        logger.info("  Terminal 2: python -m integrations.mcp.tests.test_integration --client-only")
+        sys.exit(1)
 
 if __name__ == "__main__":
     asyncio.run(main()) 

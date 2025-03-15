@@ -9,7 +9,7 @@ import logging
 import os
 from dotenv import load_dotenv
 
-from integrations.mcp import AuthedMCPServer
+from adapter import AuthedMCPServer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -60,41 +60,26 @@ async def main():
     )
     
     # Register a resource handler
-    @server.resource("/hello/{name}")
+    @server.resource("hello/{name}")
     async def hello_resource(name: str):
-        # Get the agent_id from the request state
-        from starlette.requests import Request
-        request = Request.scope.get("request")
-        agent_id = request.state.agent_id if request else "unknown"
-        
-        logger.info(f"Resource request from agent: {agent_id}")
-        return f"Hello, {name}! You are authenticated as agent {agent_id}.", "text/plain"
+        logger.info(f"Resource request for name: {name}")
+        return f"Hello, {name}!", "text/plain"
     
     # Register a tool handler
     @server.tool("echo")
     async def echo_tool(message: str):
-        # Get the agent_id from the request state
-        from starlette.requests import Request
-        request = Request.scope.get("request")
-        agent_id = request.state.agent_id if request else "unknown"
-        
-        logger.info(f"Tool request from agent: {agent_id}")
-        return {"message": message, "from_agent": agent_id}
+        logger.info(f"Tool request with message: {message}")
+        return {"message": message}
     
     # Register a prompt handler
     @server.prompt("greeting")
     async def greeting_prompt(name: str = "World"):
-        # Get the agent_id from the request state
-        from starlette.requests import Request
-        request = Request.scope.get("request")
-        agent_id = request.state.agent_id if request else "unknown"
-        
-        logger.info(f"Prompt request from agent: {agent_id}")
-        return f"Hello, {name}! Welcome to the MCP server. You are authenticated as agent {agent_id}."
+        logger.info(f"Prompt request for name: {name}")
+        return f"Hello, {name}! Welcome to the MCP server."
     
     # Run the server
     logger.info("Starting MCP server...")
-    await server.run(host="localhost", port=8000)
+    await server.run()
 
 if __name__ == "__main__":
     asyncio.run(main()) 

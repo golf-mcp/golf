@@ -7,11 +7,15 @@ This package provides integration between Authed authentication and Model Contex
 from .adapter import (
     AuthedMCPServer,
     AuthedMCPClient,
-    AuthedMCPServerMiddleware
+    AuthedMCPServerMiddleware,
+    register_mcp_server,
+    grant_mcp_access
 )
 
 __all__ = [
     'AuthedMCPServer',
     'AuthedMCPClient',
-    'AuthedMCPServerMiddleware'
+    'AuthedMCPServerMiddleware',
+    'register_mcp_server',
+    'grant_mcp_access'
 ] 

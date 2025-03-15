@@ -9,7 +9,7 @@ import logging
 import os
 from dotenv import load_dotenv
 
-from integrations.mcp import AuthedMCPClient
+from adapter import AuthedMCPClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,29 +63,31 @@ async def main():
         logger.error("Server agent ID not found. Please set MCP_SERVER_AGENT_ID environment variable.")
         return
     
-    # Define server URL
-    server_url = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
+    # Define server command and args
+    server_command = "python"
+    server_args = ["-m", "integrations.mcp.server_example"]
     
     try:
         # List resources
         logger.info("Listing resources...")
-        resources = await client.list_resources(server_url, server_agent_id)
+        resources = await client.list_resources(server_command, server_args, server_agent_id)
         logger.info(f"Resources: {resources}")
         
         # List tools
         logger.info("Listing tools...")
-        tools = await client.list_tools(server_url, server_agent_id)
+        tools = await client.list_tools(server_command, server_args, server_agent_id)
         logger.info(f"Tools: {tools}")
         
         # List prompts
         logger.info("Listing prompts...")
-        prompts = await client.list_prompts(server_url, server_agent_id)
+        prompts = await client.list_prompts(server_command, server_args, server_agent_id)
         logger.info(f"Prompts: {prompts}")
         
         # Call a tool
         logger.info("Calling echo tool...")
         result = await client.call_tool(
-            server_url=server_url,
+            server_command=server_command,
+            server_args=server_args,
             server_agent_id=server_agent_id,
             tool_name="echo",
             arguments={"message": "Hello from MCP client!"}
@@ -95,7 +97,8 @@ async def main():
         # Get a prompt
         logger.info("Getting greeting prompt...")
         prompt = await client.get_prompt(
-            server_url=server_url,
+            server_command=server_command,
+            server_args=server_args,
             server_agent_id=server_agent_id,
             prompt_name="greeting",
             arguments={"name": "MCP Client"}
@@ -105,9 +108,10 @@ async def main():
         # Read a resource
         logger.info("Reading hello resource...")
         content, mime_type = await client.read_resource(
-            server_url=server_url,
+            server_command=server_command,
+            server_args=server_args,
             server_agent_id=server_agent_id,
-            resource_id="/hello/MCP"
+            resource_id="hello/MCP"
         )
         logger.info(f"Resource content: {content} ({mime_type})")
         
