@@ -50,6 +50,8 @@ class Settings:
         
         # Security
         self.MIN_TLS_VERSION = os.environ.get("MIN_TLS_VERSION")
+        self.SECURE_CIPHERS = os.environ.get("SECURE_CIPHERS")
+        self.CSP_POLICY = os.environ.get("CSP_POLICY")
         
         allowed_hosts = os.environ.get("ALLOWED_HOSTS")
         self.ALLOWED_HOSTS = self._parse_json_or_csv(allowed_hosts)
