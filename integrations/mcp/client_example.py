@@ -52,7 +52,7 @@ async def main():
     )
     
     # Define server URL - this should be the URL where the server is running
-    server_url = "http://localhost:8000/sse"  # Adjust as needed
+    server_url = "http://localhost:8000/sse"  # Add the /sse path
     
     try:
         # List resources
