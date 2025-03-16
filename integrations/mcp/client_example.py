@@ -51,46 +51,29 @@ async def main():
         public_key=public_key
     )
     
-    # Define server command and args
-    server_command = sys.executable  # Use the current Python interpreter
-    
-    # Get the absolute path to the run_server.py file
-    server_script = str(pathlib.Path(__file__).parent / "run_server.py")
-    server_args = [server_script]  # This must be a list
+    # Define server URL - this should be the URL where the server is running
+    server_url = "http://localhost:8000/sse"  # Adjust as needed
     
     try:
         # List resources
         logger.info("Listing resources...")
-        resources = await client.list_resources(
-            server_command=server_command,
-            server_args=server_args,
-            server_agent_id=server_agent_id
-        )
+        resources = await client.list_resources(server_url, server_agent_id)
         logger.info(f"Resources: {resources}")
         
         # List tools
         logger.info("Listing tools...")
-        tools = await client.list_tools(
-            server_command=server_command,
-            server_args=server_args,
-            server_agent_id=server_agent_id
-        )
+        tools = await client.list_tools(server_url, server_agent_id)
         logger.info(f"Tools: {tools}")
         
         # List prompts
         logger.info("Listing prompts...")
-        prompts = await client.list_prompts(
-            server_command=server_command,
-            server_args=server_args,
-            server_agent_id=server_agent_id
-        )
+        prompts = await client.list_prompts(server_url, server_agent_id)
         logger.info(f"Prompts: {prompts}")
         
         # Call a tool
         logger.info("Calling echo tool...")
         result = await client.call_tool(
-            server_command=server_command,
-            server_args=server_args,
+            server_url=server_url,
             server_agent_id=server_agent_id,
             tool_name="echo",
             arguments={"message": "Hello from MCP client!"}
@@ -100,8 +83,7 @@ async def main():
         # Get a prompt
         logger.info("Getting greeting prompt...")
         prompt = await client.get_prompt(
-            server_command=server_command,
-            server_args=server_args,
+            server_url=server_url,
             server_agent_id=server_agent_id,
             prompt_name="greeting",
             arguments={"name": "MCP Client"}
@@ -111,8 +93,7 @@ async def main():
         # Read a resource
         logger.info("Reading hello resource...")
         content, mime_type = await client.read_resource(
-            server_command=server_command,
-            server_args=server_args,
+            server_url=server_url,
             server_agent_id=server_agent_id,
             resource_id="hello/MCP"
         )
@@ -121,6 +102,9 @@ async def main():
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         logger.exception(e)  # Print full traceback for debugging
+    finally:
+        # Clean up resources
+        await client.cleanup()
 
 if __name__ == "__main__":
     asyncio.run(main()) 
