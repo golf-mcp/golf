@@ -8,7 +8,6 @@ import json
 import logging
 from typing import Any, Dict, Optional, Union, List
 from uuid import UUID
-from contextlib import AsyncExitStack
 
 # Import Authed SDK
 from client.sdk import Authed
@@ -93,9 +92,7 @@ class AuthedMCPServer:
                             raise ValueError("Invalid token")
                     except Exception as e:
                         logger.error(f"Token verification failed: {str(e)}")
-                        # In a real implementation, you would raise an exception here
-                        # to prevent the request from being processed
-                        # raise ValueError("Invalid token")
+                        raise ValueError("Invalid token")
                 else:
                     logger.warning("No Bearer token found in Authorization header")
                     raise ValueError("No Bearer token found")
