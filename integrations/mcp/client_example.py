@@ -113,8 +113,7 @@ async def main():
         logger.error(f"Error: {str(e)}")
         logger.exception(e)  # Print full traceback for debugging
     finally:
-        # Clean up resources
-        await client.cleanup()
+        pass
 
 if __name__ == "__main__":
     asyncio.run(main()) 

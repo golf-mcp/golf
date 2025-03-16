@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import pathlib
-import sys
 import argparse
 import uvicorn
 from starlette.applications import Starlette
@@ -14,6 +13,8 @@ from starlette.requests import Request
 from starlette.routing import Mount, Route
 from mcp.server.sse import SseServerTransport
 from mcp.server import Server
+from starlette.responses import JSONResponse
+import httpx
 
 from adapter import AuthedMCPServer
 
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('client.sdk').setLevel(logging.DEBUG)
 logging.getLogger('client.sdk.auth').setLevel(logging.DEBUG)
 
-def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlette:
+def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False) -> Starlette:
     """Create a Starlette application that can serve the provided mcp server with SSE."""
     sse = SseServerTransport("/messages/")
 
@@ -41,15 +42,82 @@ def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlett
         auth_header = request.headers.get("Authorization")
         if auth_header:
             logger.info(f"Request includes Authorization header: {auth_header[:15]}...")
+            
+            # Verify the token
+            if auth_header.startswith("Bearer "):
+                try:
+                    # Verify the token using Authed
+                    logger.info("Verifying token with Authed...")
+                    
+                    # Extract token from Authorization header
+                    token = auth_header.replace("Bearer ", "")
+                    
+                    # Extract DPoP proof from headers
+                    dpop_header = None
+                    for header_name, header_value in request.headers.items():
+                        if header_name.lower() == "dpop":
+                            dpop_header = header_value
+                            break
+                    
+                    if not dpop_header:
+                        logger.warning("Missing DPoP proof header")
+                        return JSONResponse(
+                            status_code=401,
+                            content={"detail": "Authentication failed - missing DPoP proof header"}
+                        )
+                    
+                    # Call registry's verify endpoint directly
+                    verify_url = f"{authed_auth.registry_url}/tokens/verify"
+                    
+                    async with httpx.AsyncClient(
+                        base_url=authed_auth.registry_url,
+                        follow_redirects=False
+                    ) as client:
+                        # Set up verification headers
+                        verify_headers = {
+                            "authorization": f"Bearer {token}",
+                            "dpop": dpop_header  # Use the original DPoP proof
+                        }
+                        
+                        # Send verification request
+                        response = await client.post(
+                            "/tokens/verify",
+                            headers=verify_headers
+                        )
+                        
+                        if response.status_code == 200:
+                            logger.info("Token verified successfully")
+                        else:
+                            logger.warning(f"Token verification failed: {response.text}")
+                            return JSONResponse(
+                                status_code=401,
+                                content={"detail": f"Authentication failed: {response.text}"}
+                            )
+                except Exception as e:
+                    logger.error(f"Token verification failed: {str(e)}")
+                    return JSONResponse(
+                        status_code=401,
+                        content={"detail": f"Authentication failed: {str(e)}"}
+                    )
+            else:
+                logger.warning("No Bearer token found in Authorization header")
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Authentication failed - no Bearer token"}
+                )
         else:
-            logger.warning("Request does not include Authorization header")
+            logger.warning("No Authorization header found")
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Authentication required"}
+            )
         
+        # If authentication is successful, proceed with the connection
         async with sse.connect_sse(
                 request.scope,
                 request.receive,
                 request._send,  # noqa: SLF001
         ) as (read_stream, write_stream):
-            logger.info("SSE connection established, running MCP server")
             await mcp_server.run(
                 read_stream,
                 write_stream,
@@ -124,9 +192,12 @@ def main():
     # Get the internal MCP server
     mcp_server = server.mcp._mcp_server  # Access the internal server
     
-    # Create a Starlette app with SSE transport
-    logger.info("Creating Starlette app with SSE transport...")
-    starlette_app = create_starlette_app(mcp_server, debug=True)
+    # Create a Starlette app with SSE transport and authentication
+    starlette_app = create_starlette_app(
+        mcp_server, 
+        server.authed.auth,  # Pass the auth handler
+        debug=True
+    )
     
     # Run the server
     logger.info(f"Starting MCP server on {args.host}:{args.port}...")

@@ -53,60 +53,7 @@ class AuthedMCPServer:
         
         # Create MCP server
         self.mcp = FastMCP(name)
-        
-        # Add authentication middleware to intercept requests
-        self._setup_auth_middleware()
-    
-    def _setup_auth_middleware(self):
-        """Set up authentication middleware to intercept requests."""
-        # Get the internal MCP server
-        mcp_server = self.mcp._mcp_server
-        
-        # Store the original run method
-        original_run = mcp_server.run
-        
-        # Define a wrapper function to intercept requests
-        async def run_with_auth(read_stream, write_stream, initialization_options):
-            logger.info("MCP server received a connection request")
-            
-            # Get the request from the read_stream context
-            request = getattr(read_stream, 'request', None)
-            
-            if request:
-                # Extract the token from the Authorization header
-                auth_header = request.headers.get("Authorization", "")
-                logger.info(f"Authorization header: {auth_header[:20]}...")
-                
-                if auth_header.startswith("Bearer "):
-                    token = auth_header.replace("Bearer ", "")
-                    logger.info(f"Extracted token: {token[:20]}...")
-                    
-                    try:
-                        # Verify the token using Authed
-                        logger.info("Verifying token with Authed...")
-                        agent_id = await self.authed.auth.verify_interaction_token(token)
-                        if agent_id:
-                            logger.info(f"Token verified for agent: {agent_id}")
-                        else:
-                            logger.warning("Token verification failed")
-                            raise ValueError("Invalid token")
-                    except Exception as e:
-                        logger.error(f"Token verification failed: {str(e)}")
-                        raise ValueError("Invalid token")
-                else:
-                    logger.warning("No Bearer token found in Authorization header")
-                    raise ValueError("No Bearer token found")
-            else:
-                logger.warning("No request object found in read_stream context")
-            
-            # Call the original run method
-            return await original_run(read_stream, write_stream, initialization_options)
-        
-        # Replace the run method with our wrapper
-        mcp_server.run = run_with_auth
-        
-        logger.info("Authed authentication middleware set up for MCP server")
-    
+
     def resource(self, path: str = None):
         """Register a resource handler."""
         return self.mcp.resource(path)
@@ -141,32 +88,24 @@ class AuthedMCPClient:
             public_key=public_key
         )
         logger.info(f"Authed SDK initialized successfully for client")
-        self._token_cache = {}
-    
-    async def get_token(self, target_server_id: Union[str, UUID]) -> str:
-        """Get an interaction token for a target server."""
-        cache_key = str(target_server_id)
-        if cache_key in self._token_cache:
-            logger.info(f"Using cached token for server: {target_server_id}")
-            return self._token_cache[cache_key]
-        
-        logger.info(f"Requesting new interaction token for server: {target_server_id}")
-        try:
-            token = await self.authed.auth.get_interaction_token(target_server_id)
-            logger.info(f"Received token for server: {target_server_id} (first 10 chars: {token[:10]}...)")
-            self._token_cache[cache_key] = token
-            return token
-        except Exception as e:
-            logger.error(f"Error getting token for server {target_server_id}: {str(e)}")
-            raise
     
     async def connect_and_execute(self, server_url: str, server_agent_id: Union[str, UUID], operation):
         """Connect to an MCP server and execute an operation."""
         # Get authentication token
-        token = await self.get_token(server_agent_id)
+        token = await self.authed.auth.get_interaction_token(server_agent_id)
+        
+        # Create DPoP proof for the request
+        dpop_proof = self.authed.auth._dpop.create_proof(
+            "GET",
+            server_url,
+            self.authed.auth._private_key
+        )
         
         # Set up SSE client with authentication
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "DPoP": dpop_proof
+        }
         logger.info(f"Connecting to MCP server at {server_url} with Authed token")
         logger.debug(f"Using headers: {headers}")
         

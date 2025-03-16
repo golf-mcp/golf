@@ -3,11 +3,7 @@ Test MCP client with an old Authed token.
 """
 
 import asyncio
-import json
 import logging
-import os
-import pathlib
-import sys
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
