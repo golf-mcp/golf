@@ -4,9 +4,9 @@ pydantic==2.10.6
 PyJWT==2.10.1
 sqlalchemy==2.0.27
 psycopg2-binary==2.9.9
-python-multipart==0.0.6
+python-multipart==0.0.20
 redis==5.2.1
-cryptography==44.0.0
+cryptography==44.0.1
 structlog==25.1.0
 python-json-logger==2.0.7
 pydantic-settings==2.7.1
