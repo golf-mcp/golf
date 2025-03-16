@@ -69,6 +69,25 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
                     # Call registry's verify endpoint directly
                     verify_url = f"{authed_auth.registry_url}/tokens/verify"
                     
+                    # Log the DPoP header for debugging
+                    logger.debug(f"DPoP header: {dpop_header[:50]}...")
+                    
+                    # Parse the DPoP header to check the public key format
+                    try:
+                        import jwt
+                        dpop_header_data = jwt.get_unverified_header(dpop_header)
+                        logger.debug(f"DPoP header data: {dpop_header_data}")
+                        
+                        # Check if jwk is present
+                        if 'jwk' not in dpop_header_data:
+                            logger.error("Missing jwk in DPoP header")
+                            return JSONResponse(
+                                status_code=401,
+                                content={"detail": "Authentication failed - missing jwk in DPoP header"}
+                            )
+                    except Exception as e:
+                        logger.error(f"Error parsing DPoP header: {str(e)}")
+                    
                     async with httpx.AsyncClient(
                         base_url=authed_auth.registry_url,
                         follow_redirects=False
