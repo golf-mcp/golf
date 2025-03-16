@@ -91,21 +91,13 @@ class AuthedMCPClient:
     
     async def connect_and_execute(self, server_url: str, server_agent_id: Union[str, UUID], operation):
         """Connect to an MCP server and execute an operation."""
-        # Get authentication token
-        token = await self.authed.auth.get_interaction_token(server_agent_id)
-        
-        # Create DPoP proof for the request
-        dpop_proof = self.authed.auth._dpop.create_proof(
-            "GET",
-            server_url,
-            self.authed.auth._private_key
+        # Use the protect_request method to get properly formatted headers
+        headers = await self.authed.auth.protect_request(
+            method="GET",
+            url=server_url,
+            target_agent_id=server_agent_id
         )
         
-        # Set up SSE client with authentication
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "DPoP": dpop_proof
-        }
         logger.info(f"Connecting to MCP server at {server_url} with Authed token")
         logger.debug(f"Using headers: {headers}")
         

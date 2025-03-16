@@ -73,10 +73,10 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
                         base_url=authed_auth.registry_url,
                         follow_redirects=False
                     ) as client:
-                        # Set up verification headers
+                        # Set up verification headers - use the same case as the SDK
                         verify_headers = {
                             "authorization": f"Bearer {token}",
-                            "dpop": dpop_header  # Use the original DPoP proof
+                            "dpop": dpop_header  # Use lowercase "dpop" to match what the SDK uses
                         }
                         
                         # Send verification request
