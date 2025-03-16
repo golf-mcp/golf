@@ -116,6 +116,44 @@ Our protocol uses robust cryptographic signatures and verification mechanisms to
 
 As your ecosystem of agents grows, Authed scales with you - no need to manage ever-growing lists of API keys or credentials.
 
+## Agent-to-Agent communication
+
+Authed provides a Channel component for secure, authenticated communication between agents using WebSockets. This enables agents to establish connections, exchange messages, and maintain persistent communication channels with minimal setup.
+
+### Key keatures
+
+- **Secure WebSocket communication**: Establish authenticated WebSocket connections between agents
+- **Message handling**: Register custom handlers for different message types
+- **Connection management**: Automatically manage multiple connections
+- **Authentication integration**: Leverages Authed's core authentication system
+
+### Quick example
+
+```python
+# Initialize Authed
+auth = Authed.from_env()
+
+# Create a channel
+channel = auth.create_channel()
+
+# Open a channel to another agent
+target_channel = await channel.open_channel(
+    target_agent_id="target-agent-id",
+    websocket_url="wss://target-agent-domain.com/ws"
+)
+
+# Send a message
+await channel.send_message(
+    channel=target_channel,
+    content_type=MessageType.REQUEST,
+    content_data={"text": "Hello from Agent A!"}
+)
+
+# Receive a response
+response = await channel.receive_message(target_channel)
+```
+
+See the [Channel documentation](https://docs.getauthed.dev/channels) for more details and examples.
 
 ## Roadmap
 
