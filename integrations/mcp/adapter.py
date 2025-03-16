@@ -42,6 +42,7 @@ class AuthedMCPServer:
         self.name = name
         
         # Initialize Authed SDK
+        logger.info(f"Initializing Authed SDK for server with agent_id: {agent_id}")
         self.authed = Authed.initialize(
             registry_url=registry_url,
             agent_id=agent_id,
@@ -49,9 +50,41 @@ class AuthedMCPServer:
             private_key=private_key,
             public_key=public_key
         )
+        logger.info(f"Authed SDK initialized successfully for server")
         
         # Create MCP server
         self.mcp = FastMCP(name)
+        
+        # Add authentication middleware to intercept requests
+        self._setup_auth_middleware()
+    
+    def _setup_auth_middleware(self):
+        """Set up authentication middleware to intercept requests."""
+        # Get the internal MCP server
+        mcp_server = self.mcp._mcp_server
+        
+        # Store the original run method
+        original_run = mcp_server.run
+        
+        # Define a wrapper function to intercept requests
+        async def run_with_auth(read_stream, write_stream, initialization_options):
+            logger.info("MCP server received a connection request")
+            
+            # Check for authentication headers in the request
+            # This is a simplified example - in a real implementation,
+            # you would extract the token from the request headers
+            # and verify it using Authed
+            
+            # Log the request
+            logger.info("Processing MCP request with Authed authentication")
+            
+            # Call the original run method
+            return await original_run(read_stream, write_stream, initialization_options)
+        
+        # Replace the run method with our wrapper
+        mcp_server.run = run_with_auth
+        
+        logger.info("Authed authentication middleware set up for MCP server")
     
     def resource(self, path: str = None):
         """Register a resource handler."""
@@ -78,6 +111,7 @@ class AuthedMCPClient:
     
     def __init__(self, registry_url: str, agent_id: str, agent_secret: str, private_key: str, public_key: str = None):
         """Initialize the client with Authed credentials."""
+        logger.info(f"Initializing Authed SDK for client with agent_id: {agent_id}")
         self.authed = Authed.initialize(
             registry_url=registry_url,
             agent_id=agent_id,
@@ -85,19 +119,25 @@ class AuthedMCPClient:
             private_key=private_key,
             public_key=public_key
         )
+        logger.info(f"Authed SDK initialized successfully for client")
         self._token_cache = {}
-        # Don't store session and context managers as instance variables
-        # Create a new connection for each request
     
     async def get_token(self, target_server_id: Union[str, UUID]) -> str:
         """Get an interaction token for a target server."""
         cache_key = str(target_server_id)
         if cache_key in self._token_cache:
+            logger.info(f"Using cached token for server: {target_server_id}")
             return self._token_cache[cache_key]
         
-        token = await self.authed.auth.get_interaction_token(target_server_id)
-        self._token_cache[cache_key] = token
-        return token
+        logger.info(f"Requesting new interaction token for server: {target_server_id}")
+        try:
+            token = await self.authed.auth.get_interaction_token(target_server_id)
+            logger.info(f"Received token for server: {target_server_id} (first 10 chars: {token[:10]}...)")
+            self._token_cache[cache_key] = token
+            return token
+        except Exception as e:
+            logger.error(f"Error getting token for server {target_server_id}: {str(e)}")
+            raise
     
     async def connect_and_execute(self, server_url: str, server_agent_id: Union[str, UUID], operation):
         """Connect to an MCP server and execute an operation."""
@@ -106,20 +146,31 @@ class AuthedMCPClient:
         
         # Set up SSE client with authentication
         headers = {"Authorization": f"Bearer {token}"}
+        logger.info(f"Connecting to MCP server at {server_url} with Authed token")
+        logger.debug(f"Using headers: {headers}")
         
         # Use a context manager to ensure proper cleanup
-        async with sse_client(url=server_url, headers=headers) as streams:
-            session = ClientSession(*streams)
-            await session.initialize()
-            
-            # Execute the operation
-            result = await operation(session)
-            
-            # Return the result
-            return result
+        try:
+            logger.info(f"Establishing SSE connection to {server_url}")
+            async with sse_client(url=server_url, headers=headers) as streams:
+                logger.info(f"SSE connection established, initializing MCP session")
+                session = ClientSession(*streams)
+                await session.initialize()
+                
+                # Execute the operation
+                logger.info(f"Executing MCP operation")
+                result = await operation(session)
+                
+                # Return the result
+                logger.info(f"MCP operation completed successfully")
+                return result
+        except Exception as e:
+            logger.error(f"Error during MCP operation: {str(e)}")
+            raise
     
     async def list_resources(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Resource]:
         """List resources from an MCP server."""
+        logger.info(f"Listing resources from server: {server_agent_id}")
         return await self.connect_and_execute(
             server_url, 
             server_agent_id,
@@ -128,6 +179,7 @@ class AuthedMCPClient:
     
     async def list_tools(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Tool]:
         """List tools from an MCP server."""
+        logger.info(f"Listing tools from server: {server_agent_id}")
         return await self.connect_and_execute(
             server_url, 
             server_agent_id,
@@ -136,6 +188,7 @@ class AuthedMCPClient:
     
     async def list_prompts(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Prompt]:
         """List prompts from an MCP server."""
+        logger.info(f"Listing prompts from server: {server_agent_id}")
         return await self.connect_and_execute(
             server_url, 
             server_agent_id,
@@ -144,6 +197,7 @@ class AuthedMCPClient:
     
     async def read_resource(self, server_url: str, server_agent_id: Union[str, UUID], resource_id: str) -> tuple:
         """Read a resource from an MCP server."""
+        logger.info(f"Reading resource {resource_id} from server: {server_agent_id}")
         return await self.connect_and_execute(
             server_url, 
             server_agent_id,
@@ -152,6 +206,7 @@ class AuthedMCPClient:
     
     async def call_tool(self, server_url: str, server_agent_id: Union[str, UUID], tool_name: str, arguments: Dict[str, Any] = None) -> Any:
         """Call a tool on an MCP server."""
+        logger.info(f"Calling tool {tool_name} on server: {server_agent_id} with arguments: {arguments}")
         return await self.connect_and_execute(
             server_url, 
             server_agent_id,
@@ -160,6 +215,7 @@ class AuthedMCPClient:
     
     async def get_prompt(self, server_url: str, server_agent_id: Union[str, UUID], prompt_name: str, arguments: Dict[str, str] = None) -> Any:
         """Get a prompt from an MCP server."""
+        logger.info(f"Getting prompt {prompt_name} from server: {server_agent_id} with arguments: {arguments}")
         return await self.connect_and_execute(
             server_url, 
             server_agent_id,

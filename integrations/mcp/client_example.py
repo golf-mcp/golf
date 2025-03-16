@@ -14,8 +14,15 @@ import sys
 from adapter import AuthedMCPClient
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,  # Set to DEBUG for more detailed logs
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
+
+# Set Authed SDK logger to DEBUG
+logging.getLogger('client.sdk').setLevel(logging.DEBUG)
+logging.getLogger('client.sdk.auth').setLevel(logging.DEBUG)
 
 async def main():
     """Run the example MCP client."""
@@ -43,6 +50,7 @@ async def main():
         return
     
     # Create MCP client with Authed authentication
+    logger.info("Creating AuthedMCPClient...")
     client = AuthedMCPClient(
         registry_url=registry_url,
         agent_id=agent_id,
@@ -50,9 +58,11 @@ async def main():
         private_key=private_key,
         public_key=public_key
     )
+    logger.info("AuthedMCPClient created successfully")
     
-    # Define server URL - this should be the URL where the server is running
-    server_url = "http://localhost:8000/sse"  # Add the /sse path
+    # Define server URL
+    server_url = "http://localhost:8000/sse"
+    logger.info(f"Using server URL: {server_url}")
     
     try:
         # List resources

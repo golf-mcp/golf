@@ -18,19 +18,38 @@ from mcp.server import Server
 from adapter import AuthedMCPServer
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,  # Set to DEBUG for more detailed logs
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
+
+# Set Authed SDK logger to DEBUG
+logging.getLogger('client.sdk').setLevel(logging.DEBUG)
+logging.getLogger('client.sdk.auth').setLevel(logging.DEBUG)
 
 def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlette:
     """Create a Starlette application that can serve the provided mcp server with SSE."""
     sse = SseServerTransport("/messages/")
 
     async def handle_sse(request: Request) -> None:
+        # Log the incoming request
+        logger.info(f"Received SSE connection request from {request.client.host}")
+        logger.debug(f"Request headers: {request.headers}")
+        
+        # Check for authentication headers
+        auth_header = request.headers.get("Authorization")
+        if auth_header:
+            logger.info(f"Request includes Authorization header: {auth_header[:15]}...")
+        else:
+            logger.warning("Request does not include Authorization header")
+        
         async with sse.connect_sse(
                 request.scope,
                 request.receive,
                 request._send,  # noqa: SLF001
         ) as (read_stream, write_stream):
+            logger.info("SSE connection established, running MCP server")
             await mcp_server.run(
                 read_stream,
                 write_stream,
@@ -73,6 +92,7 @@ def main():
         return
     
     # Create MCP server with Authed authentication
+    logger.info("Creating AuthedMCPServer...")
     server = AuthedMCPServer(
         name="example-server",
         registry_url=registry_url,
@@ -81,6 +101,7 @@ def main():
         private_key=private_key,
         public_key=public_key
     )
+    logger.info("AuthedMCPServer created successfully")
     
     # Register a resource handler
     @server.resource("hello/{name}")
@@ -104,11 +125,12 @@ def main():
     mcp_server = server.mcp._mcp_server  # Access the internal server
     
     # Create a Starlette app with SSE transport
+    logger.info("Creating Starlette app with SSE transport...")
     starlette_app = create_starlette_app(mcp_server, debug=True)
     
     # Run the server
     logger.info(f"Starting MCP server on {args.host}:{args.port}...")
-    uvicorn.run(starlette_app, host=args.host, port=args.port)
+    uvicorn.run(starlette_app, host=args.host, port=args.port, log_level="debug")
 
 if __name__ == "__main__":
     main()
