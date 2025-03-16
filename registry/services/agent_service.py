@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from fastapi import HTTPException, Request, status
 
-from ..core.config import get_settings
 from ..core.logging.logging import log_service
 from ..core.logging.models import LogLevel
 from ..core.security.encryption import EncryptionManager
@@ -18,7 +17,7 @@ encryption_manager = EncryptionManager()
 
 class AgentService:
     def __init__(self):
-        self.settings = get_settings()
+        pass
 
     def create_agent_secret(self) -> str:
         """Generate a secure random secret for agent authentication"""
