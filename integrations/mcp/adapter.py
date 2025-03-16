@@ -70,13 +70,37 @@ class AuthedMCPServer:
         async def run_with_auth(read_stream, write_stream, initialization_options):
             logger.info("MCP server received a connection request")
             
-            # Check for authentication headers in the request
-            # This is a simplified example - in a real implementation,
-            # you would extract the token from the request headers
-            # and verify it using Authed
+            # Get the request from the read_stream context
+            request = getattr(read_stream, 'request', None)
             
-            # Log the request
-            logger.info("Processing MCP request with Authed authentication")
+            if request:
+                # Extract the token from the Authorization header
+                auth_header = request.headers.get("Authorization", "")
+                logger.info(f"Authorization header: {auth_header[:20]}...")
+                
+                if auth_header.startswith("Bearer "):
+                    token = auth_header.replace("Bearer ", "")
+                    logger.info(f"Extracted token: {token[:20]}...")
+                    
+                    try:
+                        # Verify the token using Authed
+                        logger.info("Verifying token with Authed...")
+                        agent_id = await self.authed.auth.verify_interaction_token(token)
+                        if agent_id:
+                            logger.info(f"Token verified for agent: {agent_id}")
+                        else:
+                            logger.warning("Token verification failed")
+                            raise ValueError("Invalid token")
+                    except Exception as e:
+                        logger.error(f"Token verification failed: {str(e)}")
+                        # In a real implementation, you would raise an exception here
+                        # to prevent the request from being processed
+                        # raise ValueError("Invalid token")
+                else:
+                    logger.warning("No Bearer token found in Authorization header")
+                    raise ValueError("No Bearer token found")
+            else:
+                logger.warning("No request object found in read_stream context")
             
             # Call the original run method
             return await original_run(read_stream, write_stream, initialization_options)
