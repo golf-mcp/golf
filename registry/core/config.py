@@ -57,6 +57,7 @@ class Settings:
         self.ALLOWED_HOSTS = self._parse_json_or_csv(allowed_hosts)
         
         self.KEY_ROTATION_DAYS = int(os.environ.get("KEY_ROTATION_DAYS"))
+        self.KEY_ROTATION_ENABLED = os.environ.get("KEY_ROTATION_ENABLED").lower() in ("true", "1", "t", "yes", "y", "false", "0", "f", "no", "n")
         self.DB_ENCRYPTION_ENABLED = os.environ.get("DB_ENCRYPTION_ENABLED").lower() in ("true", "1", "t", "yes", "y")
         self.DB_ENCRYPTION_ALGORITHM = os.environ.get("DB_ENCRYPTION_ALGORITHM")
         self.TOKEN_EXPIRY_MINUTES = int(os.environ.get("TOKEN_EXPIRY_MINUTES"))
