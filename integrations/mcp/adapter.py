@@ -77,16 +77,7 @@ class AuthedMCPClient:
     """
     
     def __init__(self, registry_url: str, agent_id: str, agent_secret: str, private_key: str, public_key: str = None):
-        """
-        Initialize the client with Authed credentials.
-        
-        Args:
-            registry_url: URL of the Authed registry
-            agent_id: ID of the agent
-            agent_secret: Secret of the agent
-            private_key: Private key of the agent
-            public_key: Public key of the agent (optional)
-        """
+        """Initialize the client with Authed credentials."""
         self.authed = Authed.initialize(
             registry_url=registry_url,
             agent_id=agent_id,
@@ -95,21 +86,11 @@ class AuthedMCPClient:
             public_key=public_key
         )
         self._token_cache = {}
-        self.exit_stack = AsyncExitStack()
-        self.session = None
-        self._streams_context = None
-        self._session_context = None
+        # Don't store session and context managers as instance variables
+        # Create a new connection for each request
     
     async def get_token(self, target_server_id: Union[str, UUID]) -> str:
-        """
-        Get an interaction token for a target server.
-        
-        Args:
-            target_server_id: ID of the target MCP server
-            
-        Returns:
-            Authentication token
-        """
+        """Get an interaction token for a target server."""
         cache_key = str(target_server_id)
         if cache_key in self._token_cache:
             return self._token_cache[cache_key]
@@ -118,130 +99,72 @@ class AuthedMCPClient:
         self._token_cache[cache_key] = token
         return token
     
-    async def connect(self, server_url: str, server_agent_id: Union[str, UUID]):
-        """
-        Connect to an MCP server using SSE transport.
-        
-        Args:
-            server_url: URL of the MCP server
-            server_agent_id: ID of the MCP server agent
-            
-        Returns:
-            MCP client session
-        """
+    async def connect_and_execute(self, server_url: str, server_agent_id: Union[str, UUID], operation):
+        """Connect to an MCP server and execute an operation."""
         # Get authentication token
         token = await self.get_token(server_agent_id)
         
         # Set up SSE client with authentication
         headers = {"Authorization": f"Bearer {token}"}
         
-        # Store the context managers so they stay alive
-        self._streams_context = sse_client(url=server_url, headers=headers)
-        streams = await self._streams_context.__aenter__()
-        
-        self._session_context = ClientSession(*streams)
-        self.session = await self._session_context.__aenter__()
-        
-        # Initialize the session
-        await self.session.initialize()
-        
-        return self.session
-    
-    async def cleanup(self):
-        """Properly clean up the session and streams"""
-        if self._session_context:
-            await self._session_context.__aexit__(None, None, None)
-        if self._streams_context:
-            await self._streams_context.__aexit__(None, None, None)
+        # Use a context manager to ensure proper cleanup
+        async with sse_client(url=server_url, headers=headers) as streams:
+            session = ClientSession(*streams)
+            await session.initialize()
+            
+            # Execute the operation
+            result = await operation(session)
+            
+            # Return the result
+            return result
     
     async def list_resources(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Resource]:
-        """
-        List resources from an MCP server.
-        
-        Args:
-            server_url: URL of the MCP server
-            server_agent_id: ID of the MCP server agent
-            
-        Returns:
-            List of resources
-        """
-        session = await self.connect(server_url, server_agent_id)
-        return await session.list_resources()
+        """List resources from an MCP server."""
+        return await self.connect_and_execute(
+            server_url, 
+            server_agent_id,
+            lambda session: session.list_resources()
+        )
     
     async def list_tools(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Tool]:
-        """
-        List tools from an MCP server.
-        
-        Args:
-            server_url: URL of the MCP server
-            server_agent_id: ID of the MCP server agent
-            
-        Returns:
-            List of tools
-        """
-        session = await self.connect(server_url, server_agent_id)
-        return await session.list_tools()
+        """List tools from an MCP server."""
+        return await self.connect_and_execute(
+            server_url, 
+            server_agent_id,
+            lambda session: session.list_tools()
+        )
     
     async def list_prompts(self, server_url: str, server_agent_id: Union[str, UUID]) -> List[Prompt]:
-        """
-        List prompts from an MCP server.
-        
-        Args:
-            server_url: URL of the MCP server
-            server_agent_id: ID of the MCP server agent
-            
-        Returns:
-            List of prompts
-        """
-        session = await self.connect(server_url, server_agent_id)
-        return await session.list_prompts()
+        """List prompts from an MCP server."""
+        return await self.connect_and_execute(
+            server_url, 
+            server_agent_id,
+            lambda session: session.list_prompts()
+        )
     
     async def read_resource(self, server_url: str, server_agent_id: Union[str, UUID], resource_id: str) -> tuple:
-        """
-        Read a resource from an MCP server.
-        
-        Args:
-            server_url: URL of the MCP server
-            server_agent_id: ID of the MCP server agent
-            resource_id: ID of the resource to read
-            
-        Returns:
-            Tuple of (content, mime_type)
-        """
-        session = await self.connect(server_url, server_agent_id)
-        return await session.read_resource(resource_id)
+        """Read a resource from an MCP server."""
+        return await self.connect_and_execute(
+            server_url, 
+            server_agent_id,
+            lambda session: session.read_resource(resource_id)
+        )
     
     async def call_tool(self, server_url: str, server_agent_id: Union[str, UUID], tool_name: str, arguments: Dict[str, Any] = None) -> Any:
-        """
-        Call a tool on an MCP server.
-        
-        Args:
-            server_url: URL of the MCP server
-            server_agent_id: ID of the MCP server agent
-            tool_name: Name of the tool to call
-            arguments: Arguments for the tool
-            
-        Returns:
-            Tool result
-        """
-        session = await self.connect(server_url, server_agent_id)
-        return await session.call_tool(tool_name, arguments or {})
+        """Call a tool on an MCP server."""
+        return await self.connect_and_execute(
+            server_url, 
+            server_agent_id,
+            lambda session: session.call_tool(tool_name, arguments or {})
+        )
     
     async def get_prompt(self, server_url: str, server_agent_id: Union[str, UUID], prompt_name: str, arguments: Dict[str, str] = None) -> Any:
-        """
-        Get a prompt from an MCP server.
-        
-        Args:
-            server_url: URL of the MCP server
-            server_agent_id: ID of the MCP server agent
-            prompt_name: Name of the prompt to get
-            arguments: Arguments for the prompt
-            
-        Returns:
-            Prompt result
-        """
-        session = await self.connect(server_url, server_agent_id)
-        return await session.get_prompt(prompt_name, arguments or {})
+        """Get a prompt from an MCP server."""
+        return await self.connect_and_execute(
+            server_url, 
+            server_agent_id,
+            lambda session: session.get_prompt(prompt_name, arguments or {})
+        )
 
 
 async def register_mcp_server(authed: Authed, 
