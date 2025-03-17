@@ -149,7 +149,7 @@ class TokenService:
             dpop_hash = self.dpop_verifier.hash_dpop_proof(dpop_proof)
             
             # Encrypt sensitive data
-            encrypted_dpop_key = self.key_manager.encrypt_data(dpop_public_key)
+            encrypted_dpop_key = self.field_encryption.encrypt_field(dpop_public_key)
             
             to_encode = {
                 "sub": str(agent_id),
