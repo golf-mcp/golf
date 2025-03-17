@@ -92,11 +92,35 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
                         base_url=authed_auth.registry_url,
                         follow_redirects=False
                     ) as client:
-                        # Set up verification headers - use the same case as the SDK
-                        verify_headers = {
-                            "authorization": f"Bearer {token}",
-                            "dpop": dpop_header  # Use lowercase "dpop" to match what the SDK uses
-                        }
+                        try:
+                            # Import the DPoP handler
+                            from client.sdk.auth.dpop import DPoPHandler
+                            
+                            # Create a new DPoP proof specifically for the verification request
+                            verify_url = f"{authed_auth.registry_url}/tokens/verify"
+                            dpop_handler = DPoPHandler()
+                            verification_proof = dpop_handler.create_proof(
+                                "POST",  # Verification endpoint uses POST
+                                verify_url,  # Use the verification endpoint URL
+                                authed_auth._private_key
+                            )
+                            
+                            logger.debug(f"Created new DPoP proof for verification: {verification_proof[:50]}...")
+                            
+                            # Set up verification headers
+                            verify_headers = {
+                                "authorization": f"Bearer {token}",
+                                "dpop": verification_proof  # Use the new proof for verification
+                            }
+                            
+                            logger.debug(f"Verify request headers keys: {verify_headers.keys()}")
+                        except Exception as e:
+                            logger.error(f"Error creating DPoP proof: {str(e)}")
+                            # Fall back to the original DPoP proof if creation fails
+                            verify_headers = {
+                                "authorization": f"Bearer {token}",
+                                "dpop": dpop_header
+                            }
                         
                         # Send verification request
                         response = await client.post(
