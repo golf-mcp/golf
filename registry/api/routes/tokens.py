@@ -84,7 +84,8 @@ async def verify_token(
     token: str = Header(..., alias="authorization"),
     dpop: Optional[str] = Header(None),
     expected_target: Optional[UUID] = Header(None, alias="target-agent-id"),
-    original_method: Optional[str] = Header(None, alias="original-method")
+    original_method: Optional[str] = Header(None, alias="original-method"),
+    original_url: Optional[str] = Header(None, alias="original-url")
 ) -> dict:
     """Verify an interaction token.
     
@@ -104,12 +105,17 @@ async def verify_token(
             event_type=AuditAction.TOKEN_VERIFIED,
             details={
                 "expected_target": str(expected_target) if expected_target else None,
-                "original_method": original_method
+                "original_method": original_method,
+                "original_url": original_url
             }
         )
         
         # Use original_method if provided, otherwise use request.method
         method_to_use = original_method if original_method else request.method
+        
+        # Use original_url if provided, otherwise use request.url
+        url_to_use = original_url if original_url else str(request.url)
+        url_to_use = ensure_https_url(url_to_use)
         
         # Verify the token with HTTPS URL
         payload = token_service.verify_token(
@@ -117,7 +123,7 @@ async def verify_token(
             expected_target=expected_target,
             dpop_proof=dpop,
             method=method_to_use,
-            url=ensure_https_url(str(request.url))
+            url=url_to_use
         )
         
         return {
