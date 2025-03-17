@@ -2,7 +2,7 @@ import hmac
 import hashlib
 import uuid
 from datetime import datetime, timezone
-from urllib.parse import urlparse, parse_qs, urlencode
+from urllib.parse import urlparse
 from jwt import decode as jwt_decode, get_unverified_header
 from jwt.exceptions import InvalidTokenError
 
@@ -15,17 +15,29 @@ from ...utils.validation import validate_url, validate_method
 def normalize_url(url: str) -> str:
     """Normalize URL for comparison"""
     parsed = urlparse(url)
-    # Sort query parameters
-    if parsed.query:
-        params = parse_qs(parsed.query)
-        sorted_params = {k: sorted(v) for k, v in params.items()}
-        query = urlencode(sorted_params, doseq=True)
-    else:
-        query = ""
+    
+    # Fix duplicated port issue (e.g., localhost:8000:8000)
+    netloc = parsed.netloc
+    if netloc.count(':') > 1:
+        # Extract hostname and first port
+        parts = netloc.split(':')
+        netloc = f"{parts[0]}:{parts[1]}"
+        
     # Normalize port
-    port = f":{parsed.port}" if parsed.port and parsed.port not in (80, 443) else ""
+    port = ""
+    if ':' in netloc:
+        hostname, port_str = netloc.split(':', 1)
+        try:
+            port_num = int(port_str)
+            if port_num not in (80, 443):
+                port = f":{port_num}"
+            netloc = hostname
+        except ValueError:
+            # Invalid port, keep as is
+            pass
+            
     # Always use HTTPS for comparison since middleware enforces it
-    return f"https://{parsed.netloc}{port}{parsed.path}"
+    return f"https://{netloc}{port}{parsed.path}"
 
 class DPoPVerifier:
     def __init__(self):
