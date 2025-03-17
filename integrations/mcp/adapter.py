@@ -89,17 +89,18 @@ class AuthedMCPClient:
         )
         logger.info(f"Authed SDK initialized successfully for client")
     
-    async def connect_and_execute(self, server_url: str, server_agent_id: Union[str, UUID], operation):
+    async def connect_and_execute(self, server_url: str, server_agent_id: Union[str, UUID], operation, method: str = "GET"):
         """Connect to an MCP server and execute an operation."""
         # Use the protect_request method to get properly formatted headers
         headers = await self.authed.auth.protect_request(
-            method="GET",
+            method=method,
             url=server_url,
             target_agent_id=server_agent_id
         )
         
         logger.info(f"Connecting to MCP server at {server_url} with Authed token")
         logger.debug(f"Using headers: {headers}")
+        logger.debug(f"Using HTTP method: {method}")
         
         # Use a context manager to ensure proper cleanup
         try:
