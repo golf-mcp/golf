@@ -106,24 +106,20 @@ async def verify_token(
             details={
                 "expected_target": str(expected_target) if expected_target else None,
                 "original_method": original_method,
-                "original_url": original_url
+                "original_url": original_url,
+                "request_method": request.method,
+                "request_url": str(request.url)
             }
         )
         
-        # Use original_method if provided, otherwise use request.method
-        method_to_use = original_method if original_method else request.method
-        
-        # Use original_url if provided, otherwise use request.url
-        url_to_use = original_url if original_url else str(request.url)
-        url_to_use = ensure_https_url(url_to_use)
-        
-        # Verify the token with HTTPS URL
+        # Verify the token with actual request method and URL
+        # This is for verifying the DPoP proof that was created specifically for this verification request
         payload = token_service.verify_token(
             token=token,
             expected_target=expected_target,
             dpop_proof=dpop,
-            method=method_to_use,
-            url=url_to_use
+            method=request.method,  # Use the actual verification request method (POST)
+            url=ensure_https_url(str(request.url))  # Use the actual verification request URL
         )
         
         return {
