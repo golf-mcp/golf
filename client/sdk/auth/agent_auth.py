@@ -247,6 +247,7 @@ class AgentAuth:
                 verify_headers = {
                     "authorization": f"Bearer {token}",
                     "dpop": verification_proof,  # Our new proof for this verification request
+                    "original-method": method,  # Include the original method for verification
                     **({"target-agent-id": target_agent_id} if target_agent_id else {})
                 }
                 logger.debug(f"Verify request headers: {verify_headers}")

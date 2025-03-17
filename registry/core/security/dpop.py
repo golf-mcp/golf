@@ -227,11 +227,24 @@ class DPoPVerifier:
                 )
                 return False
 
+            # Log both methods for debugging
+            log_service.log_event(
+                "dpop_method_comparison",
+                {
+                    "proof_method": decoded_proof["htm"],
+                    "request_method": http_method
+                }
+            )
+
             # Use constant-time comparison for method
             if not hmac.compare_digest(decoded_proof["htm"].upper(), http_method.upper()):
                 log_service.log_event(
                     "dpop_verification_error",
-                    {"error": "HTTP method mismatch"},
+                    {
+                        "error": "HTTP method mismatch",
+                        "proof_method": decoded_proof["htm"],
+                        "request_method": http_method
+                    },
                     level=LogLevel.ERROR
                 )
                 return False
@@ -239,6 +252,15 @@ class DPoPVerifier:
             # Normalize URLs before comparison
             normalized_proof_url = normalize_url(decoded_proof["htu"])
             normalized_request_url = normalize_url(url)
+            
+            # Log URLs for debugging
+            log_service.log_event(
+                "dpop_url_comparison",
+                {
+                    "proof_url": normalized_proof_url,
+                    "request_url": normalized_request_url
+                }
+            )
             
             if not hmac.compare_digest(normalized_proof_url, normalized_request_url):
                 log_service.log_event(
