@@ -84,7 +84,7 @@ async def verify_token(
     token: str = Header(..., alias="authorization"),
     dpop: Optional[str] = Header(None),
     expected_target: Optional[UUID] = Header(None, alias="target-agent-id"),
-    original_method: Optional[str] = Header(None)
+    original_method: Optional[str] = Header(None, alias="original-method")
 ) -> dict:
     """Verify an interaction token.
     
@@ -108,8 +108,8 @@ async def verify_token(
             }
         )
         
-        # Use original method if provided, otherwise use request method
-        method_to_use = original_method or request.method
+        # Use original_method if provided, otherwise use request.method
+        method_to_use = original_method if original_method else request.method
         
         # Verify the token with HTTPS URL
         payload = token_service.verify_token(
