@@ -83,9 +83,7 @@ async def verify_token(
     request: Request,
     token: str = Header(..., alias="authorization"),
     dpop: Optional[str] = Header(None),
-    expected_target: Optional[UUID] = Header(None, alias="target-agent-id"),
-    original_method: Optional[str] = Header(None, alias="original-method"),
-    original_url: Optional[str] = Header(None, alias="original-url")
+    expected_target: Optional[UUID] = Header(None, alias="target-agent-id")
 ) -> dict:
     """Verify an interaction token.
     
@@ -105,8 +103,6 @@ async def verify_token(
             event_type=AuditAction.TOKEN_VERIFIED,
             details={
                 "expected_target": str(expected_target) if expected_target else None,
-                "original_method": original_method,
-                "original_url": original_url,
                 "request_method": request.method,
                 "request_url": str(request.url)
             }
