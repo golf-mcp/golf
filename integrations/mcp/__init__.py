@@ -4,6 +4,7 @@ Authed MCP Integration
 This package provides integration between Authed authentication and the Model Context Protocol (MCP).
 """
 
+# Import all public components to make them available at the root level
 from .adapter import (
     AuthedMCPServer,
     AuthedMCPClient,
@@ -22,6 +23,10 @@ from .client import (
     create_client
 )
 
+# Import the modules directly for use in entry points
+from . import server
+from . import client
+
 __all__ = [
     # Adapter classes
     "AuthedMCPServer",
@@ -36,7 +41,11 @@ __all__ = [
     "register_default_handlers",
     
     # Client helper functions
-    "create_client"
+    "create_client",
+    
+    # Modules
+    "server",
+    "client"
 ]
 
 __version__ = "0.1.0" 

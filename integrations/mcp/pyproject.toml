@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=76", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,6 +9,7 @@ description = "Authed authentication integration for Model Context Protocol (MCP
 authors = [{name = "Antoni Gmitruk", email = "antoni@getauthed.dev"}]
 readme = "README.md"
 requires-python = ">=3.8"
+license = {text = "MIT"}
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -28,6 +29,7 @@ dependencies = [
     "starlette>=0.46.1",
     "pyjwt>=2.10.1",
     "cryptography>=44.0.2",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.urls]
@@ -35,8 +37,16 @@ Documentation = "https://docs.getauthed.dev"
 "Source code" = "https://github.com/authed-dev/authed/tree/master/integrations/mcp"
 
 [project.scripts]
-authed-mcp-server = "integrations.mcp.server:main"
-authed-mcp-client = "integrations.mcp.client:main"
+authed-mcp-server = "authed_mcp:server.main"
+authed-mcp-client = "authed_mcp:client.main"
+
+[tool.setuptools]
+# Map the namespace package to the actual directory
+package-dir = {"authed_mcp" = "integrations/mcp"}
+
+[tool.setuptools.packages]
+# Find all packages in the integrations/mcp directory
+find = {namespaces = false, where = ["integrations"]}
 
 [tool.setuptools.packages.find]
 include = ["integrations.mcp*"]  # Include the MCP integration package
