@@ -9,9 +9,15 @@ import os
 import asyncio
 import logging
 from dotenv import load_dotenv
+import sys
+from pathlib import Path
 
-# Import the integration package
-from integrations.mcp import create_client
+# Add the project root to path
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Now use direct imports
+from integrations.mcp.client import create_client
 
 # Configure logging
 logging.basicConfig(

@@ -15,6 +15,7 @@ from starlette.routing import Mount, Route
 from starlette.responses import JSONResponse
 from mcp.server.sse import SseServerTransport
 from mcp.server import Server
+import httpx
 
 from .adapter import AuthedMCPServer
 
@@ -145,17 +146,19 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
                 "original-method": request.method  # Include original method
             }
             
-            # Verify the token
-            async with authed_auth.client.post(
-                "/tokens/verify",
-                headers=verify_headers,
-                json={"token": token}
-            ) as response:
+            # Verify the token using standalone httpx client instead of authed_auth.client
+            async with httpx.AsyncClient(base_url=authed_auth.registry_url) as client:
+                response = await client.post(
+                    "/tokens/verify",
+                    headers=verify_headers,
+                    json={"token": token}
+                )
+                
                 if response.status_code != 200:
-                    logger.warning(f"Token verification failed: {await response.text()}")
+                    logger.warning(f"Token verification failed: {response.text}")
                     return JSONResponse(
                         status_code=401,
-                        content={"detail": f"Authentication failed: {await response.text()}"}
+                        content={"detail": f"Authentication failed: {response.text}"}
                     )
                 logger.info("Token verified successfully")
         except Exception as e:
