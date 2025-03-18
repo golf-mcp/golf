@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "authed"
-version = "0.2.0"
+version = "0.2.3"
 description = "Agent authentication SDK for secure service-to-service communication"
 authors = [{name = "Antoni Gmitruk", email = "antoni@getauthed.dev"}]
 readme = "README.md"
@@ -31,6 +31,7 @@ dependencies = [
     "pyjwt>=2.10.1",
     "websockets>=15.0.1",
     "uvicorn[standard]>=0.34.0"
+    "authed-mcp>=0.1.2"
 ]
 
 [project.urls]
