@@ -8,8 +8,7 @@ using the new simplified API.
 import logging
 from dotenv import load_dotenv
 
-# Now use direct imports
-from integrations.mcp.server import create_server, run_server, register_default_handlers
+from authed_mcp.server import create_server, run_server, register_default_handlers
 
 # Configure logging
 logging.basicConfig(
