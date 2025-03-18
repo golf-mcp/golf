@@ -30,7 +30,7 @@ dependencies = [
     "cryptography>=44.0.0",
     "pyjwt>=2.10.1",
     "websockets>=15.0.1",
-    "uvicorn[standard]>=0.34.0"
+    "uvicorn[standard]>=0.34.0",
     "authed-mcp>=0.1.2"
 ]
 
