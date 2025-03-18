@@ -34,7 +34,7 @@ dependencies = [
 
 [project.urls]
 Documentation = "https://docs.getauthed.dev"
-"Source code" = "https://github.com/authed-dev/authed/tree/master/integrations/mcp"
+"Source code" = "https://github.com/authed-dev/authed/tree/master/integrations/authed_mcp"
 Homepage = "https://getauthed.dev"
 "Bug Tracker" = "https://github.com/authed-dev/authed/issues"
 
@@ -42,10 +42,5 @@ Homepage = "https://getauthed.dev"
 authed-mcp-server = "authed_mcp.server:main"
 authed-mcp-client = "authed_mcp.client:main"
 
-# Define it as a proper package
 [tool.setuptools]
-package-dir = {"" = "."}
-
-[tool.setuptools.packages.find]
-include = ["integrations.authed_mcp"]
-exclude = ["integrations.authed_mcp.examples*", "integrations.authed_mcp.tests*"]
+packages = ["authed_mcp"]
