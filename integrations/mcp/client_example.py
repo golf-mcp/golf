@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import pathlib
-import sys
 
 from adapter import AuthedMCPClient
 

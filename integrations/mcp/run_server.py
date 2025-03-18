@@ -1,20 +1,19 @@
 """
 Script to run the MCP server independently with SSE transport.
 """
-
+import os
 import json
 import logging
-import os
 import pathlib
 import argparse
 import uvicorn
+import httpx
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Mount, Route
 from mcp.server.sse import SseServerTransport
 from mcp.server import Server
 from starlette.responses import JSONResponse
-import httpx
 
 from adapter import AuthedMCPServer
 
