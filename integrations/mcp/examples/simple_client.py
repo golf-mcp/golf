@@ -87,11 +87,15 @@ async def main():
         except Exception as e:
             logger.warning(f"Could not read 'hello/world' resource: {str(e)}")
         
+        return client
+        
     except ValueError as e:
         logger.error(f"Failed to create client: {str(e)}")
     except Exception as e:
         logger.error(f"Error using client: {str(e)}")
         logger.exception(e)
+    
+    return None
 
 if __name__ == "__main__":
     asyncio.run(main()) 

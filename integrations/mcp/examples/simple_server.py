@@ -5,7 +5,6 @@ This example demonstrates how to create and run an MCP server with Authed authen
 using the new simplified API.
 """
 
-import os
 import logging
 from dotenv import load_dotenv
 
@@ -45,11 +44,16 @@ def main():
         # Run the server
         logger.info("Starting server...")
         run_server(server, host="0.0.0.0", port=8000)
+        
+        # Note: This line will only be reached when the server is stopped
+        return server
     except ValueError as e:
         logger.error(f"Failed to create server: {str(e)}")
     except Exception as e:
         logger.error(f"Error running server: {str(e)}")
         logger.exception(e)
+    
+    return None
 
 if __name__ == "__main__":
     main() 
