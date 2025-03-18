@@ -7,12 +7,6 @@ using the new simplified API.
 
 import logging
 from dotenv import load_dotenv
-import sys
-from pathlib import Path
-
-# Add the project root to path
-project_root = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(project_root))
 
 # Now use direct imports
 from integrations.mcp.server import create_server, run_server, register_default_handlers
