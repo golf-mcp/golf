@@ -6,8 +6,9 @@ This module provides adapters for integrating Authed authentication with Model C
 
 import json
 import logging
-from typing import Any, Dict, Optional, Union, List
 from uuid import UUID
+from typing import Any, Dict, Optional, Union, List
+
 
 # Import Authed SDK
 from client.sdk import Authed
