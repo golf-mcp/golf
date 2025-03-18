@@ -35,19 +35,17 @@ dependencies = [
 [project.urls]
 Documentation = "https://docs.getauthed.dev"
 "Source code" = "https://github.com/authed-dev/authed/tree/master/integrations/mcp"
+Homepage = "https://getauthed.dev"
+"Bug Tracker" = "https://github.com/authed-dev/authed/issues"
 
 [project.scripts]
-authed-mcp-server = "authed_mcp:server.main"
-authed-mcp-client = "authed_mcp:client.main"
+authed-mcp-server = "authed_mcp.server:main"
+authed-mcp-client = "authed_mcp.client:main"
 
+# Define it as a proper package
 [tool.setuptools]
-# Map the namespace package to the actual directory
-package-dir = {"authed_mcp" = "integrations/mcp"}
-
-[tool.setuptools.packages]
-# Find all packages in the integrations/mcp directory
-find = {namespaces = false, where = ["integrations"]}
+package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
-include = ["integrations.mcp*"]  # Include the MCP integration package
-exclude = ["integrations.mcp.examples*"]  # Exclude test directories 
+include = ["integrations.authed_mcp"]
+exclude = ["integrations.authed_mcp.examples*", "integrations.authed_mcp.tests*"]
