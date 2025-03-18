@@ -2,7 +2,7 @@ import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from uuid import UUID, uuid4
-from jwt import PyJWTError
+
 
 from .. import models
 from ..core.config import get_settings
@@ -13,8 +13,11 @@ from ..core.security.dpop import DPoPVerifier
 from ..services.agent_service import AgentService
 from ..core.security.encryption import EncryptionManager
 
-# Use RS256 (RSA + SHA-256) instead of HS256 (HMAC + SHA-256)
+# Use RS256 (RSA + SHA-256)
 JWT_ALGORITHM = "RS256"
+
+# Get settings
+settings = get_settings()
 
 key_manager = KeyManager()
 dpop_verifier = DPoPVerifier()
@@ -22,16 +25,14 @@ REGISTRY_PRIVATE_KEY = key_manager.get_private_key()
 REGISTRY_PUBLIC_KEY = key_manager.get_public_key()
 field_encryption = EncryptionManager()
 
-settings = get_settings()
-
 class TokenService:
     def __init__(self):
         """Initialize the token service."""
-        self.settings = get_settings()
         self.dpop_verifier = DPoPVerifier()
         self.agent_service = AgentService()
         self.key_manager = KeyManager()
         self.field_encryption = EncryptionManager()
+        self.settings = get_settings()
 
     def _check_agent_has_permission(self, agent_permissions: List[models.AgentPermission], target_agent_id: str, target_provider_id: str) -> bool:
         """Check if an agent has permission for a target (either directly or via provider)."""
@@ -148,7 +149,7 @@ class TokenService:
             dpop_hash = self.dpop_verifier.hash_dpop_proof(dpop_proof)
             
             # Encrypt sensitive data
-            encrypted_dpop_key = self.key_manager.encrypt_data(dpop_public_key)
+            encrypted_dpop_key = self.field_encryption.encrypt_field(dpop_public_key)
             
             to_encode = {
                 "sub": str(agent_id),
@@ -236,30 +237,97 @@ class TokenService:
                 if not verifying_agent:
                     raise ValueError("Verifying agent not found")
                     
-                # Decrypt the verifying agent's public key using field encryption
+                # Try to get the public key from the token payload first
                 try:
-                    decrypted_public_key = self.field_encryption.decrypt_field(verifying_agent.dpop_public_key)
-                except ValueError as e:
+                    # The dpop_public_key in the token payload is already encrypted
+                    dpop_public_key = payload.get("dpop_public_key")
+                    decrypted_public_key = None
+                    
+                    if dpop_public_key:
+                        try:
+                            # Try to decrypt the public key from the token
+                            decrypted_public_key = self.field_encryption.decrypt_field(dpop_public_key)
+                            log_service.log_event(
+                                "dpop_verification_info",
+                                {"message": "Using public key from token payload"}
+                            )
+                        except Exception as e:
+                            log_service.log_event(
+                                "dpop_verification_error",
+                                {"error": f"Failed to decrypt public key from token: {str(e)}"},
+                                level=LogLevel.ERROR
+                            )
+                            # If decryption fails, decrypted_public_key remains None
+                    
+                    # If we couldn't get the key from the token, try to extract it from the DPoP proof
+                    if not decrypted_public_key:
+                        try:
+                            # Extract the public key from the DPoP proof's JWK
+                            from jwt import get_unverified_header
+                            header = get_unverified_header(dpop_proof)
+                            jwk = header.get("jwk")
+                            
+                            if not jwk:
+                                raise ValueError("No JWK found in DPoP proof header")
+                                
+                            # Log the JWK for debugging
+                            log_service.log_event(
+                                "dpop_verification_info",
+                                {"message": "Extracted JWK from DPoP proof", "jwk": jwk}
+                            )
+                            
+                            # Convert JWK to PEM format
+                            from cryptography.hazmat.primitives.asymmetric import rsa
+                            from cryptography.hazmat.primitives import serialization
+                            import base64
+                            
+                            # Decode the modulus and exponent
+                            n = int.from_bytes(base64.urlsafe_b64decode(jwk["n"] + "=" * (4 - len(jwk["n"]) % 4)), byteorder="big")
+                            e = int.from_bytes(base64.urlsafe_b64decode(jwk["e"] + "=" * (4 - len(jwk["e"]) % 4)), byteorder="big")
+                            
+                            # Create the public key
+                            public_numbers = rsa.RSAPublicNumbers(e=e, n=n)
+                            public_key = public_numbers.public_key()
+                            
+                            # Convert to PEM format
+                            decrypted_public_key = public_key.public_bytes(
+                                encoding=serialization.Encoding.PEM,
+                                format=serialization.PublicFormat.SubjectPublicKeyInfo
+                            ).decode('utf-8')
+                            
+                            log_service.log_event(
+                                "dpop_verification_info",
+                                {"message": "Successfully converted JWK to PEM"}
+                            )
+                        except Exception as e:
+                            log_service.log_event(
+                                "dpop_verification_error",
+                                {"error": f"Failed to extract public key from DPoP proof: {str(e)}"},
+                                level=LogLevel.ERROR
+                            )
+                            raise ValueError("Failed to extract public key from DPoP proof")
+                    
+                    # Ensure proper PEM format
+                    if decrypted_public_key and not decrypted_public_key.startswith('-----BEGIN PUBLIC KEY-----'):
+                        decrypted_public_key = f"-----BEGIN PUBLIC KEY-----\n{decrypted_public_key}\n-----END PUBLIC KEY-----"
+                    
+                    # Verify the DPoP proof
+                    if not decrypted_public_key or not self.dpop_verifier.verify_proof(
+                        dpop_proof,
+                        decrypted_public_key,
+                        method,
+                        url
+                    ):
+                        raise ValueError("Invalid DPoP proof from verifying agent")
+                        
+                except Exception as e:
                     log_service.log_event(
                         "dpop_verification_error",
-                        {"error": f"Failed to decrypt verifying agent's public key: {str(e)}"},
+                        {"error": f"Failed to verify DPoP proof: {str(e)}"},
                         level=LogLevel.ERROR
                     )
-                    raise ValueError("Failed to decrypt verifying agent's public key")
-
-                # Ensure proper PEM format
-                if not decrypted_public_key.startswith('-----BEGIN PUBLIC KEY-----'):
-                    decrypted_public_key = f"-----BEGIN PUBLIC KEY-----\n{decrypted_public_key}\n-----END PUBLIC KEY-----"
-
-                # Verify the new DPoP proof
-                if not self.dpop_verifier.verify_proof(
-                    dpop_proof,
-                    decrypted_public_key,
-                    method,
-                    url
-                ):
-                    raise ValueError("Invalid DPoP proof from verifying agent")
-                    
+                    raise ValueError(f"Could not verify DPoP proof: {str(e)}")
+            
             # Verify permissions are still valid
             if not self._verify_agent_permissions(
                 UUID(payload["sub"]),

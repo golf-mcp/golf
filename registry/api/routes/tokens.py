@@ -102,17 +102,20 @@ async def verify_token(
         audit_logger.log_event(
             event_type=AuditAction.TOKEN_VERIFIED,
             details={
-                "expected_target": str(expected_target) if expected_target else None
+                "expected_target": str(expected_target) if expected_target else None,
+                "request_method": request.method,
+                "request_url": str(request.url)
             }
         )
         
-        # Verify the token with HTTPS URL
+        # Verify the token with actual request method and URL
+        # This is for verifying the DPoP proof that was created specifically for this verification request
         payload = token_service.verify_token(
             token=token,
             expected_target=expected_target,
             dpop_proof=dpop,
-            method=request.method,
-            url=ensure_https_url(str(request.url))
+            method=request.method,  # Use the actual verification request method (POST)
+            url=ensure_https_url(str(request.url))  # Use the actual verification request URL
         )
         
         return {
