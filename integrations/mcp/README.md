@@ -145,19 +145,6 @@ A client for making authenticated requests to MCP servers. It automatically:
 - Includes improved URL normalization for consistent comparison
 - Provides robust error handling
 
-### Advanced Features
-
-The Authed MCP integration includes several advanced features:
-
-#### URL Normalization
-
-Both the client and server use consistent URL normalization to prevent issues with port duplication and scheme differences:
-- Properly handles ports in URLs (omitting standard ports 80/443)
-- Consistently compares URLs for verification
-- Sorts query parameters for deterministic comparison
-
-
-
 ## Utility Functions
 
 ### register_mcp_server
