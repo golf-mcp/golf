@@ -1,6 +1,6 @@
 # Authed MCP Integration
 
-This package provides integration between [Authed](https://getauthed.dev) authentication and the [Model Context Protocol (MCP)](https://github.com/mcp-sdk/mcp).
+This package provides integration between [Authed](https://getauthed.dev) authentication and the [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol).
 
 ## Overview
 

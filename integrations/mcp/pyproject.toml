@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "authed-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "Authed authentication integration for Model Context Protocol (MCP)"
 authors = [{name = "Antoni Gmitruk", email = "antoni@getauthed.dev"}]
 readme = "README.md"
