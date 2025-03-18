@@ -1,0 +1,11 @@
+include LICENSE
+include README.md
+include pyproject.toml
+include setup.py
+recursive-include integrations/mcp/examples *.py
+recursive-include integrations/mcp/examples *.env.example
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .*.swp
+global-exclude .DS_Store 

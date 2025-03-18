@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=76", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "authed-mcp"
+version = "0.1.2"
+description = "Authed authentication integration for Model Context Protocol (MCP)"
+authors = [{name = "Antoni Gmitruk", email = "antoni@getauthed.dev"}]
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "authed>=0.2.0",
+    "mcp>=1.4.0",
+    "httpx>=0.28.0",
+    "uvicorn>=0.34.0",
+    "starlette>=0.46.1",
+    "pyjwt>=2.10.1",
+    "cryptography>=44.0.2",
+    "python-dotenv>=1.0.0",
+]
+
+[project.urls]
+Documentation = "https://docs.getauthed.dev"
+"Source code" = "https://github.com/authed-dev/authed/tree/master/integrations/authed_mcp"
+Homepage = "https://getauthed.dev"
+"Bug Tracker" = "https://github.com/authed-dev/authed/issues"
+
+[project.scripts]
+authed-mcp-server = "authed_mcp.server:main"
+authed-mcp-client = "authed_mcp.client:main"
+
+[tool.setuptools]
+packages = ["authed_mcp"]
