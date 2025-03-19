@@ -4,7 +4,6 @@ import httpx
 from typing import Dict
 from urllib.parse import urljoin
 from uuid import UUID
-import click
 
 class CLIAuth:
     """Handles authentication for CLI commands."""

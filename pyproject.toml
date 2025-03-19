@@ -43,4 +43,4 @@ authed = "client.cli.main:cli"
 
 [tool.setuptools.packages.find]
 include = ["client*"]  # This will include client and all its subpackages
-exclude = ["registry*", "tests*"]  # Exclude registry and tests directories
+exclude = ["registry*", "tests*", "integrations*"]  # Exclude registry and tests directories

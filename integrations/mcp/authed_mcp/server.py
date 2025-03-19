@@ -129,7 +129,7 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
         
         try:
             # Create a new DPoP proof specifically for the verification request
-            from client.sdk.auth.dpop import DPoPHandler
+            from authed.sdk.auth.dpop import DPoPHandler
             
             verify_url = f"{authed_auth.registry_url}/tokens/verify"
             dpop_handler = DPoPHandler()

@@ -1,10 +1,10 @@
-"""Test Agent B for WebSocket channel testing."""
+"""Test Agent A for WebSocket channel testing."""
 
 import logging
 import os
 import sys
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket
 import uvicorn
 from typing import Dict, Any
 import asyncio
@@ -14,8 +14,8 @@ from contextlib import asynccontextmanager
 # Make sure the local development version takes precedence
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
-from client.sdk.channel import Channel
-from client.sdk.channel.protocol import MessageType
+from authed.sdk.channel import Channel
+from authed.sdk.channel.protocol import MessageType
 
 # Configure logging
 logging.basicConfig(
@@ -24,45 +24,46 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with lifespan
+# Define lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler."""
     # Startup: Run when the application starts
-    logger.info(f"Agent B started with ID: {AGENT_ID}")
+    logger.info(f"Agent A started with ID: {AGENT_ID}")
     logger.info(f"Listening on port: {PORT}")
     
-    # If Agent A info is provided, initiate a connection
-    if AGENT_A_ID and AGENT_A_WS_URL:
+    # If Agent B info is provided, initiate a connection
+    if AGENT_B_ID and AGENT_B_WS_URL:
         # Start the connection task in the background
-        asyncio.create_task(connect_to_agent_a())
+        asyncio.create_task(connect_to_agent_b())
     
     yield  # This is where the application runs
     
     # Shutdown: Run when the application is shutting down
-    logger.info("Agent B shutting down")
+    logger.info("Agent A shutting down")
 
-app = FastAPI(title="Test Agent B", lifespan=lifespan)
+# Create FastAPI app with lifespan
+app = FastAPI(title="Test Agent A", lifespan=lifespan)
 
 # Agent configuration
-AGENT_ID = os.environ.get("AGENT_B_ID")
-AGENT_SECRET = os.environ.get("AGENT_B_SECRET")
+AGENT_ID = os.environ.get("AGENT_A_ID")
+AGENT_SECRET = os.environ.get("AGENT_A_SECRET")
 REGISTRY_URL = os.environ.get("REGISTRY_URL", "https://api.getauthed.dev")
 
 # Get keys if provided
-PRIVATE_KEY = os.environ.get("AGENT_B_PRIVATE_KEY")
-PUBLIC_KEY = os.environ.get("AGENT_B_PUBLIC_KEY")
+PRIVATE_KEY = os.environ.get("AGENT_A_PRIVATE_KEY")
+PUBLIC_KEY = os.environ.get("AGENT_A_PUBLIC_KEY")
 
 # Target agent information
-AGENT_A_ID = os.environ.get("AGENT_A_ID")
-AGENT_A_WS_URL = os.environ.get("AGENT_A_WS_URL", "http://localhost:8000/ws")
+AGENT_B_ID = os.environ.get("AGENT_B_ID")
+AGENT_B_WS_URL = os.environ.get("AGENT_B_WS_URL", "http://localhost:8001/ws")
 
 # Port for this agent
-PORT = int(os.environ.get("PORT", 8001))
+PORT = int(os.environ.get("PORT", 8000))
 
 # Check required environment variables
 if not AGENT_ID or not AGENT_SECRET:
-    logger.error("AGENT_B_ID and AGENT_B_SECRET environment variables must be set")
+    logger.error("AGENT_A_ID and AGENT_A_SECRET environment variables must be set")
     sys.exit(1)
 
 # Create a custom message handler
@@ -72,11 +73,11 @@ async def handle_text_message(message: Dict[str, Any]) -> Dict[str, Any]:
     content_data = message["content"]["data"]
     text = content_data.get("text", "No text provided")
     
-    logger.info(f"Agent B received message: {text}")
+    logger.info(f"Agent A received message: {text}")
     
     # Create response
     response_data = {
-        "text": f"Agent B received: {text}",
+        "text": f"Agent A received: {text}",
         "timestamp": agent.get_iso_timestamp()
     }
     
@@ -118,20 +119,20 @@ async def health_check():
     """Health check endpoint."""
     return {"status": "ok"}
 
-# Connect to Agent A endpoint
-@app.get("/connect-to-agent-a")
-async def connect_to_agent_a_endpoint():
-    """Endpoint to test connection to Agent A."""
+# Connect to Agent B endpoint
+@app.get("/connect-to-agent-b")
+async def connect_to_agent_b_endpoint():
+    """Endpoint to test connection to Agent B."""
     try:
-        # Open a channel to Agent A
+        # Open a channel to Agent B
         channel = await agent.open_channel(
-            target_agent_id=AGENT_A_ID,
-            websocket_url=AGENT_A_WS_URL
+            target_agent_id=AGENT_B_ID,
+            websocket_url=AGENT_B_WS_URL
         )
         
         # Send a test message
         content_data = {
-            "text": "Hello from Agent B! This is a test message from the /connect-to-agent-a endpoint.",
+            "text": "Hello from Agent A! This is a test message from the /connect-to-agent-b endpoint.",
             "timestamp": agent.get_iso_timestamp()
         }
         
@@ -156,31 +157,31 @@ async def connect_to_agent_a_endpoint():
             "response": response_text
         }
     except Exception as e:
-        logger.error(f"Error connecting to Agent A: {e}")
+        logger.error(f"Error connecting to Agent B: {e}")
         return {
             "status": "error",
             "error": str(e)
         }
 
-async def connect_to_agent_a():
-    """Connect to Agent A and send a test message."""
+async def connect_to_agent_b():
+    """Connect to Agent B and send a test message."""
     try:
-        # Wait a bit for Agent A to start
-        await asyncio.sleep(3)
+        # Wait a bit for Agent B to start
+        await asyncio.sleep(2)
         
-        logger.info(f"Connecting to Agent A ({AGENT_A_ID}) at {AGENT_A_WS_URL}")
+        logger.info(f"Connecting to Agent B ({AGENT_B_ID}) at {AGENT_B_WS_URL}")
         
-        # Open a channel to Agent A
+        # Open a channel to Agent B
         channel = await agent.open_channel(
-            target_agent_id=AGENT_A_ID,
-            websocket_url=AGENT_A_WS_URL
+            target_agent_id=AGENT_B_ID,
+            websocket_url=AGENT_B_WS_URL
         )
         
         logger.info("Channel opened successfully")
         
         # Send a test message
         content_data = {
-            "text": "Hello from Agent B! This is an automated test message.",
+            "text": "Hello from Agent A! This is an automated test message.",
             "timestamp": agent.get_iso_timestamp()
         }
         
@@ -197,12 +198,12 @@ async def connect_to_agent_a():
         
         # Extract and log the response text
         response_text = response["content"]["data"].get("text", "")
-        logger.info(f"Received response from Agent A: {response_text}")
+        logger.info(f"Received response from Agent B: {response_text}")
         
         # Keep the channel open for future messages
         
     except Exception as e:
-        logger.error(f"Error connecting to Agent A: {e}")
+        logger.error(f"Error connecting to Agent B: {e}")
 
 # Run the server
 if __name__ == "__main__":

@@ -3,9 +3,7 @@
 import click
 import json
 from pathlib import Path
-import os
 from typing import Optional
-from dotenv import load_dotenv, find_dotenv, set_key
 from ..utils import async_command
 
 CONFIG_DIR = Path.home() / '.authed'

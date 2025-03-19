@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, Union, List
 
 
 # Import Authed SDK
-from client.sdk import Authed
+from authed.sdk import Authed
 
 # Import MCP SDK
 from mcp.server.fastmcp import FastMCP
