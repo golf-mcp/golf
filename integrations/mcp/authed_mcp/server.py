@@ -16,6 +16,7 @@ from starlette.responses import JSONResponse
 from mcp.server.sse import SseServerTransport
 from mcp.server import Server
 import httpx
+from authed.sdk.auth.dpop import DPoPHandler
 
 from .adapter import AuthedMCPServer
 
@@ -32,11 +33,11 @@ def configure_logging(verbose: bool = False) -> None:
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.getLogger().setLevel(log_level)
     if verbose:
-        logging.getLogger('client.sdk').setLevel(logging.DEBUG)
-        logging.getLogger('client.sdk.auth').setLevel(logging.DEBUG)
+        logging.getLogger('authed.sdk').setLevel(logging.DEBUG)
+        logging.getLogger('authed.sdk.auth').setLevel(logging.DEBUG)
     else:
-        logging.getLogger('client.sdk').setLevel(logging.INFO)
-        logging.getLogger('client.sdk.auth').setLevel(logging.INFO)
+        logging.getLogger('authed.sdk').setLevel(logging.INFO)
+        logging.getLogger('authed.sdk.auth').setLevel(logging.INFO)
 
 
 def create_server(registry_url: Optional[str] = None,
@@ -129,8 +130,6 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
         
         try:
             # Create a new DPoP proof specifically for the verification request
-            from authed.sdk.auth.dpop import DPoPHandler
-            
             verify_url = f"{authed_auth.registry_url}/tokens/verify"
             dpop_handler = DPoPHandler()
             verification_proof = dpop_handler.create_proof(

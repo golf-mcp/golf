@@ -27,11 +27,11 @@ def configure_logging(verbose: bool = False) -> None:
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.getLogger().setLevel(log_level)
     if verbose:
-        logging.getLogger('client.sdk').setLevel(logging.DEBUG)
-        logging.getLogger('client.sdk.auth').setLevel(logging.DEBUG)
+        logging.getLogger('authed.sdk').setLevel(logging.DEBUG)
+        logging.getLogger('authed.sdk.auth').setLevel(logging.DEBUG)
     else:
-        logging.getLogger('client.sdk').setLevel(logging.INFO)
-        logging.getLogger('client.sdk.auth').setLevel(logging.INFO)
+        logging.getLogger('authed.sdk').setLevel(logging.INFO)
+        logging.getLogger('authed.sdk.auth').setLevel(logging.INFO)
 
 
 async def create_client(registry_url: Optional[str] = None,
