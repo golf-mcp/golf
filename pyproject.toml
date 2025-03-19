@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "authed"
-version = "0.2.3"
+version = "0.2.4"
 description = "Agent authentication SDK for secure service-to-service communication"
 authors = [{name = "Antoni Gmitruk", email = "antoni@getauthed.dev"}]
 readme = "README.md"
@@ -39,8 +39,8 @@ Documentation = "https://docs.getauthed.dev"
 "Source code" = "https://github.com/authed-dev/authed"
 
 [project.scripts]
-authed = "client.cli.main:cli"
+authed = "authed.cli.main:cli"
 
 [tool.setuptools.packages.find]
-include = ["client*"]  # This will include client and all its subpackages
+include = ["authed*"]  # This will include authed and all its subpackages
 exclude = ["registry*", "tests*", "integrations*"]  # Exclude registry and tests directories
