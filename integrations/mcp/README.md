@@ -26,8 +26,8 @@ import asyncio
 import os
 from dotenv import load_dotenv
 
-from client.sdk import Authed
-from integrations.mcp import AuthedMCPServer
+from authed import Authed
+from authed_mcp import AuthedMCPServer
 
 async def main():
     # Load environment variables
@@ -79,7 +79,7 @@ import asyncio
 import os
 from dotenv import load_dotenv
 
-from integrations.mcp import AuthedMCPClient
+from authed_mcp import AuthedMCPClient
 
 async def main():
     # Load environment variables
@@ -152,8 +152,8 @@ A client for making authenticated requests to MCP servers. It automatically:
 Registers an MCP server as an agent in Authed:
 
 ```python
-from client.sdk import Authed
-from integrations.mcp import register_mcp_server
+from authed import Authed
+from authed_mcp import register_mcp_server
 
 async def setup():
     authed = Authed.initialize(...)
@@ -174,8 +174,8 @@ async def setup():
 Grants an MCP client access to an MCP server:
 
 ```python
-from client.sdk import Authed
-from integrations.mcp import grant_mcp_access
+from authed import Authed
+from authed_mcp import grant_mcp_access
 
 async def setup_permissions():
     authed = Authed.initialize(...)
