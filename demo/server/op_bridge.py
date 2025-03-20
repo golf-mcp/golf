@@ -19,8 +19,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import the 1Password Authed client
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'client'))
-from op_client_authed import OnePasswordAuthedClient
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from client.op_client_authed import OnePasswordAuthedClient
 
 logger.info("Initializing MCP bridge server...")
 

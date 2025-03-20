@@ -17,7 +17,6 @@ from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
 import json
-import base64
 
 # Load environment variables from .env file
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -63,13 +62,6 @@ class AuthedAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next: Callable) -> StarletteResponse:
         # Skip auth for OPTIONS requests (CORS preflight)
         if request.method == "OPTIONS":
-            return await call_next(request)
-            
-        # Skip auth for SSE and messages endpoints
-        # This is critical for SSE connections to work properly
-        skip_auth_paths = ["/health", "/sse", "/messages/"]
-        if any(skip_path in request.url.path for skip_path in skip_auth_paths):
-            logger.info(f"Bypassing authentication for SSE endpoint: {request.url.path}")
             return await call_next(request)
             
         logger.debug(f"Verifying request to {request.url.path}")
@@ -145,7 +137,7 @@ try:
         return await op_client.list_items(vault_id)
     
     @mcp.tool()
-    async def onepassword_get_secret(vault_id: str, item_id: str, field_name: Optional[str] = None) -> Any:
+    async def onepassword_get_secret(vault_id: str, item_id: str, field_name: Optional[str] = "credential") -> Any:
         """Get a secret from 1Password"""
         logger.info(f"Tool called: onepassword_get_secret(vault_id={vault_id}, item_id={item_id}, field_name={field_name})")
         return await op_client.get_secret(vault_id, item_id, field_name)

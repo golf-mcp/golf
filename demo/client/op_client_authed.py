@@ -432,7 +432,7 @@ async def main():
                 item_title = first_item.get('title', 'unnamed')
                 
                 print(f"\n=== Getting Secret from '{item_title}' ===")
-                secret = await client.get_secret(vault_id, item_id)
+                secret = await client.get_secret(vault_id, item_id, "credential")
                 
                 # Just print success, don't display the actual secret
                 print(f"Successfully retrieved secret from '{item_title}'")
