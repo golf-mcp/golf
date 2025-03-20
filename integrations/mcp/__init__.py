@@ -5,21 +5,19 @@ This package provides integration between Authed authentication and the Model Co
 """
 
 # Import all public components to make them available at the root level
-from .adapter import (
+from .authed_mcp.adapter import (
     AuthedMCPServer,
-    AuthedMCPClient,
-    register_mcp_server,
-    grant_mcp_access
+    AuthedMCPClient
 )
 
-from .server import (
+from .authed_mcp.server import (
     create_server,
     run_server,
     McpServerBuilder,
     register_default_handlers
 )
 
-from .client import (
+from .authed_mcp.client import (
     create_client
 )
 
@@ -31,8 +29,6 @@ __all__ = [
     # Adapter classes
     "AuthedMCPServer",
     "AuthedMCPClient",
-    "register_mcp_server",
-    "grant_mcp_access",
     
     # Server helper functions
     "create_server",
