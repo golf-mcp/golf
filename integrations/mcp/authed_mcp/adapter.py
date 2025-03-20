@@ -54,18 +54,80 @@ class AuthedMCPServer:
         
         # Create MCP server
         self.mcp = FastMCP(name)
+        
+        # Keep track of registrations for debugging
+        self._tool_registrations = []
+        self._resource_registrations = []
+        self._prompt_registrations = []
 
     def resource(self, path: str = None):
         """Register a resource handler."""
-        return self.mcp.resource(path)
+        original_decorator = self.mcp.resource(path)
+        
+        def wrapper(func):
+            # Apply the original decorator
+            result = original_decorator(func)
+            # Track registration for debugging
+            self._resource_registrations.append((path, func))
+            return result
+            
+        return wrapper
     
     def tool(self, name: str = None):
         """Register a tool handler."""
-        return self.mcp.tool(name)
+        original_decorator = self.mcp.tool(name)
+        
+        def wrapper(func):
+            # Apply the original decorator
+            result = original_decorator(func)
+            # Track registration for debugging
+            self._tool_registrations.append((name, func))
+            return result
+            
+        return wrapper
     
     def prompt(self, name: str = None):
         """Register a prompt handler."""
-        return self.mcp.prompt(name)
+        original_decorator = self.mcp.prompt(name)
+        
+        def wrapper(func):
+            # Apply the original decorator
+            result = original_decorator(func)
+            # Track registration for debugging
+            self._prompt_registrations.append((name, func))
+            return result
+            
+        return wrapper
+    
+    def initialize_handlers(self):
+        """
+        Make sure all handlers are properly initialized.
+        """
+        logger.info(f"Initializing {len(self._tool_registrations)} tool handlers...")
+        logger.info(f"Initializing {len(self._resource_registrations)} resource handlers...")
+        logger.info(f"Initializing {len(self._prompt_registrations)} prompt handlers...")
+        
+        # Based on the FastMCP source code, modify the initialization options
+        # to force tool, resource, and prompt listing
+        mcp_server = self.mcp._mcp_server
+        
+        # Store the original function
+        original_init_fn = mcp_server.create_initialization_options
+        
+        # Replace with our custom function
+        def modified_init_options():
+            options = original_init_fn()
+            # Based on the FastMCP source code, we need to modify the capabilities
+            if isinstance(options, dict) and 'capabilities' in options:
+                caps = options['capabilities']
+                for cap_type in ['tools', 'resources', 'prompts']:
+                    if cap_type in caps:
+                        # Force "listChanged" to be True to make clients request the lists
+                        caps[cap_type]['listChanged'] = True
+            return options
+        
+        # Replace the function
+        mcp_server.create_initialization_options = modified_init_options
     
     def run(self):
         """Run the MCP server."""

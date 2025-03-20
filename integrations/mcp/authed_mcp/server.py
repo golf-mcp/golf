@@ -94,6 +94,23 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
     """Create a Starlette application that can serve the provided mcp server with SSE."""
     sse = SseServerTransport("/messages/")
 
+    # Force listChanged to be true EVERY time before handling an SSE connection
+    original_init_fn = mcp_server.create_initialization_options
+    
+    def modified_init_options():
+        options = original_init_fn()
+        # Force capabilities to show tools as changed
+        if isinstance(options, dict) and 'capabilities' in options:
+            for cap_type in ['tools', 'resources', 'prompts']:
+                if cap_type in options['capabilities']:
+                    logger.info(f"Setting {cap_type} listChanged to True in initialization options")
+                    options['capabilities'][cap_type]['listChanged'] = True
+        return options
+    
+    # Replace the function
+    mcp_server.create_initialization_options = modified_init_options
+    logger.info("Modified initialization options to advertise changed tools")
+
     async def handle_sse(request: Request) -> None:
         """Handle SSE connections with Authed authentication."""
         # Log the incoming request
@@ -169,6 +186,10 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
         
         # If authentication is successful, proceed with the connection
         try:
+            # Log the init options to verify our change is working
+            init_options = mcp_server.create_initialization_options()
+            logger.info(f"Starting SSE connection with options: {init_options}")
+            
             async with sse.connect_sse(
                     request.scope,
                     request.receive,
@@ -198,15 +219,15 @@ def create_starlette_app(mcp_server: Server, authed_auth, *, debug: bool = False
 def run_server(server: AuthedMCPServer, host: str = "0.0.0.0", port: int = 8000, debug: bool = False) -> None:
     """
     Run the MCP server with Starlette and Uvicorn.
-    
-    Args:
-        server: The AuthedMCPServer instance
-        host: Host to bind to
-        port: Port to listen on
-        debug: Whether to enable debug mode
     """
+    # Make sure handlers are properly initialized
+    server.initialize_handlers()
+    
     # Get the internal MCP server
     mcp_server = server.mcp._mcp_server
+    
+    # Debug: Check the actual registered handlers
+    logger.info("Checking registered handlers before starting server...")
     
     # Create a Starlette app with SSE transport and authentication
     starlette_app = create_starlette_app(
