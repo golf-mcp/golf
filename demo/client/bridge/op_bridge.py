@@ -18,17 +18,14 @@ else:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import the 1Password Authed client
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from client.op_client_authed import OnePasswordAuthedClient
+from ..op_client_authed import OnePasswordAuthedClient
 
 logger.info("Initializing MCP bridge server...")
 
-# Initialize FastMCP server for Cursor
+# Initialize FastMCP server
 mcp = FastMCP("op-bridge")
 
 # Initialize the 1Password Authed client
-logger.info("Creating 1Password Authed client...")
 op_client = OnePasswordAuthedClient()
 
 @mcp.tool()
@@ -75,40 +72,34 @@ async def health() -> Dict[str, str]:
             "message": error_msg
         }
 
-async def connect_and_verify():
-    """Connect to the Authed service and verify the connection."""
-    logger.info("Connecting to Authed-protected 1Password service...")
+async def main():
+    """Run the entire bridge in a single asyncio context."""
     try:
+        # First connect to the 1Password service
+        logger.info("Connecting to Authed-protected 1Password service...")
         await op_client.connect()
         logger.info("Successfully connected to Authed-protected 1Password service")
         
-        # Run a health check to verify connection
+        # Check health
         health_result = await health()
         if health_result["status"] == "ok":
             logger.info("Health check passed")
+            print("\n=== 1Password MCP Bridge ===")
+            print("✅ Connected to 1Password service")
+            print("Ready for connections from Cursor\n")
         else:
             logger.warning(f"Health check warning: {health_result['message']}")
-            
-    except Exception as e:
-        logger.error(f"Failed to connect to Authed-protected 1Password service: {str(e)}")
-        raise
-
-async def main():
-    """Run the MCP bridge."""
-    try:
-        # Connect to the Authed-protected 1Password service first
-        await connect_and_verify()
         
-        # Run the MCP server with stdio transport for Cursor integration
+        # Run the MCP server with stdio transport
         logger.info("Starting MCP bridge server with stdio transport...")
-        mcp.run(transport='stdio')
+        await mcp.run_stdio_async()
     except Exception as e:
         logger.error(f"Error running the MCP bridge: {str(e)}")
         sys.exit(1)
     finally:
-        # Clean up the client when the server stops
+        # Clean up the client
         await op_client.cleanup()
 
 if __name__ == "__main__":
-    # Use asyncio.run for the main function
+    # Run everything in a single asyncio event loop
     asyncio.run(main()) 

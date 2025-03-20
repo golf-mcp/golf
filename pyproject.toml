@@ -44,3 +44,6 @@ authed = "authed.cli.main:cli"
 [tool.setuptools.packages.find]
 include = ["authed*"]  # This will include authed and all its subpackages
 exclude = ["registry*", "tests*", "integrations*"]  # Exclude registry and tests directories
+
+[tool.uv.workspace]
+members = ["demo/client/bridge"]
