@@ -353,7 +353,7 @@ class ProviderService:
                 )
                 
                 # Get agent count for this provider
-                agent_count = db.query(func.count(AgentDB.id)).filter(
+                agent_count = db.query(func.count(AgentDB.agent_id)).filter(
                     AgentDB.provider_id == provider_db.id
                 ).scalar()
                 

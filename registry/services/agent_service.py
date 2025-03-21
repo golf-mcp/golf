@@ -244,7 +244,7 @@ class AgentService:
         db = SessionLocal()
         try:
             agent_db = db.query(AgentDB).filter(
-                AgentDB.id == agent_id
+                AgentDB.agent_id == agent_id
             ).first()
             
             if not agent_db:
