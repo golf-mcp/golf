@@ -14,7 +14,7 @@ from pydantic import (
 
 from ..utils.validation import sanitize_string
 
-NAME_PATTERN = r"^[a-zA-Z0-9_-]{3,50}$"
+NAME_PATTERN = r"^[a-zA-Z0-9_\s-]{3,50}$"
 
 class ProviderCreate(BaseModel):
     name: Annotated[str, Field(pattern=NAME_PATTERN)]
