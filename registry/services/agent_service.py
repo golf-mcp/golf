@@ -1,8 +1,9 @@
 import hashlib
 import secrets
 from datetime import datetime, timezone
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict, Any
 from uuid import uuid4
+from sqlalchemy import text
 
 from fastapi import HTTPException, Request, status
 
@@ -239,29 +240,187 @@ class AgentService:
             db.close()
 
     def get_agent(self, agent_id: str) -> Optional[Agent]:
-        """Get an agent by ID
-        
-        Args:
-            agent_id: The ID of the agent to retrieve
-            
-        Returns:
-            Optional[Agent]: The agent if found, None otherwise
-        """
+        """Get an agent by ID"""
         db = SessionLocal()
         try:
-            db_agent = db.query(AgentDB).filter(
+            agent_db = db.query(AgentDB).filter(
                 AgentDB.agent_id == agent_id
             ).first()
             
-            if not db_agent:
+            if not agent_db:
                 return None
                 
-            # Decrypt sensitive data before returning
-            if db_agent.dpop_public_key:
-                db_agent.dpop_public_key = encryption_manager.decrypt_field(db_agent.dpop_public_key)
-                
-            return Agent.model_validate(db_agent)
+            provider_db = db.query(ProviderDB).filter(
+                ProviderDB.id == agent_db.provider_id
+            ).first()
             
+            return Agent(
+                agent_id=agent_db.agent_id,
+                name=agent_db.name,
+                provider_id=agent_db.provider_id,
+                dpop_public_key=agent_db.dpop_public_key,
+                hashed_secret=agent_db.hashed_secret,
+                created_at=agent_db.created_at,
+                updated_at=agent_db.updated_at
+            )
         finally:
             db.close()
+
+    def list_agents(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        provider_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        include_inactive: bool = False
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        List all agents with pagination and filtering.
+        Used by admin interfaces for monitoring and analysis.
+        
+        Args:
+            skip: Number of records to skip (for pagination)
+            limit: Maximum number of records to return
+            provider_id: Filter by provider ID
+            user_id: Filter by user ID (optional)
+            from_date: Filter by created date (inclusive)
+            to_date: Filter by created date (inclusive)
+            include_inactive: Whether to include inactive agents
+            
+        Returns:
+            Tuple of (list of agent dictionaries, total count)
+        """
+        db = SessionLocal()
+        try:
+            # Start building the query
+            query = db.query(AgentDB, ProviderDB).join(
+                ProviderDB, AgentDB.provider_id == ProviderDB.id
+            )
+            
+            # Apply filters
+            if provider_id:
+                query = query.filter(AgentDB.provider_id == provider_id)
+
+            if from_date:
+                query = query.filter(AgentDB.created_at >= from_date)
+                
+            if to_date:
+                query = query.filter(AgentDB.created_at <= to_date)
+            
+            # Count total records (before pagination)
+            total_count = query.count()
+            
+            # Apply pagination
+            query = query.order_by(AgentDB.created_at.desc())
+            query = query.offset(skip).limit(limit)
+            
+            # Execute query and convert to model
+            agents = []
+            for agent_db, provider_db in query.all():
+                agent = Agent(
+                    agent_id=agent_db.agent_id,
+                    name=agent_db.name,
+                    provider_id=agent_db.provider_id,
+                    dpop_public_key=agent_db.dpop_public_key,
+                    hashed_secret=agent_db.hashed_secret,
+                    created_at=agent_db.created_at,
+                    updated_at=agent_db.updated_at
+                )
+                
+                # Create a dict from the Agent model that we can extend
+                agent_dict = agent.model_dump()
+                
+                # Add provider name to the agent dictionary
+                agent_dict["provider_name"] = provider_db.name if provider_db else None
+                
+                # Add agent's permissions directly to the dict
+                agent_dict["permissions"] = self._get_agent_permissions(db, agent_db.agent_id)
+                
+                # Add agent's request stats
+                request_count = 0
+                last_activity = None
+                
+                try:
+                    # Use text() for raw SQL to avoid SQLAlchemy errors
+                    request_count_result = db.execute(
+                        text("SELECT COUNT(*) FROM agent_requests WHERE agent_id = :agent_id"),
+                        {"agent_id": agent_db.agent_id}
+                    ).scalar()
+                    
+                    last_activity_result = db.execute(
+                        text("SELECT MAX(timestamp) FROM agent_requests WHERE agent_id = :agent_id"),
+                        {"agent_id": agent_db.agent_id}
+                    ).scalar()
+                    
+                    request_count = request_count_result or 0
+                    last_activity = last_activity_result
+                except Exception as e:
+                    log_service.log_event(
+                        "agent_stats_query_error",
+                        {
+                            "error": str(e),
+                            "agent_id": agent_db.agent_id
+                        },
+                        level=LogLevel.ERROR
+                    )
+                
+                # Add stats to the agent dictionary
+                agent_dict["stats"] = {
+                    "request_count": request_count,
+                    "last_activity": last_activity
+                }
+                
+                agents.append(agent_dict)
+                
+            return agents, total_count
+            
+        except Exception as e:
+            log_service.log_event(
+                "admin_list_agents_error",
+                {
+                    "error": str(e),
+                    "filters": {
+                        "provider_id": provider_id,
+                        "user_id": user_id,
+                        "from_date": from_date,
+                        "to_date": to_date,
+                        "include_inactive": include_inactive
+                    }
+                },
+                level=LogLevel.ERROR
+            )
+            raise
+        finally:
+            db.close()
+            
+    def _get_agent_permissions(self, db, agent_id: str) -> List[Dict[str, Any]]:
+        """Helper method to get agent permissions from DB"""
+        try:
+            # Query permissions from agent_permissions table using text()
+            permissions = []
+            permission_rows = db.execute(
+                text("SELECT scope, resource, action FROM agent_permissions WHERE agent_id = :agent_id"),
+                {"agent_id": agent_id}
+            ).fetchall()
+            
+            for row in permission_rows:
+                permissions.append({
+                    "scope": row[0],
+                    "resource": row[1],
+                    "action": row[2]
+                })
+                
+            return permissions
+        except Exception as e:
+            log_service.log_event(
+                "_get_agent_permissions_error",
+                {
+                    "error": str(e),
+                    "agent_id": agent_id
+                },
+                level=LogLevel.ERROR
+            )
+            return []
 

@@ -149,8 +149,7 @@ class PermissionService:
                 elif permission.type == PermissionType.ALLOW_PROVIDER:
                     # Verify provider exists and is active
                     provider = db.query(ProviderDB).filter(
-                        ProviderDB.id == from_agent.provider_id,
-                        ProviderDB.is_active == True
+                        ProviderDB.id == from_agent.provider_id
                     ).first()
                     
                     if not provider:

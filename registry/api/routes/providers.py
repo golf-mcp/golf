@@ -1,10 +1,12 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from pydantic import UUID4
 from fastapi import APIRouter, HTTPException, Header, Request, Query
+from datetime import datetime
 
 from ...core.logging.audit import AuditAction, AuditSeverity, audit_logger
 from ...models import Agent, ProviderCreate, ProviderUpdate
 from ...services import ProviderService, AgentService
+from ...core.config import get_settings
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 provider_service = ProviderService()
@@ -244,3 +246,62 @@ async def list_provider_agents(
             severity=AuditSeverity.ERROR
         )
         raise HTTPException(status_code=500, detail=error_msg)
+
+@router.get("/admin/list")
+async def admin_list_providers(
+    request: Request,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=1000),
+    name: Optional[str] = None,
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
+    include_inactive: bool = Query(default=False)
+):
+    """
+    Admin endpoint to list all providers with pagination and filtering options.
+    Protected by internal API key.
+    """
+    # Check for internal API key auth
+    api_key = request.headers.get("x-api-key")
+    if not api_key or api_key != get_settings().INTERNAL_API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+    
+    # Get providers with filters
+    providers, total_count = provider_service.list_providers(
+        skip=skip,
+        limit=limit,
+        name=name,
+        from_date=from_date,
+        to_date=to_date,
+        include_inactive=include_inactive
+    )
+    
+    # Log access for audit trail
+    audit_logger.log_event(
+        event_type=AuditAction.ADMIN_QUERY.value,
+        details={
+            "endpoint": "admin_list_providers",
+            "filters": {
+                "skip": skip,
+                "limit": limit,
+                "name": name,
+                "from_date": from_date.isoformat() if from_date else None,
+                "to_date": to_date.isoformat() if to_date else None,
+                "include_inactive": include_inactive
+            }
+        },
+        severity=AuditSeverity.INFO
+    )
+    
+    return {
+        "providers": providers,  # Now contains dictionaries with stats
+        "pagination": {
+            "total": total_count,
+            "skip": skip,
+            "limit": limit,
+            "has_more": (skip + limit) < total_count
+        }
+    }

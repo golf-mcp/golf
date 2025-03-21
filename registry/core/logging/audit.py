@@ -36,6 +36,9 @@ class AuditAction(str, Enum):
     AGENT_PERMISSION_CHANGE = "agent_permission_change"
     AGENT_PERMISSION_VIEW = "agent_permission_view"
     
+    # Admin actions 
+    ADMIN_QUERY = "admin_query"
+    ADMIN_ACTION = "admin_action"
     
     # Security events
     KEY_ROTATION = "key_rotation"
