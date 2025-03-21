@@ -247,7 +247,7 @@ async def list_provider_agents(
         )
         raise HTTPException(status_code=500, detail=error_msg)
 
-@router.get("/admin/list", response_model=Dict[str, Any])
+@router.get("/admin/list")
 async def admin_list_providers(
     request: Request,
     skip: int = Query(default=0, ge=0),
@@ -297,7 +297,7 @@ async def admin_list_providers(
     )
     
     return {
-        "providers": providers,
+        "providers": providers,  # Now contains dictionaries with stats
         "pagination": {
             "total": total_count,
             "skip": skip,

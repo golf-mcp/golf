@@ -357,12 +357,13 @@ class ProviderService:
                     AgentDB.provider_id == provider_db.id
                 ).scalar()
                 
-                # Add additional stats to the provider object
-                provider.stats = {
+                # Instead of adding stats to the model, add it to a dict representation
+                provider_dict = provider.model_dump()
+                provider_dict["stats"] = {
                     "agent_count": agent_count,
                 }
                 
-                providers.append(provider)
+                providers.append(provider_dict)  # Return dict instead of Provider object
                 
             return providers, total_count
             
