@@ -68,17 +68,11 @@ class LogService:
         self,
         event_type: str,
         details: Dict[str, Any],
-        level: LogLevel = LogLevel.INFO,
-        actor_id: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        resource_id: Optional[str] = None
+        level: LogLevel = LogLevel.INFO
     ):
         """Log an event with full context"""
         enriched_details = {
             **details,
-            "actor_id": actor_id,
-            "resource_type": resource_type,
-            "resource_id": resource_id,
             "environment": self.settings.ENV,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
@@ -190,16 +184,24 @@ class LogService:
             # Ensure consistent format for all logs
             formatted_logs = []
             for log in logs:
+                timestamp = log.get("timestamp")
+                formatted_timestamp = None
+                
+                # Handle different timestamp formats
+                if timestamp:
+                    if isinstance(timestamp, datetime):
+                        formatted_timestamp = timestamp.isoformat()
+                    elif isinstance(timestamp, str):
+                        formatted_timestamp = timestamp
+                    else:
+                        formatted_timestamp = str(timestamp)
+                
                 formatted_log = {
                     "id": log.get("id"),
-                    "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else None,
+                    "timestamp": formatted_timestamp,
                     "level": log.get("level"),
                     "event_type": log.get("event_type"),
-                    "details": log.get("details"),
-                    "agent_id": log.get("agent_id"),
-                    "provider_id": log.get("provider_id"),
-                    "resource_type": log.get("resource_type"),
-                    "resource_id": log.get("resource_id")
+                    "details": log.get("details")
                 }
                 formatted_logs.append(formatted_log)
                 

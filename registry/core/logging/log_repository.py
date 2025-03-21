@@ -2,6 +2,7 @@
 from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 from pydantic import UUID4
+from sqlalchemy import text
 from ...db.session import SessionLocal
 from .models import LogLevel, SecurityEvent
 
@@ -32,7 +33,7 @@ class LogRepository:
             query = db.query(SecurityEvent)
             
             if provider_id:
-                query = query.filter(SecurityEvent.details['provider_id'].astext == str(provider_id))
+                query = query.filter(text("details->>'provider_id' = :provider_id").params(provider_id=str(provider_id)))
             if since:
                 query = query.filter(SecurityEvent.timestamp > since)
                 
@@ -52,7 +53,7 @@ class LogRepository:
             query = db.query(SecurityEvent)
             
             if provider_id:
-                query = query.filter(SecurityEvent.details['provider_id'].astext == str(provider_id))
+                query = query.filter(text("details->>'provider_id' = :provider_id").params(provider_id=str(provider_id)))
             if since:
                 query = query.filter(SecurityEvent.timestamp > since)
                 
@@ -93,7 +94,8 @@ class LogRepository:
                     
                     # Handle JSON fields in details
                     if field_name in ['provider_id', 'agent_id']:
-                        query = query.filter(SecurityEvent.details[field_name].astext == str(value))
+                        # Use text() for JSONB queries
+                        query = query.filter(text(f"details->>'{field_name}' = :value").params(value=str(value)))
                     elif field_name == 'event_type':
                         query = query.filter(SecurityEvent.event_type == value)
                     elif field_name == 'level':
