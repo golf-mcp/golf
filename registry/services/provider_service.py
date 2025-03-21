@@ -301,7 +301,7 @@ class ProviderService:
         name: Optional[str] = None,
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None,
-        include_inactive: bool = False
+        include_inactive: Optional[bool] = False
     ) -> Tuple[List[Provider], int]:
         """
         List all providers with pagination and filtering.
@@ -333,9 +333,6 @@ class ProviderService:
             if to_date:
                 query = query.filter(ProviderDB.created_at <= to_date)
                 
-            if not include_inactive:
-                query = query.filter(ProviderDB.is_active == True)
-                
             # Count total records (before pagination)
             total_count = query.count()
             
@@ -352,8 +349,7 @@ class ProviderService:
                     contact_email=provider_db.contact_email,
                     registered_user_id=provider_db.registered_user_id,
                     created_at=provider_db.created_at,
-                    provider_secret=provider_db.provider_secret,
-                    is_active=provider_db.is_active
+                    provider_secret=provider_db.provider_secret
                 )
                 
                 # Get agent count for this provider
