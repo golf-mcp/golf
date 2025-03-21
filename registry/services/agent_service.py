@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Optional, Tuple, List, Dict, Any
 from uuid import uuid4
-from sqlalchemy import func
+from sqlalchemy import text
 
 from fastapi import HTTPException, Request, status
 
@@ -258,7 +258,6 @@ class AgentService:
                 agent_id=agent_db.agent_id,
                 name=agent_db.name,
                 provider_id=agent_db.provider_id,
-                user_id=agent_db.user_id,
                 dpop_public_key=agent_db.dpop_public_key,
                 hashed_secret=agent_db.hashed_secret,
                 created_at=agent_db.created_at,
@@ -324,7 +323,6 @@ class AgentService:
                     agent_id=agent_db.agent_id,
                     name=agent_db.name,
                     provider_id=agent_db.provider_id,
-                    user_id=agent_db.user_id,
                     dpop_public_key=agent_db.dpop_public_key,
                     hashed_secret=agent_db.hashed_secret,
                     created_at=agent_db.created_at,
@@ -341,22 +339,36 @@ class AgentService:
                 agent_dict["permissions"] = self._get_agent_permissions(db, agent_db.agent_id)
                 
                 # Add agent's request stats
-                request_count = db.query(func.count("*")).select_from(
-                    "agent_requests"
-                ).where(
-                    func.column("agent_id") == agent_db.agent_id
-                ).scalar()
+                request_count = 0
+                last_activity = None
                 
-                # Add agent's last activity
-                last_activity = db.query(func.max("timestamp")).select_from(
-                    "agent_requests"
-                ).where(
-                    func.column("agent_id") == agent_db.agent_id
-                ).scalar()
+                try:
+                    # Use text() for raw SQL to avoid SQLAlchemy errors
+                    request_count_result = db.execute(
+                        text("SELECT COUNT(*) FROM agent_requests WHERE agent_id = :agent_id"),
+                        {"agent_id": agent_db.agent_id}
+                    ).scalar()
+                    
+                    last_activity_result = db.execute(
+                        text("SELECT MAX(timestamp) FROM agent_requests WHERE agent_id = :agent_id"),
+                        {"agent_id": agent_db.agent_id}
+                    ).scalar()
+                    
+                    request_count = request_count_result or 0
+                    last_activity = last_activity_result
+                except Exception as e:
+                    log_service.log_event(
+                        "agent_stats_query_error",
+                        {
+                            "error": str(e),
+                            "agent_id": agent_db.agent_id
+                        },
+                        level=LogLevel.ERROR
+                    )
                 
                 # Add stats to the agent dictionary
                 agent_dict["stats"] = {
-                    "request_count": request_count or 0,
+                    "request_count": request_count,
                     "last_activity": last_activity
                 }
                 
@@ -386,10 +398,10 @@ class AgentService:
     def _get_agent_permissions(self, db, agent_id: str) -> List[Dict[str, Any]]:
         """Helper method to get agent permissions from DB"""
         try:
-            # Query permissions from agent_permissions table
+            # Query permissions from agent_permissions table using text()
             permissions = []
             permission_rows = db.execute(
-                "SELECT scope, resource, action FROM agent_permissions WHERE agent_id = :agent_id",
+                text("SELECT scope, resource, action FROM agent_permissions WHERE agent_id = :agent_id"),
                 {"agent_id": agent_id}
             ).fetchall()
             
