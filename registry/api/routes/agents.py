@@ -385,7 +385,7 @@ async def modify_agent_permissions(
         )
         raise HTTPException(status_code=500, detail=error_msg)
 
-@router.get("/admin/list", response_model=Dict[str, Any])
+@router.get("/admin/list")
 async def admin_list_agents(
     request: Request,
     skip: int = Query(default=0, ge=0),

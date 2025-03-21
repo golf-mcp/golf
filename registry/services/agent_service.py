@@ -255,14 +255,14 @@ class AgentService:
             ).first()
             
             return Agent(
-                id=agent_db.id,
+                agent_id=agent_db.agent_id,
                 name=agent_db.name,
                 provider_id=agent_db.provider_id,
-                provider_name=provider_db.name if provider_db else None,
-                created_at=agent_db.created_at,
                 user_id=agent_db.user_id,
-                is_active=agent_db.is_active,
-                dpop_bound=agent_db.dpop_bound
+                dpop_public_key=agent_db.dpop_public_key,
+                hashed_secret=agent_db.hashed_secret,
+                created_at=agent_db.created_at,
+                updated_at=agent_db.updated_at
             )
         finally:
             db.close()
@@ -276,7 +276,7 @@ class AgentService:
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None,
         include_inactive: bool = False
-    ) -> Tuple[List[Agent], int]:
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """
         List all agents with pagination and filtering.
         Used by admin interfaces for monitoring and analysis.
@@ -285,13 +285,13 @@ class AgentService:
             skip: Number of records to skip (for pagination)
             limit: Maximum number of records to return
             provider_id: Filter by provider ID
-            user_id: Filter by user ID
+            user_id: Filter by user ID (optional)
             from_date: Filter by created date (inclusive)
             to_date: Filter by created date (inclusive)
             include_inactive: Whether to include inactive agents
             
         Returns:
-            Tuple of (list of agents, total count)
+            Tuple of (list of agent dictionaries, total count)
         """
         db = SessionLocal()
         try:
@@ -303,19 +303,13 @@ class AgentService:
             # Apply filters
             if provider_id:
                 query = query.filter(AgentDB.provider_id == provider_id)
-                
-            if user_id:
-                query = query.filter(AgentDB.user_id == user_id)
-                
+
             if from_date:
                 query = query.filter(AgentDB.created_at >= from_date)
                 
             if to_date:
                 query = query.filter(AgentDB.created_at <= to_date)
-                
-            if not include_inactive:
-                query = query.filter(AgentDB.is_active == True)
-                
+            
             # Count total records (before pagination)
             total_count = query.count()
             
@@ -327,40 +321,46 @@ class AgentService:
             agents = []
             for agent_db, provider_db in query.all():
                 agent = Agent(
-                    id=agent_db.id,
+                    agent_id=agent_db.agent_id,
                     name=agent_db.name,
                     provider_id=agent_db.provider_id,
-                    provider_name=provider_db.name,
-                    created_at=agent_db.created_at,
                     user_id=agent_db.user_id,
-                    is_active=agent_db.is_active,
-                    dpop_bound=agent_db.dpop_bound
+                    dpop_public_key=agent_db.dpop_public_key,
+                    hashed_secret=agent_db.hashed_secret,
+                    created_at=agent_db.created_at,
+                    updated_at=agent_db.updated_at
                 )
                 
-                # Add agent's permissions
-                agent.permissions = self._get_agent_permissions(db, agent_db.id)
+                # Create a dict from the Agent model that we can extend
+                agent_dict = agent.model_dump()
+                
+                # Add provider name to the agent dictionary
+                agent_dict["provider_name"] = provider_db.name if provider_db else None
+                
+                # Add agent's permissions directly to the dict
+                agent_dict["permissions"] = self._get_agent_permissions(db, agent_db.agent_id)
                 
                 # Add agent's request stats
                 request_count = db.query(func.count("*")).select_from(
                     "agent_requests"
                 ).where(
-                    func.column("agent_id") == agent_db.id
+                    func.column("agent_id") == agent_db.agent_id
                 ).scalar()
                 
                 # Add agent's last activity
                 last_activity = db.query(func.max("timestamp")).select_from(
                     "agent_requests"
                 ).where(
-                    func.column("agent_id") == agent_db.id
+                    func.column("agent_id") == agent_db.agent_id
                 ).scalar()
                 
-                # Add stats to the agent object
-                agent.stats = {
+                # Add stats to the agent dictionary
+                agent_dict["stats"] = {
                     "request_count": request_count or 0,
                     "last_activity": last_activity
                 }
                 
-                agents.append(agent)
+                agents.append(agent_dict)
                 
             return agents, total_count
             
