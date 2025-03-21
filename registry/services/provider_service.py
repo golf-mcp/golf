@@ -1,8 +1,9 @@
 import secrets
 import uuid
 from datetime import UTC, datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from pydantic import UUID4
+from sqlalchemy import func
 from ..core.logging.logging import log_service
 from ..core.logging.models import LogLevel, SecurityEvent
 from ..core.security.key_manager import KeyManager
@@ -275,32 +276,114 @@ class ProviderService:
             db.close()
 
     def get_provider_by_secret(self, provider_secret: str) -> Optional[Provider]:
-        """Get provider by their secret
-        
-        Args:
-            provider_secret: The provider's secret key
-            
-        Returns:
-            Optional[Provider]: The provider if found and secret matches, None otherwise
-        """
-        if not provider_secret:
-            return None
-            
+        """Get a provider by their secret"""
         db = SessionLocal()
         try:
-            provider = db.query(ProviderDB).filter(
-                ProviderDB.provider_secret == provider_secret
-            ).first()
+            provider_db = db.query(ProviderDB).filter(ProviderDB.provider_secret == provider_secret).first()
+            if not provider_db:
+                return None
             
-            if provider:
-                return Provider(
-                    id=provider.id,
-                    name=provider.name,
-                    contact_email=provider.contact_email,
-                    created_at=provider.created_at,
-                    updated_at=provider.updated_at,
-                    provider_secret=provider.provider_secret
+            return Provider(
+                id=provider_db.id,
+                name=provider_db.name,
+                contact_email=provider_db.contact_email,
+                registered_user_id=provider_db.registered_user_id,
+                created_at=provider_db.created_at,
+                provider_secret=provider_db.provider_secret
+            )
+        finally:
+            db.close()
+            
+    def list_providers(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        name: Optional[str] = None,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        include_inactive: bool = False
+    ) -> Tuple[List[Provider], int]:
+        """
+        List all providers with pagination and filtering.
+        Used by admin interfaces for monitoring and analysis.
+        
+        Args:
+            skip: Number of records to skip (for pagination)
+            limit: Maximum number of records to return
+            name: Filter by provider name (partial match)
+            from_date: Filter by created date (inclusive)
+            to_date: Filter by created date (inclusive)
+            include_inactive: Whether to include inactive providers
+            
+        Returns:
+            Tuple of (list of providers, total count)
+        """
+        db = SessionLocal()
+        try:
+            # Start building the query
+            query = db.query(ProviderDB)
+            
+            # Apply filters
+            if name:
+                query = query.filter(ProviderDB.name.ilike(f"%{name}%"))
+                
+            if from_date:
+                query = query.filter(ProviderDB.created_at >= from_date)
+                
+            if to_date:
+                query = query.filter(ProviderDB.created_at <= to_date)
+                
+            if not include_inactive:
+                query = query.filter(ProviderDB.is_active == True)
+                
+            # Count total records (before pagination)
+            total_count = query.count()
+            
+            # Apply pagination
+            query = query.order_by(ProviderDB.created_at.desc())
+            query = query.offset(skip).limit(limit)
+            
+            # Execute query and convert to model
+            providers = []
+            for provider_db in query.all():
+                provider = Provider(
+                    id=provider_db.id,
+                    name=provider_db.name,
+                    contact_email=provider_db.contact_email,
+                    registered_user_id=provider_db.registered_user_id,
+                    created_at=provider_db.created_at,
+                    provider_secret=provider_db.provider_secret,
+                    is_active=provider_db.is_active
                 )
-            return None
+                
+                # Get agent count for this provider
+                agent_count = db.query(func.count(AgentDB.id)).filter(
+                    AgentDB.provider_id == provider_db.id
+                ).scalar()
+                
+                # Add additional stats to the provider object
+                provider.stats = {
+                    "agent_count": agent_count,
+                }
+                
+                providers.append(provider)
+                
+            return providers, total_count
+            
+        except Exception as e:
+            log_service.log_event(
+                "admin_list_providers_error",
+                {
+                    "error": str(e),
+                    "filters": {
+                        "name": name,
+                        "from_date": from_date,
+                        "to_date": to_date,
+                        "include_inactive": include_inactive
+                    }
+                },
+                level=LogLevel.ERROR
+            )
+            raise
         finally:
             db.close() 

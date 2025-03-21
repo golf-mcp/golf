@@ -3,14 +3,15 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Generator
 from pydantic import UUID4
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 
 from ...db import SessionLocal
 from ...core.logging.logging import log_service
-from ...core.logging.models import SecurityEvent
+from ...core.logging.models import SecurityEvent, LogLevel
 from ...services import AgentService, ProviderService
 from ...core.config import get_settings
+from ...core.logging.audit import AuditAction, AuditSeverity, audit_logger
 
 router = APIRouter(prefix="/logs", tags=["logs"])
 agent_service = AgentService()
@@ -300,4 +301,95 @@ async def websocket_logs(
         print(f"Error traceback: {traceback.format_exc()}")  # Debug log full traceback
         await websocket.close(code=4500, reason=str(e))
     finally:
-        db.close() 
+        db.close()
+
+@router.get("/admin/list", response_model=Dict[str, Any])
+async def admin_list_logs(
+    request: Request,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=5000),
+    provider_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
+    level: Optional[str] = None,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Admin endpoint to retrieve all logs with pagination and filtering.
+    Protected by internal API key.
+    
+    This endpoint allows admins to query all logs in the system with various filters
+    for monitoring, debugging, and analytics purposes.
+    """
+    # Check for internal API key auth
+    api_key = request.headers.get("x-api-key")
+    if not api_key or api_key != get_settings().INTERNAL_API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+    
+    try:
+        # Get logs with filters
+        logs, total_count = log_service.get_logs_for_admin(
+            skip=skip,
+            limit=limit,
+            provider_id=provider_id,
+            agent_id=agent_id,
+            event_type=event_type,
+            from_date=from_date,
+            to_date=to_date,
+            level=level
+        )
+        
+        # Log access for audit trail
+        audit_logger.log_event(
+            event_type=AuditAction.ADMIN_QUERY.value,
+            details={
+                "endpoint": "admin_list_logs",
+                "filters": {
+                    "skip": skip,
+                    "limit": limit,
+                    "provider_id": provider_id,
+                    "agent_id": agent_id,
+                    "event_type": event_type,
+                    "from_date": from_date.isoformat() if from_date else None,
+                    "to_date": to_date.isoformat() if to_date else None,
+                    "level": level
+                }
+            },
+            severity=AuditSeverity.INFO
+        )
+        
+        return {
+            "logs": logs,
+            "pagination": {
+                "total": total_count,
+                "skip": skip,
+                "limit": limit,
+                "has_more": (skip + limit) < total_count
+            }
+        }
+    except Exception as e:
+        # Log the error
+        log_service.log_event(
+            "admin_list_logs_error",
+            {
+                "error": str(e),
+                "filters": {
+                    "provider_id": provider_id,
+                    "agent_id": agent_id,
+                    "event_type": event_type,
+                    "from_date": from_date,
+                    "to_date": to_date,
+                    "level": level
+                }
+            },
+            level=LogLevel.ERROR
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving logs: {str(e)}"
+        ) 

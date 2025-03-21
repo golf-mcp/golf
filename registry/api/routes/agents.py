@@ -1,4 +1,5 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from datetime import datetime
 from cryptography.hazmat.primitives import serialization
 from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel
@@ -8,6 +9,7 @@ from ...core.logging.audit import AuditAction, AuditSeverity, audit_logger
 from ...models import AgentPermission, AgentRegistration
 from ...services import AgentService, PermissionService
 from ...core.security.key_manager import KeyManager
+from ...core.config import get_settings
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 agent_service = AgentService()
@@ -382,3 +384,65 @@ async def modify_agent_permissions(
             severity=AuditSeverity.ERROR
         )
         raise HTTPException(status_code=500, detail=error_msg)
+
+@router.get("/admin/list", response_model=Dict[str, Any])
+async def admin_list_agents(
+    request: Request,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=1000),
+    provider_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
+    include_inactive: bool = Query(default=False)
+):
+    """
+    Admin endpoint to list all agents with pagination and filtering options.
+    Protected by internal API key.
+    """
+    # Check for internal API key auth
+    api_key = request.headers.get("x-api-key")
+    if not api_key or api_key != get_settings().INTERNAL_API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+    
+    # Get agents with filters
+    agents, total_count = agent_service.list_agents(
+        skip=skip,
+        limit=limit,
+        provider_id=provider_id,
+        user_id=user_id,
+        from_date=from_date,
+        to_date=to_date,
+        include_inactive=include_inactive
+    )
+    
+    # Log access for audit trail
+    audit_logger.log_event(
+        event_type=AuditAction.ADMIN_QUERY.value,
+        details={
+            "endpoint": "admin_list_agents",
+            "filters": {
+                "skip": skip,
+                "limit": limit,
+                "provider_id": provider_id,
+                "user_id": user_id,
+                "from_date": from_date.isoformat() if from_date else None,
+                "to_date": to_date.isoformat() if to_date else None,
+                "include_inactive": include_inactive
+            }
+        },
+        severity=AuditSeverity.INFO
+    )
+    
+    return {
+        "agents": agents,
+        "pagination": {
+            "total": total_count,
+            "skip": skip,
+            "limit": limit,
+            "has_more": (skip + limit) < total_count
+        }
+    }
