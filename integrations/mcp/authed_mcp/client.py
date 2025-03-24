@@ -35,7 +35,7 @@ class AuthedMCPHeaders:
             url: The URL of the request
             method: HTTP method
             target_agent_id: Agent ID of the target server
-            fallback: Whether to fall back to basic auth if Authed auth fails
+            fallback: Whether to fall back to no auth if Authed auth fails
             
         Returns:
             Dict[str, str]: Headers to include in the request
@@ -75,16 +75,16 @@ class AuthedMCPHeaders:
                 if not fallback:
                     raise
         
-        # Fallback to basic auth if Authed auth failed or not configured
+        # Fallback - return just the basic headers if Authed auth failed or not configured
+        # MCP doesn't have native auth, so we don't add any auth headers in fallback mode
         if fallback:
             if self.debug:
-                logger.debug("Using fallback Basic authentication")
-            
-            auth_credentials = f"{self.authed.agent_id}:{self.authed.agent_secret}"
-            encoded_credentials = base64.b64encode(auth_credentials.encode()).decode('utf-8')
-            headers['Authorization'] = f"Basic {encoded_credentials}"
-        
-        return headers
+                logger.debug("Using fallback mode (no authentication)")
+            return headers
+        else:
+            # If we got here with fallback disabled, we failed to create Authed headers
+            # and should raise an error
+            raise ValueError("Failed to create Authed authentication headers and fallback is disabled")
 
 # Helper functions
 async def get_auth_headers(
@@ -102,7 +102,7 @@ async def get_auth_headers(
         url: The URL of the request
         method: HTTP method
         target_agent_id: Agent ID of the target server
-        fallback: Whether to fall back to basic auth if Authed auth fails
+        fallback: Whether to fall back to no auth if Authed auth fails
         debug: Enable debug logging
         
     Returns:
