@@ -45,18 +45,20 @@ class EncryptionManager:
                 
                 # Load keys into memory
                 for db_key in db_keys:
-                    self.keys[db_key.key_id] = EncryptionKey(
-                        key=db_key.key,
-                        salt=db_key.salt,
-                        created_at=db_key.created_at
-                    )
-                    if db_key.is_current:
-                        self.current_key_id = db_key.key_id
-                
-                log_service.log_event(
-                    "keys_loaded",
-                    {"key_count": len(self.keys)}
-                )
+                    try:
+                        self.keys[db_key.key_id] = EncryptionKey(
+                            key=db_key.key,
+                            salt=db_key.salt,
+                            created_at=db_key.created_at
+                        )
+                        if db_key.is_current:
+                            self.current_key_id = db_key.key_id
+                    except Exception as e:
+                        log_service.log_event(
+                            "encryption_key_load_error",
+                            {"key_id": db_key.key_id, "error": str(e), "error_type": type(e).__name__},
+                            level="ERROR"
+                        )
 
                 # Create new key if needed
                 if not self.keys or self._should_rotate_key():
@@ -65,7 +67,7 @@ class EncryptionManager:
         except Exception as e:
             log_service.log_event(
                 "key_load_error",
-                {"error": str(e)},
+                {"error": str(e), "error_type": type(e).__name__},
                 level="ERROR"
             )
             raise RuntimeError(f"Failed to load encryption keys: {str(e)}")
@@ -119,7 +121,7 @@ class EncryptionManager:
             db.rollback()
             log_service.log_event(
                 "key_creation_error",
-                {"error": str(e)},
+                {"error": str(e), "error_type": type(e).__name__},
                 level="ERROR"
             )
             raise RuntimeError(f"Failed to create new encryption key: {str(e)}")
@@ -161,12 +163,13 @@ class EncryptionManager:
                 fernet = Fernet(b64encode(derived_key))
                 
                 encrypted = fernet.encrypt(data.encode())
-                return f"{self.current_key_id}:{b64encode(encrypted).decode('utf-8')}"
+                result = f"{self.current_key_id}:{b64encode(encrypted).decode('utf-8')}"
+                return result
                 
         except Exception as e:
             log_service.log_event(
                 "encryption_error",
-                {"error": str(e)},
+                {"error": str(e), "error_type": type(e).__name__},
                 level="ERROR"
             )
             raise ValueError(f"Failed to encrypt data: {str(e)}")
@@ -179,10 +182,29 @@ class EncryptionManager:
         try:
             self._ensure_initialized()
             
+            # Check format of encrypted data
+            if ":" not in encrypted_data:
+                log_service.log_event(
+                    "decrypt_field_format_error",
+                    {"error": "Missing key_id separator"},
+                    level="ERROR"
+                )
+                raise ValueError("Invalid encrypted data format: missing key_id separator")
+            
             key_id, data = encrypted_data.split(":", 1)
+            
+            log_service.log_event(
+                "decrypt_field_parsed",
+                {"key_id": key_id, "data_len": len(data)}
+            )
             
             # Load key if not in memory
             if key_id not in self.keys:
+                log_service.log_event(
+                    "decrypt_key_not_in_memory",
+                    {"key_id": key_id, "available_keys": list(self.keys.keys())}
+                )
+                
                 with SessionLocal() as db:
                     db_key = db.query(EncryptionKeyModel).filter(
                         EncryptionKeyModel.key_id == key_id,
@@ -190,8 +212,13 @@ class EncryptionManager:
                     ).first()
                     
                     if not db_key:
+                        log_service.log_event(
+                            "decrypt_key_not_found",
+                            {"key_id": key_id},
+                            level="ERROR"
+                        )
                         raise ValueError(f"Unknown or inactive key ID: {key_id}")
-                        
+                    
                     self.keys[key_id] = EncryptionKey(
                         key=db_key.key,
                         salt=db_key.salt,
@@ -210,13 +237,33 @@ class EncryptionManager:
             derived_key = kdf.derive(key.key)
             fernet = Fernet(b64encode(derived_key))
             
-            decrypted = fernet.decrypt(b64decode(data.encode()))
-            return decrypted.decode('utf-8')
+            try:
+                decoded_data = b64decode(data.encode())
+                log_service.log_event("decrypt_field_decoded", {"decoded_len": len(decoded_data)})
+            except Exception as e:
+                log_service.log_event(
+                    "decrypt_field_decode_error", 
+                    {"error": str(e), "error_type": type(e).__name__},
+                    level="ERROR"
+                )
+                raise ValueError(f"Failed to decode encrypted data: {str(e)}")
+            
+            try:
+                decrypted = fernet.decrypt(decoded_data)
+                result = decrypted.decode('utf-8')
+                return result
+            except Exception as e:
+                log_service.log_event(
+                    "decrypt_field_fernet_error", 
+                    {"error": str(e), "error_type": type(e).__name__},
+                    level="ERROR"
+                )
+                raise ValueError(f"Failed to decrypt data with Fernet: {str(e)}")
             
         except Exception as e:
             log_service.log_event(
                 "decryption_error",
-                {"error": str(e)},
+                {"error": str(e), "error_type": type(e).__name__},
                 level="ERROR"
             )
             raise ValueError(f"Failed to decrypt data: {str(e)}")
@@ -238,15 +285,10 @@ class EncryptionManager:
                 if key_id in self.keys:
                     del self.keys[key_id]
                     
-                log_service.log_event(
-                    "key_deactivated",
-                    {"key_id": key_id}
-                )
-                
         except Exception as e:
             log_service.log_event(
                 "key_deactivation_error",
-                {"error": str(e)},
+                {"error": str(e), "error_type": type(e).__name__},
                 level="ERROR"
             )
             raise ValueError(f"Failed to deactivate key: {str(e)}")

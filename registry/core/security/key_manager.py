@@ -25,23 +25,42 @@ class KeyManager:
             public_key_data = os.getenv("REGISTRY_PUBLIC_KEY")
             encryption_key = os.getenv("REGISTRY_ENCRYPTION_KEY")
 
+
             if all([private_key_data, public_key_data, encryption_key]):
                 # Load from k8s secrets (env vars)
-                self.private_key = serialization.load_pem_private_key(
-                    private_key_data.encode(),
-                    password=None,
-                    backend=default_backend()
-                )
-                self.public_key = serialization.load_pem_public_key(
-                    public_key_data.encode(),
-                    backend=default_backend()
-                )
-                self._encryption_key = b64decode(encryption_key)
-                log_service.log_event("key_load", {"source": "kubernetes_secrets"})
+                try:
+                    self.private_key = serialization.load_pem_private_key(
+                        private_key_data.encode(),
+                        password=None,
+                        backend=default_backend()
+                    )
+                    self.public_key = serialization.load_pem_public_key(
+                        public_key_data.encode(),
+                        backend=default_backend()
+                    )
+                    
+                    # Add more detailed logging around encryption key decoding
+                    try:
+                        self._encryption_key = b64decode(encryption_key)
+                    except Exception as e:
+                        log_service.log_event(
+                            "encryption_key_decode_error",
+                            {"error": str(e),
+                             "encryption_key_snippet": encryption_key[:10] + "..." if encryption_key else None}
+                        )
+                        raise
+                    
+                except Exception as e:
+                    log_service.log_event(
+                        "key_load_detailed_error",
+                        {"error": str(e),
+                         "error_type": type(e).__name__,
+                         "stage": "key_parsing"}
+                    )
+                    raise
             else:
                 # Development/local environment - generate new keys
                 self._generate_new_keys()
-                log_service.log_event("key_load", {"source": "generated"})
 
         except Exception as e:
             log_service.log_event(
@@ -75,15 +94,6 @@ class KeyManager:
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
             )
-            log_service.log_event(
-                "development_keys_generated",
-                {
-                    "private_key": private_pem.decode(),
-                    "public_key": public_pem.decode(),
-                    "encryption_key": b64encode(self._encryption_key).decode()
-                }
-            )
-
     def get_private_key(self):
         return self.private_key
 
@@ -116,11 +126,28 @@ class KeyManager:
         if not encrypted_data:
             return encrypted_data
             
-        try:
-            encrypted = b64decode(encrypted_data)
+        try:            
+            try:
+                encrypted = b64decode(encrypted_data)
+            except Exception as e:
+                log_service.log_event(
+                    "data_decode_error", 
+                    {"error": str(e), "error_type": type(e).__name__}, 
+                    level="ERROR"
+                )
+                return encrypted_data
+            
+            if len(encrypted) < 40:  # Minimum expected length (12 IV + 16 tag + some ciphertext)
+                return encrypted_data
+                
             iv = encrypted[:12]
             tag = encrypted[12:28]
             ciphertext = encrypted[28:]
+            
+            
+            if self._encryption_key is None:
+                log_service.log_event("encryption_key_missing", level="ERROR")
+                return encrypted_data
             
             cipher = Cipher(
                 algorithms.AES(self._encryption_key),
@@ -132,5 +159,11 @@ class KeyManager:
             return plaintext.decode('utf-8')
             
         except Exception as e:
-            log_service.log_event("decryption_error", {"error": str(e)}, level="ERROR")
+            log_service.log_event(
+                "decryption_error", 
+                {"error": str(e), 
+                 "error_type": type(e).__name__,
+                 "encryption_key_exists": self._encryption_key is not None},
+                level="ERROR"
+            )
             return encrypted_data 

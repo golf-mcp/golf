@@ -6,12 +6,12 @@ from pydantic import UUID4
 from sqlalchemy import func
 from ..core.logging.logging import log_service
 from ..core.logging.models import LogLevel, SecurityEvent
-from ..core.security.key_manager import KeyManager
+from ..core.security.encryption import EncryptionManager
 from ..db.models import AgentDB, ProviderDB
 from ..db.session import SessionLocal
 from ..models import Agent, Provider, ProviderUpdate
 
-key_manager = KeyManager()
+encryption_manager = EncryptionManager()
 
 class ProviderService:
     def register_provider(
@@ -227,9 +227,8 @@ class ProviderService:
             
             # Decrypt sensitive fields before converting to Pydantic models
             for agent in agents:
-                agent.dpop_public_key = key_manager.decrypt_data(agent.dpop_public_key)
-                agent.public_key = key_manager.decrypt_data(agent.public_key)
-                agent.hashed_secret = key_manager.decrypt_data(agent.hashed_secret)
+                if agent.dpop_public_key:
+                    agent.dpop_public_key = encryption_manager.decrypt_field(agent.dpop_public_key)
             
             # Convert to Pydantic models
             return [Agent.model_validate(agent) for agent in agents]
