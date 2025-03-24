@@ -1,6 +1,5 @@
 from typing import Dict, Optional
 import logging
-import base64
 from authed.sdk import Authed
 
 logger = logging.getLogger(__name__)

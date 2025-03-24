@@ -1,8 +1,9 @@
-from typing import Callable, List, Optional
 import logging
+from typing import Callable, List, Optional
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
+
 from authed.sdk import Authed
 
 logger = logging.getLogger(__name__)
