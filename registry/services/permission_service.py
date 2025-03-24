@@ -1,15 +1,14 @@
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import List
 
-from ..core.security.key_manager import KeyManager
+from ..core.security.encryption import EncryptionManager
 from ..db.models import AgentDB, ProviderDB
 from ..db.session import SessionLocal
 from ..models import Agent, AgentPermission, PermissionType
 from ..core.logging.models import LogLevel
 from ..core.logging.logging import log_service
 
-
-key_manager = KeyManager()
+encryption_manager = EncryptionManager()
 
 class PermissionService:
     def add_permission(
@@ -65,9 +64,8 @@ class PermissionService:
             db.commit()
             
             # Decrypt sensitive fields before converting to Agent model
-            agent.dpop_public_key = key_manager.decrypt_data(agent.dpop_public_key)
-            agent.hashed_secret = key_manager.decrypt_data(agent.hashed_secret)
-            
+            if agent.dpop_public_key:
+                agent.dpop_public_key = encryption_manager.decrypt_field(agent.dpop_public_key)
             return Agent.model_validate(agent)
         finally:
             db.close()
@@ -122,10 +120,16 @@ class PermissionService:
             db.commit()
             
             # Decrypt sensitive fields before converting to Agent model
-            agent.dpop_public_key = key_manager.decrypt_data(agent.dpop_public_key)
-            agent.hashed_secret = key_manager.decrypt_data(agent.hashed_secret)
-            
-            # Convert back to Agent model with proper permission objects
+            try:
+                if agent.dpop_public_key:
+                    agent.dpop_public_key = encryption_manager.decrypt_field(agent.dpop_public_key)
+                
+            except Exception as e:
+                log_service.log_event(
+                    "field_decryption_error",
+                    {"agent_id": agent_id, "error": str(e), "error_type": type(e).__name__},
+                    level=LogLevel.ERROR
+                )
             agent_model = Agent.model_validate(agent)
             return agent_model
         finally:
@@ -153,19 +157,10 @@ class PermissionService:
                     ).first()
                     
                     if not provider:
-                        log_service.log_event(
-                            "permission_check_failed",
-                            {
-                                "reason": "inactive_provider",
-                                "provider_id": str(from_agent.provider_id)
-                            },
-                            level=LogLevel.WARNING
-                        )
                         return False
                         
                     if permission.target_id == str(from_agent.provider_id):
                         return True
-                        
             return False
         finally:
             db.close()
@@ -200,8 +195,9 @@ class PermissionService:
             db.commit()
             
             # Decrypt sensitive fields before converting to Agent model
-            agent.dpop_public_key = key_manager.decrypt_data(agent.dpop_public_key)
-            agent.hashed_secret = key_manager.decrypt_data(agent.hashed_secret)
+            if agent.dpop_public_key:
+                agent.dpop_public_key = encryption_manager.decrypt_field(agent.dpop_public_key)
+            # Note: hashed_secret is not encrypted, it's a SHA-256 hash
             
             return Agent.model_validate(agent)
         finally:

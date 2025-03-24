@@ -261,7 +261,8 @@ class AgentService:
                 dpop_public_key=agent_db.dpop_public_key,
                 hashed_secret=agent_db.hashed_secret,
                 created_at=agent_db.created_at,
-                updated_at=agent_db.updated_at
+                updated_at=agent_db.updated_at,
+                permissions=agent_db.permissions or []
             )
         finally:
             db.close()
