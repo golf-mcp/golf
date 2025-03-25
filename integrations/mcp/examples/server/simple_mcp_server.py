@@ -1,3 +1,23 @@
+"""
+Example MCP Server with Authed Authentication
+
+This example demonstrates how to:
+1. Create an MCP server with Authed authentication
+2. Set up SSE endpoints for bidirectional communication
+3. Register and expose tools to authenticated clients
+4. Handle both GET (SSE) and POST (message) requests securely
+
+Usage:
+    1. Copy .env.example to .env and fill in your Authed credentials
+    2. Run the server: python simple_mcp_server.py
+    3. The server will start on http://localhost:8000 by default
+
+Security Notes:
+    - Always use HTTPS in production
+    - Keep your agent secrets secure
+    - Make sure your agent ID is different from your clients
+"""
+
 import os
 import sys
 import asyncio
@@ -23,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 class SimpleMCPServer:
     def __init__(self):
-        # Initialize Authed SDK
+        # Initialize Authed SDK with credentials from environment
         self.authed = Authed.initialize(
             registry_url=os.getenv("AUTHED_REGISTRY_URL", "https://api.getauthed.dev"),
             agent_id=os.getenv("AUTHED_AGENT_ID"),
@@ -32,34 +52,41 @@ class SimpleMCPServer:
             public_key=os.getenv("AUTHED_PUBLIC_KEY")
         )
         
-        # Initialize FastMCP server
+        # Initialize FastMCP server with a service name
         self.mcp = FastMCP("example-service")
         self.register_tools()
     
     def register_tools(self):
-        """Register MCP tools that will be available to clients."""
+        """Register MCP tools that will be available to authenticated clients."""
         
         @self.mcp.tool()
         async def echo(message: str) -> Dict[str, Any]:
-            """Simple echo tool for testing."""
+            """Simple echo tool for testing the connection."""
             logger.info(f"Echo tool called with message: {message}")
             return {"message": message}
         
         @self.mcp.tool()
         async def add_numbers(a: float, b: float) -> Dict[str, Any]:
-            """Add two numbers together."""
+            """Add two numbers together - example of a typed tool."""
             logger.info(f"Adding numbers: {a} + {b}")
             result = a + b
             return {"result": result}
     
     def create_app(self, debug: bool = False) -> Starlette:
-        """Create a Starlette application with SSE transport and Authed protection."""
-        # Create SSE transport
+        """Create a Starlette application with SSE transport and Authed protection.
+        
+        This sets up:
+        1. SSE endpoint for client connections
+        2. Message endpoint for client-to-server communication
+        3. Authed authentication middleware
+        4. Health check endpoint
+        """
+        # Create SSE transport for bidirectional communication
         sse = SseServerTransport("/messages/")
         
         # Create a handler for SSE connections
         async def handle_sse(request):
-            """Handle SSE connections"""
+            """Handle incoming SSE connections from clients."""
             logger.info(f"SSE connection request from: {request.client}")
             
             async with sse.connect_sse(
@@ -78,13 +105,14 @@ class SimpleMCPServer:
             Middleware(
                 AuthedMiddleware,
                 authed=self.authed,
-                require_auth=True,  # Set to False initially for testing
+                require_auth=True,  # Require authentication for all requests, setting this to False will allow unauthenticated requests
                 debug=True
             )
         ]
         
         # Create a simple health check endpoint
         async def health_check(request):
+            """Health check endpoint to verify server is running."""
             return StarletteResponse(
                 content='{"status": "ok"}',
                 media_type="application/json"
