@@ -8,7 +8,8 @@ The Authed MCP integration allows you to:
 
 1. Create MCP servers with Authed authentication
 2. Create MCP clients that can authenticate with Authed
-
+3. Connect to pure MCP servers without Authed authentication (optional)
+4. Accept connections from pure MCP clients without Authed authentication (optional)
 
 ## Installation
 
@@ -41,7 +42,11 @@ app = Starlette(
         Middleware(
             AuthedMiddleware,
             authed=authed,
-            require_auth=True
+            # If True, all requests must be authenticated using Authed
+            # If False, allows unauthenticated requests
+            require_auth=True,
+            # Enable debug logging for authentication
+            debug=True
         )
     ]
 )
@@ -68,7 +73,17 @@ headers = await get_auth_headers(
     authed=authed,
     url="http://localhost:8000/sse",
     method="GET",
-    target_agent_id=os.getenv("TARGET_AGENT_ID")
+    
+    # The agent ID of the server you're connecting to
+    # This must be different from your client's agent_id
+    target_agent_id=os.getenv("TARGET_AGENT_ID"),
+    
+    # If True, allows connection to pure MCP servers without Authed authentication
+    # If False, requires the server to support Authed authentication
+    fallback=False,
+    
+    # Enable debug logging for authentication
+    debug=True
 )
 ```
 
