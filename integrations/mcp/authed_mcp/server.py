@@ -112,6 +112,25 @@ class AuthedMiddleware(BaseHTTPMiddleware):
             
             # Call the next middleware or endpoint
             return await call_next(request)
+        
+        except TypeError as e:
+            # Handle specific errors like quote_from_bytes
+            logger.error(f"Type error in authentication: {str(e)}")
+            if "quote_from_bytes" in str(e) and not self.require_auth:
+                # This is a known error with URL quoting - allow through if auth not required
+                request.state.authenticated = False
+                return await call_next(request)
+            elif self.require_auth:
+                return JSONResponse(
+                    content={"error": f"Authentication error: {str(e)}"},
+                    status_code=401
+                )
+            else:
+                # If fallback is allowed, let the request proceed but mark as not authenticated
+                if self.debug:
+                    logger.debug(f"Allowing request despite auth error: {str(e)} (fallback mode)")
+                request.state.authenticated = False
+                return await call_next(request)
             
         except Exception as e:
             # Handle authentication errors
