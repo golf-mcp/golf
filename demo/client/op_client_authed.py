@@ -5,14 +5,16 @@ import logging
 import traceback
 from typing import List, Dict, Any
 from contextlib import AsyncExitStack
-
+import json
 from authed.sdk import Authed
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from dotenv import load_dotenv
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
 # Import our new Authed-MCP client utilities
-from authed_mcp import get_auth_headers
+from integrations.mcp import get_auth_headers
 
 load_dotenv()
 
@@ -121,9 +123,23 @@ class OnePasswordAuthedClient:
                 # Enter the streams context
                 streams = await self._streams_context.__aenter__()
                 
-                # Create MCP client session
-                logger.debug("Creating MCP client session")
-                self.session = ClientSession(streams)
+                logger.debug("Creating session context")
+                # Create session context
+                self._session_context = ClientSession(*streams)
+                
+                logger.debug("Entering session context")
+                # Enter the session context
+                self.session = await self._session_context.__aenter__()
+                
+                logger.debug("Initializing session")
+                # Initialize the session
+                await self.session.initialize()
+                
+                logger.debug("Listing tools to verify connection")
+                # List available tools to verify connection
+                response = await self.session.list_tools()
+                tools = response.tools
+                logger.info(f"Connected to server with tools: {[tool.name for tool in tools]}")
                 
                 logger.info("Successfully connected to MCP server")
                 return self.session
@@ -138,62 +154,155 @@ class OnePasswordAuthedClient:
     async def disconnect(self):
         """Disconnect from the MCP server."""
         logger.info("Disconnecting from MCP server")
-        
-        if self._streams_context:
-            await self._streams_context.__aexit__(None, None, None)
-            self._streams_context = None
-            logger.debug("Closed streams context")
-        
-        self.session = None
-        logger.info("Disconnected from MCP server")
+        try:
+            if self._session_context:
+                await self._session_context.__aexit__(None, None, None)
+                self._session_context = None
+                logger.debug("Closed session context")
+            
+            if self._streams_context:
+                await self._streams_context.__aexit__(None, None, None)
+                self._streams_context = None
+                logger.debug("Closed streams context")
+            
+            self.session = None
+            logger.info("Disconnected from MCP server")
+        except Exception as e:
+            logger.error(f"Error during disconnect: {str(e)}")
+            logger.debug(f"Disconnect error details: {traceback.format_exc()}")
+            raise
     
     async def list_vaults(self) -> List[Dict[str, str]]:
         """List all available 1Password vaults."""
         logger.info("Listing 1Password vaults")
         
         if not self.session:
+            logger.info("Session not connected, connecting now")
             await self.connect()
         
         try:
-            result = await self.session.tools.onepassword_list_vaults()
-            logger.debug(f"Got {len(result)} vaults")
-            return result
+            result = await self.session.call_tool("onepassword_list_vaults")
+            logger.info("Successfully retrieved vaults response")
+            
+            # Parse the content from the response
+            content = result.content
+            
+            # If content is a list with a single TextContent item
+            if isinstance(content, list) and len(content) == 1 and hasattr(content[0], 'text'):
+                # Extract the text which should be a JSON string
+                json_str = content[0].text
+                logger.debug(f"Parsing JSON from TextContent: {json_str}")
+                
+                # Parse the JSON string into a Python object
+                import json
+                vaults = json.loads(json_str)
+                
+                # Make sure we got a list
+                if not isinstance(vaults, list):
+                    vaults = [vaults]
+                    
+                logger.info(f"Successfully parsed {len(vaults)} vaults")
+                return vaults
+            else:
+                # Just return the content as-is if it's already a list
+                logger.info(f"Content is already parsed: {type(content)}")
+                return content
+                
         except Exception as e:
             logger.error(f"Error listing vaults: {str(e)}")
             raise
-    
+
     async def list_items(self, vault_id: str) -> List[Dict[str, str]]:
-        """List all items in a 1Password vault."""
-        logger.info(f"Listing items in vault: {vault_id}")
-        
+        """List all items in a vault."""
+        logger.info(f"Listing items in vault {vault_id}")
+
         if not self.session:
+            logger.info("Session not connected, connecting now")
             await self.connect()
-        
+            
         try:
-            result = await self.session.tools.onepassword_list_items(vault_id=vault_id)
-            logger.debug(f"Got {len(result)} items")
-            return result
+            result = await self.session.call_tool("onepassword_list_items", {
+                "vault_id": vault_id
+            })
+            logger.info(f"Successfully retrieved items response")
+            
+            # Parse the content from the response
+            content = result.content
+            
+            # If content is a list with a single TextContent item
+            if isinstance(content, list) and len(content) == 1 and hasattr(content[0], 'text'):
+                # Extract the text which should be a JSON string
+                json_str = content[0].text
+                logger.debug(f"Parsing JSON from TextContent: {json_str}")
+                
+                # Parse the JSON string into a Python object
+                import json
+                items = json.loads(json_str)
+                
+                # Make sure we got a list
+                if not isinstance(items, list):
+                    items = [items]
+                    
+                logger.info(f"Successfully parsed {len(items)} items")
+                return items
+            elif hasattr(content, 'text'):  # If content is a single TextContent
+                json_str = content.text
+                logger.debug(f"Parsing JSON from TextContent: {json_str}")
+                
+                # Parse the JSON string
+                import json
+                items = json.loads(json_str)
+                
+                # Make sure we got a list
+                if not isinstance(items, list):
+                    items = [items]
+                    
+                logger.info(f"Successfully parsed {len(items)} items")
+                return items
+            else:
+                # Just return the content as-is if it's already a list
+                logger.info(f"Content is already parsed: {type(content)}")
+                return content
+                
         except Exception as e:
-            logger.error(f"Error listing items: {str(e)}")
+            logger.error(f"Error listing items in vault {vault_id}: {str(e)}")
+            logger.debug(f"Error details: {traceback.format_exc()}")
             raise
-    
+
     async def get_secret(self, vault_id: str, item_id: str, field_name: str = "credential") -> Any:
         """Get a secret from 1Password."""
-        logger.info(f"Getting secret from vault: {vault_id}, item: {item_id}, field: {field_name}")
+        logger.info(f"Getting secret from vault={vault_id}, item={item_id}, field={field_name}")
         
         if not self.session:
+            logger.info("Session not connected, connecting now")
             await self.connect()
         
         try:
-            result = await self.session.tools.onepassword_get_secret(
-                vault_id=vault_id,
-                item_id=item_id,
-                field_name=field_name
-            )
-            logger.debug("Got secret")
-            return result
+            result = await self.session.call_tool("onepassword_get_secret", {
+                "vault_id": vault_id,
+                "item_id": item_id,
+                "field_name": field_name
+            })
+            logger.info("Successfully retrieved secret response")
+            
+            # Parse the content from the response
+            content = result.content
+            
+            # If content is a list with a single TextContent item
+            if isinstance(content, list) and len(content) == 1 and hasattr(content[0], 'text'):
+                # Extract the text which should be a JSON string
+                json_str = content[0].text
+                logger.debug(f"Parsing JSON from TextContent: {json_str}")
+                return json.loads(json_str)
+            elif hasattr(content, 'text'):  # If content is a single TextContent
+                return content.text
+            else:
+                # Just return the content as-is
+                return content
+                
         except Exception as e:
             logger.error(f"Error getting secret: {str(e)}")
+            logger.debug(f"Error details: {traceback.format_exc()}")
             raise
 
 async def main():

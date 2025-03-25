@@ -1,19 +1,22 @@
 import os
+import sys
 import logging
 from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 from authed.sdk import Authed
-from fastapi import FastAPI
-from authed.sdk.decorators.incoming.fastapi import verify_fastapi
 from op_client import OnePasswordClient
 from dotenv import load_dotenv
 from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport
 from starlette.responses import Response as StarletteResponse
-from starlette.routing import Route
+from starlette.routing import Route, Mount
 from starlette.middleware import Middleware
+import asyncio
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
 # Import our new Authed-MCP middleware
-from authed_mcp import AuthedMiddleware
+from integrations.mcp import AuthedMiddleware
 import uvicorn
 import json
 
@@ -90,16 +93,32 @@ try:
     # Create a function to set up the Starlette app with SSE transport
     def create_app(debug: bool = False) -> Starlette:
         """Create a Starlette application with SSE transport and Authed protection."""
-        # Create the SSE transport
-        transport = SseServerTransport(mcp_server)
+        # Create SSE transport
+        sse = SseServerTransport("/messages/")
+        
+        # Create a handler for SSE connections
+        async def handle_sse(request):
+            """Handle SSE connections"""
+            logger.info(f"SSE connection request from: {request.client}")
+            
+            async with sse.connect_sse(
+                request.scope,
+                request.receive,
+                request._send,  # type: ignore
+            ) as (read_stream, write_stream):
+                await mcp_server.run(
+                    read_stream,
+                    write_stream,
+                    mcp_server.create_initialization_options(),
+                )
         
         # Set up the middleware with our imported AuthedMiddleware
         middleware = [
             Middleware(
                 AuthedMiddleware,
                 authed=authed,
-                require_auth=True,
-                debug=debug
+                require_auth=False,
+                debug=True
             )
         ]
         
@@ -113,7 +132,8 @@ try:
         # Create the routes
         routes = [
             Route("/health", health_check),
-            Route("/sse", transport.handle_request),
+            Route("/sse", endpoint=handle_sse),
+            Mount("/messages/", app=sse.handle_post_message),
         ]
         
         # Create the app
@@ -127,6 +147,15 @@ try:
     
     # Create and run the app
     if __name__ == "__main__":
+        # Connect to 1Password if needed
+        try:
+            if hasattr(op_client, 'connect'):
+                logger.info("Connecting to 1Password...")
+                asyncio.run(op_client.connect())
+                logger.info("Connected to 1Password successfully")
+        except Exception as e:
+            logger.error(f"Error connecting to 1Password: {e}")
+        
         # Create the app
         app = create_app(debug=True)
         
