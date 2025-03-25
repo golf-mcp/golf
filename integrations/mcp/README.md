@@ -50,7 +50,7 @@ app = Starlette(
 ### Client Setup
 
 ```python
-from authed.sdk import Authed
+from authed import Authed
 from mcp import ClientSession
 from authed_mcp import get_auth_headers
 
