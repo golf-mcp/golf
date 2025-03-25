@@ -72,33 +72,12 @@ headers = await get_auth_headers(
 )
 ```
 
-## Environment Setup
-
-Required environment variables:
-
-```bash
-# For both client and server
-AUTHED_REGISTRY_URL=https://api.getauthed.dev
-AUTHED_AGENT_ID=your_agent_id
-AUTHED_AGENT_SECRET=your_agent_secret
-
-# Additional for client
-TARGET_AGENT_ID=server_agent_id  # The agent ID of the server you're connecting to
-```
-
 ## Examples
 
 Check out the `examples` directory for complete working examples:
 
 - `examples/server/` - Example MCP server with Authed authentication
 - `examples/client/` - Example MCP client that connects to the server
-
-## Security Considerations
-
-1. Always use HTTPS in production
-2. Keep your agent secrets secure
-3. Never use the same agent ID for both client and server
-4. Ensure proper DPoP token validation
 
 ## Contributing
 
