@@ -25,7 +25,7 @@ import logging
 from typing import Dict, Any
 from dotenv import load_dotenv
 
-from authed.sdk import Authed
+from authed import Authed
 from mcp.server.fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette

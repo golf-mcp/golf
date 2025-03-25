@@ -24,7 +24,7 @@ import os
 import asyncio
 import logging
 from dotenv import load_dotenv
-from authed.sdk import Authed
+from authed import Authed
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from authed_mcp.client import get_auth_headers
