@@ -100,7 +100,7 @@ async def main():
         sys.exit(1)
     finally:
         # Clean up the client
-        await op_client.cleanup()
+        await op_client.disconnect()
 
 if __name__ == "__main__":
     # Run everything in a single asyncio event loop

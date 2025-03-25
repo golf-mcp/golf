@@ -1,20 +1,22 @@
 import os
-import asyncio
+import sys
 import logging
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 from authed.sdk import Authed
-from fastapi import FastAPI
-from authed.sdk.decorators.incoming.fastapi import verify_fastapi
 from op_client import OnePasswordClient
 from dotenv import load_dotenv
 from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport
-from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response as StarletteResponse
-from starlette.routing import Mount, Route
+from starlette.routing import Route, Mount
 from starlette.middleware import Middleware
-from starlette.middleware.base import BaseHTTPMiddleware
+import asyncio
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
+# Import our new Authed-MCP middleware
+from integrations.mcp import AuthedMiddleware
 import uvicorn
 import json
 
@@ -55,65 +57,7 @@ authed = Authed.initialize(
     public_key=os.getenv("AUTHED_PUBLIC_KEY")
 )
 
-# Create a custom middleware for Authed authentication
-class AuthedAuthMiddleware(BaseHTTPMiddleware):
-    """Middleware that verifies Authed authentication for all requests using SDK."""
-    
-    async def dispatch(self, request: StarletteRequest, call_next: Callable) -> StarletteResponse:
-        # Skip auth for OPTIONS requests (CORS preflight)
-        if request.method == "OPTIONS":
-            return await call_next(request)
-            
-        logger.debug(f"Verifying request to {request.url.path}")
-        logger.debug(f"Request method: {request.method}")
-        logger.debug(f"Request URL: {request.url}")
-        logger.debug(f"Request headers: {dict(request.headers)}")
-        
-        # Check for Authorization header
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            logger.warning("Request missing Authorization header")
-            return StarletteResponse(
-                content=json.dumps({"error": "Unauthorized - Missing Authorization header"}),
-                status_code=401,
-                headers={"Content-Type": "application/json"}
-            )
-        
-        # Get auth handler from Authed SDK
-        auth_handler = authed.auth
-        
-        try:
-            # Use the SDK's verify_request method - this is the proper way to verify
-            # a request using the Authed SDK, exactly as in the fastapi.py decorator
-            is_valid = await auth_handler.verify_request(
-                request.method,
-                str(request.url),
-                dict(request.headers)
-            )
-            
-            if not is_valid:
-                logger.error("Request verification failed")
-                return StarletteResponse(
-                    content=json.dumps({"error": "Unauthorized - Invalid authentication"}),
-                    status_code=401,
-                    headers={"Content-Type": "application/json"}
-                )
-            
-            # Add auth info to request state
-            request.state.authenticated = True
-            logger.info(f"Authentication successful for {request.url.path}")
-            
-            # Call the next middleware or endpoint
-            return await call_next(request)
-            
-        except Exception as e:
-            # Handle authentication errors
-            logger.error(f"Authentication error: {str(e)}")
-            return StarletteResponse(
-                content=json.dumps({"error": f"Authentication failed: {str(e)}"}),
-                status_code=401,
-                headers={"Content-Type": "application/json"}
-            )
+# We're now using the middleware from authed-mcp package instead of defining our own
 
 try:
     # Initialize FastMCP server
@@ -149,10 +93,12 @@ try:
     # Create a function to set up the Starlette app with SSE transport
     def create_app(debug: bool = False) -> Starlette:
         """Create a Starlette application with SSE transport and Authed protection."""
+        # Create SSE transport
         sse = SseServerTransport("/messages/")
         
-        async def handle_sse(request: StarletteRequest) -> None:
-            # This is where SSE connections are handled
+        # Create a handler for SSE connections
+        async def handle_sse(request):
+            """Handle SSE connections"""
             logger.info(f"SSE connection request from: {request.client}")
             
             async with sse.connect_sse(
@@ -166,59 +112,60 @@ try:
                     mcp_server.create_initialization_options(),
                 )
         
-        # Set up middleware with Authed authentication
+        # Set up the middleware with our imported AuthedMiddleware
         middleware = [
-            Middleware(AuthedAuthMiddleware),
+            Middleware(
+                AuthedMiddleware,
+                authed=authed,
+                require_auth=False,
+                debug=True
+            )
         ]
         
-        # Create the app with the proper routes and middleware
+        # Create a simple health check endpoint
+        async def health_check(request):
+            return StarletteResponse(
+                content=json.dumps({"status": "ok", "service": "op-service"}),
+                media_type="application/json"
+            )
+        
+        # Create the routes
+        routes = [
+            Route("/health", health_check),
+            Route("/sse", endpoint=handle_sse),
+            Mount("/messages/", app=sse.handle_post_message),
+        ]
+        
+        # Create the app
         app = Starlette(
             debug=debug,
             middleware=middleware,
-            routes=[
-                Route("/sse", endpoint=handle_sse),
-                Mount("/messages/", app=sse.handle_post_message),
-            ],
+            routes=routes
         )
         
         return app
     
-    # Create a FastAPI app with Authed protection for REST endpoints
-    fastapi_app = FastAPI()
-    
-    @fastapi_app.get("/health")
-    async def health_check():
-        """A simple health check endpoint."""
-        return {"status": "ok", "message": "1Password MCP server is running"}
-    
-    @fastapi_app.get("/auth-check")
-    @verify_fastapi
-    async def auth_check():
-        """A protected endpoint to verify Authed authentication."""
-        return {"status": "ok", "message": "Authentication successful"}
-    
-except Exception as e:
-    logger.error(f"Error during initialization: {str(e)}")
-    import sys
-    sys.exit(1)
-
-if __name__ == "__main__":
-    try:
-        # Connect to 1Password
-        logger.info("Connecting to 1Password...")
-        asyncio.run(op_client.connect())
-        logger.info("Successfully connected to 1Password")
+    # Create and run the app
+    if __name__ == "__main__":
+        # Connect to 1Password if needed
+        try:
+            if hasattr(op_client, 'connect'):
+                logger.info("Connecting to 1Password...")
+                asyncio.run(op_client.connect())
+                logger.info("Connected to 1Password successfully")
+        except Exception as e:
+            logger.error(f"Error connecting to 1Password: {e}")
         
-        # Create the Starlette app with Authed protection
-        logger.info("Creating Starlette app with Authed authentication...")
+        # Create the app
         app = create_app(debug=True)
         
-        # Run the server
-        logger.info("Starting the server...")
+        # Get port from environment
         port = int(os.getenv("PORT", "8000"))
+        
+        # Run the app
         uvicorn.run(app, host="0.0.0.0", port=port)
-    except Exception as e:
-        logger.error(f"Error running the server: {str(e)}")
-        import sys
-        sys.exit(1)
+        
+except Exception as e:
+    logger.error(f"Error initializing server: {str(e)}")
+    raise
    
