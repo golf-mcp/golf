@@ -70,13 +70,20 @@ async def patch_provider(
                 detail="Providers can only update their own details"
             )
         
+        # Create safe log data by excluding sensitive fields
+        safe_update_data = {
+            "name": updates.name is not None,  # Just log if field is being updated
+            "contact_email": updates.contact_email is not None,  # Just log if field is being updated
+            "claimed": updates.claimed  # Boolean status is ok to log
+        }
+        
         # Log the update attempt
         audit_logger.log_event(
             event_type=AuditAction.PROVIDER_UPDATE.value,
             details={
                 "provider_id": provider_id,
                 "auth_method": auth_method,
-                "updates": updates.model_dump(exclude_unset=True)
+                "fields_updated": safe_update_data
             }
         )
         
@@ -85,12 +92,17 @@ async def patch_provider(
         
         return updated
     except ValueError as e:
+        # Log error without sensitive data
         audit_logger.log_event(
             event_type=AuditAction.PROVIDER_UPDATE.value,
             details={
                 "error": str(e),
                 "provider_id": provider_id,
-                "updates": updates.model_dump(exclude_unset=True)
+                "fields_attempted": {
+                    "name": updates.name is not None,
+                    "contact_email": updates.contact_email is not None,
+                    "claimed": updates.claimed is not None
+                }
             },
             severity=AuditSeverity.ERROR
         )
@@ -99,12 +111,17 @@ async def patch_provider(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        # Log error without sensitive data
         audit_logger.log_event(
             event_type=AuditAction.PROVIDER_UPDATE.value,
             details={
                 "error": str(e),
                 "provider_id": provider_id,
-                "updates": updates.model_dump(exclude_unset=True)
+                "fields_attempted": {
+                    "name": updates.name is not None,
+                    "contact_email": updates.contact_email is not None,
+                    "claimed": updates.claimed is not None
+                }
             },
             severity=AuditSeverity.ERROR
         )

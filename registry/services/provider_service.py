@@ -138,10 +138,12 @@ class ProviderService:
             if not provider:
                 raise ValueError(f"Provider {provider_id} not found")
 
-            # Convert updates to dict and handle datetime fields
-            update_dict = updates.model_dump(exclude_unset=True)
-            if "updated_at" in update_dict:
-                update_dict["updated_at"] = update_dict["updated_at"].isoformat()
+            # Create safe log data by excluding sensitive fields
+            safe_update_data = {
+                "name": updates.name is not None,  # Just log if field is being updated
+                "contact_email": updates.contact_email is not None,  # Just log if field is being updated
+                "claimed": updates.claimed  # Boolean status is ok to log
+            }
 
             # Log the update attempt
             log_service.log_event(
@@ -150,7 +152,7 @@ class ProviderService:
                     "actor_id": provider_id,  # The provider making the change
                     "resource_type": "provider",
                     "resource_id": provider_id,
-                    "changes": update_dict
+                    "fields_updated": safe_update_data
                 },
                 level=LogLevel.INFO
             )
@@ -169,7 +171,12 @@ class ProviderService:
                 {
                     "error_details": {
                         "message": str(e),
-                        "provider_id": provider_id
+                        "provider_id": provider_id,
+                        "fields_attempted": {
+                            "name": updates.name is not None,
+                            "contact_email": updates.contact_email is not None,
+                            "claimed": updates.claimed is not None
+                        }
                     }
                 },
                 level=LogLevel.ERROR
