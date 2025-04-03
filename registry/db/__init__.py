@@ -34,6 +34,15 @@ def initialize_models():
         # All models are already registered via the top-level imports
         # Create all tables using SQLAlchemy's built-in functionality
         Base.metadata.create_all(bind=engine)
+        
+        # Run migrations if needed
+        try:
+            from .migrations import run_all_migrations
+            run_all_migrations()
+        except ImportError:
+            # Migrations package might not exist yet
+            pass
+            
         return True
     except SQLAlchemyError as e:
         print(f"Error creating tables: {str(e)}")
