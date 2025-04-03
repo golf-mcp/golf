@@ -34,7 +34,7 @@ wheels = [
 
 [[package]]
 name = "authed"
-version = "0.2.4"
+version = "0.2.5"
 source = { editable = "." }
 dependencies = [
     { name = "authed-mcp" },
@@ -49,7 +49,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "authed-mcp", specifier = ">=0.1.2" },
+    { name = "authed-mcp", specifier = ">=0.2.0" },
     { name = "click", specifier = ">=8.1.8" },
     { name = "cryptography", specifier = ">=44.0.0" },
     { name = "httpx", specifier = ">=0.28.1" },
@@ -61,7 +61,7 @@ requires-dist = [
 
 [[package]]
 name = "authed-mcp"
-version = "0.1.9"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "authed" },
@@ -73,9 +73,9 @@ dependencies = [
     { name = "starlette" },
     { name = "uvicorn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f0/8c/9f5ae1c14acafc610cdf94f064685bff1c39427a7493b6ad2fcba41e2182/authed_mcp-0.1.9.tar.gz", hash = "sha256:44d626d34499fc96ac6c718d341291181dc1a66361845873087901a888165794", size = 11995 }
+sdist = { url = "https://files.pythonhosted.org/packages/76/9b/eaa9cc6340e33464d1aad6e6e5aaf15227c2e0745aa9417e7e4ca96a3fe5/authed_mcp-0.2.0.tar.gz", hash = "sha256:5c96d2593efc9a7a509654921976b97b8807b6e559a959773dc22fc6878ac59c", size = 5208 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/cb/b40ca5e1f917a6a59b1fda5607a016954297fa185626f81327102aeb7f9d/authed_mcp-0.1.9-py3-none-any.whl", hash = "sha256:8f867da76316157ba16e83c7680f5b6f2b109095a22b89fff7ccc213e49524ad", size = 12898 },
+    { url = "https://files.pythonhosted.org/packages/7a/b3/afc294205a8e82d1c8a20105cd3e0ee9cd7bc52495c456119b0c2f32b426/authed_mcp-0.2.0-py3-none-any.whl", hash = "sha256:6585f938607c6867d4e65b86e4435541473a535c50ac357ef500bca3a5bf32aa", size = 5628 },
 ]
 
 [[package]]
