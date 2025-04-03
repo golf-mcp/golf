@@ -21,7 +21,8 @@ from sqlalchemy import (
     JSON,
     String,
     TypeDecorator,
-    UUID
+    UUID,
+    Boolean
 )
 from sqlalchemy.orm import relationship
 
@@ -130,12 +131,13 @@ class ProviderDB(Base):
     __tablename__ = "providers"
     
     id = Column(String, primary_key=True)
-    name = Column(String, nullable=False)
-    contact_email = Column(String, nullable=False)
+    name = Column(String, nullable=True)
+    contact_email = Column(String, nullable=True)
     registered_user_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     provider_secret = Column(String, nullable=True)
+    claimed = Column(Boolean, default=False)
     agents = relationship("AgentDB", back_populates="provider", lazy="dynamic")
 
     @model_serializer
@@ -146,7 +148,8 @@ class ProviderDB(Base):
             "contact_email": self.contact_email,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "provider_secret": self.provider_secret
+            "provider_secret": self.provider_secret,
+            "claimed": self.claimed
         }
 
 class InteractionTokenDB(Base):
