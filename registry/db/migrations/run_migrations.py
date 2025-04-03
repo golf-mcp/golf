@@ -3,7 +3,7 @@ Script to run all database migrations.
 This script should be run once to update the database schema.
 """
 
-from . import add_claimed_to_providers
+from registry.db.migrations import add_claimed_to_providers
 
 def run_all_migrations():
     """Run all database migrations"""

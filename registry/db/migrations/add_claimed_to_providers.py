@@ -4,7 +4,7 @@ This script should be run once to update the database schema.
 """
 
 from sqlalchemy import text
-from ..session import engine, SessionLocal
+from registry.db.session import engine, SessionLocal
 
 def run_migration():
     """Run the migration to add the claimed column to the providers table"""

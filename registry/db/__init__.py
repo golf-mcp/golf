@@ -37,10 +37,11 @@ def initialize_models():
         
         # Run migrations if needed
         try:
-            from .migrations import run_all_migrations
+            from registry.db.migrations.run_migrations import run_all_migrations
             run_all_migrations()
-        except ImportError:
+        except ImportError as e:
             # Migrations package might not exist yet
+            print(f"Note: Migrations not found or could not be run: {str(e)}")
             pass
             
         return True
