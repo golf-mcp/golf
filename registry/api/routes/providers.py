@@ -19,7 +19,8 @@ async def register_provider(provider: ProviderCreate):
         return provider_service.register_provider(
             name=provider.name,
             contact_email=provider.contact_email,
-            registered_user_id=str(provider.registered_user_id) if provider.registered_user_id else None
+            registered_user_id=str(provider.registered_user_id) if provider.registered_user_id else None,
+            claimed=provider.registered_user_id is not None  # If registered_user_id is provided, it's from dashboard signup
         )
     except ValueError as e:
         # Handle validation errors with 400 status code
@@ -39,6 +40,71 @@ async def register_provider(provider: ProviderCreate):
             details={
                 "error": str(e),
                 "name": provider.name
+            },
+            severity=AuditSeverity.ERROR
+        )
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.patch("/{provider_id}")
+async def patch_provider(
+    provider_id: UUID4,
+    updates: ProviderUpdate,
+    request: Request
+):
+    """Update provider details with partial updates
+    
+    This endpoint requires either:
+    1. Internal API key authentication (x-api-key header)
+    2. Provider authentication (provider-secret header) - can only update their own details
+    """
+    try:
+        # Auth is handled by middleware - if we get here, we're authenticated
+        # Check if it's provider auth by looking for provider in request state
+        provider = getattr(request.state, 'provider', None)
+        auth_method = "provider_auth" if provider else "internal_api"
+        
+        # If using provider auth, verify they're updating their own details
+        if provider and str(provider.id) != str(provider_id):
+            raise HTTPException(
+                status_code=403,
+                detail="Providers can only update their own details"
+            )
+        
+        # Log the update attempt
+        audit_logger.log_event(
+            event_type=AuditAction.PROVIDER_UPDATE.value,
+            details={
+                "provider_id": provider_id,
+                "auth_method": auth_method,
+                "updates": updates.model_dump(exclude_unset=True)
+            }
+        )
+        
+        # Update the provider
+        updated = provider_service.update_provider(provider_id, updates)
+        
+        return updated
+    except ValueError as e:
+        audit_logger.log_event(
+            event_type=AuditAction.PROVIDER_UPDATE.value,
+            details={
+                "error": str(e),
+                "provider_id": provider_id,
+                "updates": updates.model_dump(exclude_unset=True)
+            },
+            severity=AuditSeverity.ERROR
+        )
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        audit_logger.log_event(
+            event_type=AuditAction.PROVIDER_UPDATE.value,
+            details={
+                "error": str(e),
+                "provider_id": provider_id,
+                "updates": updates.model_dump(exclude_unset=True)
             },
             severity=AuditSeverity.ERROR
         )
@@ -93,36 +159,6 @@ async def list_provider_agents(
         if "Provider not found" in error_msg:
             raise HTTPException(status_code=404, detail=error_msg)
         raise HTTPException(status_code=400, detail=error_msg)
-
-@router.put("/{provider_id}/update")
-async def update_provider(
-    provider_id: UUID4,
-    updates: ProviderUpdate
-):
-    """Update provider details"""
-    try:
-        updated = provider_service.update_provider(provider_id, updates)
-        
-        audit_logger.log_event(
-            event_type=AuditAction.PROVIDER_UPDATE.value,
-            details={
-                "provider_id": provider_id,
-                "updates": updates.model_dump(exclude_unset=True)
-            }
-        )
-        
-        return updated
-    except ValueError as e:
-        audit_logger.log_event(
-            event_type=AuditAction.PROVIDER_UPDATE.value,
-            details={
-                "error": str(e),
-                "provider_id": provider_id,
-                "updates": updates.model_dump(exclude_unset=True)
-            },
-            severity=AuditSeverity.ERROR
-        )
-        raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/{provider_id}/stats")
 async def get_provider_stats(provider_id: UUID4) -> Dict[str, Any]:

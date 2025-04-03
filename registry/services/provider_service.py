@@ -16,11 +16,19 @@ encryption_manager = EncryptionManager()
 class ProviderService:
     def register_provider(
         self, 
-        name: str,
-        contact_email: str,
-        registered_user_id: Optional[str] = None
+        name: Optional[str] = None,
+        contact_email: Optional[str] = None,
+        registered_user_id: Optional[str] = None,
+        claimed: bool = False
     ) -> Provider:
-        """Register a new provider"""
+        """Register a new provider
+        
+        Args:
+            name: Optional provider name
+            contact_email: Optional contact email
+            registered_user_id: Optional user ID if registered through dashboard
+            claimed: Whether the provider is already claimed (True for dashboard signup, False for CLI)
+        """
         try:
             provider_id = str(uuid.uuid4())
             provider_secret = secrets.token_urlsafe(32)
@@ -31,7 +39,8 @@ class ProviderService:
                     "step": "creating_provider_model",
                     "provider_details": {
                         "id": provider_id,
-                        "name": name
+                        "name": name,
+                        "claimed": claimed
                     }
                 },
                 level=LogLevel.INFO
@@ -43,7 +52,8 @@ class ProviderService:
                 contact_email=contact_email,
                 registered_user_id=registered_user_id,
                 created_at=datetime.now(UTC),
-                provider_secret=provider_secret
+                provider_secret=provider_secret,
+                claimed=claimed
             )
             
             db = SessionLocal()
@@ -62,7 +72,8 @@ class ProviderService:
                     name=name,
                     contact_email=contact_email,
                     created_at=provider.created_at,
-                    provider_secret=provider_secret
+                    provider_secret=provider_secret,
+                    claimed=claimed
                 )
                 db.add(db_provider)
                 db.commit()
@@ -182,7 +193,8 @@ class ProviderService:
                     contact_email=provider.contact_email,
                     created_at=provider.created_at,
                     updated_at=provider.updated_at,
-                    provider_secret=provider.provider_secret
+                    provider_secret=provider.provider_secret,
+                    claimed=provider.claimed
                 )
             return None
         finally:
@@ -288,7 +300,8 @@ class ProviderService:
                 contact_email=provider_db.contact_email,
                 registered_user_id=provider_db.registered_user_id,
                 created_at=provider_db.created_at,
-                provider_secret=provider_db.provider_secret
+                provider_secret=provider_db.provider_secret,
+                claimed=provider_db.claimed
             )
         finally:
             db.close()
@@ -348,7 +361,8 @@ class ProviderService:
                     contact_email=provider_db.contact_email,
                     registered_user_id=provider_db.registered_user_id,
                     created_at=provider_db.created_at,
-                    provider_secret=provider_db.provider_secret
+                    provider_secret=provider_db.provider_secret,
+                    claimed=provider_db.claimed
                 )
                 
                 # Get agent count for this provider

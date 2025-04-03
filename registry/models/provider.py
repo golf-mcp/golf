@@ -17,14 +17,16 @@ from ..utils.validation import sanitize_string
 NAME_PATTERN = r"^[a-zA-Z0-9_\s-]{3,50}$"
 
 class ProviderCreate(BaseModel):
-    name: Annotated[str, Field(pattern=NAME_PATTERN)]
-    contact_email: EmailStr
+    name: Optional[Annotated[str, Field(pattern=NAME_PATTERN)]] = None
+    contact_email: Optional[EmailStr] = None
     registered_user_id: Optional[str] = None
 
     @field_validator('name')
     @classmethod
     def validate_name(cls, v):
-        return sanitize_string(v, NAME_PATTERN)
+        if v is not None:
+            return sanitize_string(v, NAME_PATTERN)
+        return v
 
     model_config = ConfigDict(
         validate_assignment=True
@@ -32,17 +34,20 @@ class ProviderCreate(BaseModel):
 
 class Provider(BaseModel):
     id: str
-    name: Annotated[str, Field(pattern=NAME_PATTERN)]
-    contact_email: EmailStr
+    name: Optional[Annotated[str, Field(pattern=NAME_PATTERN)]] = None
+    contact_email: Optional[EmailStr] = None
     registered_user_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     provider_secret: Optional[str] = None
+    claimed: bool = False
 
     @field_validator('name')
     @classmethod
     def validate_name(cls, v):
-        return sanitize_string(v, NAME_PATTERN)
+        if v is not None:
+            return sanitize_string(v, NAME_PATTERN)
+        return v
 
     @model_serializer
     def ser_model(self) -> Dict[str, Any]:
@@ -53,7 +58,8 @@ class Provider(BaseModel):
             "registered_user_id": self.registered_user_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "provider_secret": self.provider_secret
+            "provider_secret": self.provider_secret,
+            "claimed": self.claimed
         }
 
     model_config = ConfigDict(
@@ -64,6 +70,7 @@ class Provider(BaseModel):
 class ProviderUpdate(BaseModel):
     name: Optional[Annotated[str, Field(pattern=NAME_PATTERN, min_length=3, max_length=50)]] = None
     contact_email: Optional[EmailStr] = None
+    claimed: Optional[bool] = None
 
     @field_validator('name')
     @classmethod
