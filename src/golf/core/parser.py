@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import hashlib
 
 from rich.console import Console
 
@@ -436,47 +435,7 @@ def parse_project(project_path: Path) -> Dict[ComponentType, List[ParsedComponen
     return components
 
 
-def parse_project_incremental(project_path: Path, fingerprints: Dict[str, str]) -> Dict[ComponentType, List[ParsedComponent]]:
-    """Parse a project with incremental file checking."""
-    parser = AstParser(project_root=project_path)
-    
-    components: Dict[ComponentType, List[ParsedComponent]] = {
-        ComponentType.TOOL: [],
-        ComponentType.RESOURCE: [],
-        ComponentType.PROMPT: []
-    }
-    
-    # Process each directory
-    for comp_type, dir_name in [
-        (ComponentType.TOOL, "tools"),
-        (ComponentType.RESOURCE, "resources"),
-        (ComponentType.PROMPT, "prompts")
-    ]:
-        dir_path = project_path / dir_name
-        if not dir_path.exists() or not dir_path.is_dir():
-            continue
-            
-        # Parse only changed files using fingerprints
-        for file_path in dir_path.glob("**/*.py"):
-            if "__pycache__" in file_path.parts or file_path.name == "__init__.py":
-                continue
-                
-            # Check if file changed
-            with open(file_path, "rb") as f:
-                content = f.read()
-                file_hash = hashlib.sha1(content).hexdigest()
-            
-            rel_path = str(file_path.relative_to(project_path))
-            
-            if rel_path not in fingerprints or fingerprints[rel_path] != file_hash:
-                try:
-                    file_components = parser.parse_file(file_path)
-                    components[comp_type].extend([c for c in file_components if c.type == comp_type])
-                    fingerprints[rel_path] = file_hash
-                except Exception as e:
-                    console.print(f"[bold red]Error parsing {rel_path}: {e}[/bold red]")
-    
-    return components
+
 
 
 def parse_common_files(project_path: Path) -> Dict[str, Path]:
