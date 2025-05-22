@@ -83,7 +83,6 @@ class Settings(BaseSettings):
     
     # Feature flags
     telemetry: bool = Field(True, description="Enable anonymous telemetry")
-    hot_reload: bool = Field(True, description="Enable hot reload in dev mode")
     
     # Project paths
     tools_dir: str = Field("tools", description="Directory containing tools")
