@@ -50,7 +50,7 @@ cd your-project-name
 golf build dev
 golf run
 ```
-This will start the FastMCP server, typically on `http://127.0.0.1:3000` (configurable in `golf.json`). The `dev` command includes hot reloading, so changes to your component files will automatically restart the server.
+This will start the FastMCP server, typically on `http://127.0.0.1:3000` (configurable in `golf.json`).
 
 That's it! Your Golf server is running and ready for integration.
 
