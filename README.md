@@ -11,7 +11,9 @@
     <a href="https://github.com/golf-mcp/golf/issues"><img src="https://img.shields.io/badge/support-contact%20author-purple.svg" alt="Support"></a>
   </p>
   
-  <p><a href="https://docs.golf.dev">Docs</a></p>
+  <p>
+    <a href="https://docs.golf.dev"><strong>📚 Documentation</strong></a> •
+  </p>
 </div>
 
 ## Overview
@@ -114,19 +116,30 @@ Golf will automatically discover this file. The module docstring `"""Hello World
 
 ## Configuration (`golf.json`)
 
-Key aspects of your Golf server are configured in `golf.json`. The boilerplate provides a starting point like this:
+The `golf.json` file is the heart of your Golf project configuration. Here's what each field controls:
 
 ```jsonc
 {
-  "name": "{{project_name}}",          // Will be replaced with your project name
-  "description": "A Golf project", // A default description
-  "host": "127.0.0.1",               // Server host address
-  "port": 3000,                      // Server port
-  "transport": "sse",                // 'sse', 'streamable-http', or 'stdio'
-  "opentelemetry_enabled": false,    // OpenTelemetry disabled by default - we're working on this as a feature
-  "opentelemetry_default_exporter": "console"
+  "name": "{{project_name}}",          // Your MCP server name (required)
+  "description": "A Golf project",     // Brief description of your server's purpose
+  "host": "127.0.0.1",                // Server host - use "0.0.0.0" to listen on all interfaces
+  "port": 3000,                       // Server port - any available port number
+  "transport": "sse",                 // Communication protocol:
+                                      // - "sse": Server-Sent Events (recommended for web clients)
+                                      // - "streamable-http": HTTP with streaming support
+                                      // - "stdio": Standard I/O (for CLI integration)
 }
 ```
+
+### Key Configuration Options:
+
+- **`name`**: The identifier for your MCP server. This will be shown to clients connecting to your server.
+- **`transport`**: Choose based on your client needs:
+  - `"sse"` is ideal for web-based clients and real-time communication
+  - `"streamable-http"` provides HTTP streaming for traditional API clients
+  - `"stdio"` enables integration with command-line tools and scripts
+- **`host` & `port`**: Control where your server listens. Use `"127.0.0.1"` for local development or `"0.0.0.0"` to accept external connections.
+
 ## Roadmap
 
 Here are the things we are working hard on:
@@ -135,11 +148,6 @@ Here are the things we are working hard on:
 *   **`golf deploy` command for one click deployments to Vercel, Blaxel and other providers**
 *   **Production-ready OAuth token management, to allow for persistent, encrypted token storage and client mapping**
 
-## Documentation
-
-For more information, please visit our official documentation:
-
-[https://docs.golf.dev](https://docs.golf.dev)
 
 <div align="center">
 Made with ❤️ in Warsaw, Poland and SF
