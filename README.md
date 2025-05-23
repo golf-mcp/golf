@@ -10,12 +10,8 @@
   </h1>
   
   <h3 align="center">
-    🚀 Easiest framework for building MCP servers
+    Easiest framework for building MCP servers
   </h3>
-  
-  <p align="center">
-    <i>Build powerful AI agents with just Python files and a config</i>
-  </p>
   
   <br>
   
