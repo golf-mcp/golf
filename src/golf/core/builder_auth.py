@@ -5,12 +5,19 @@ into the generated FastMCP application during the build process.
 """
 
 from golf.auth import get_auth_config
+from golf.auth.api_key import get_api_key_config
 
 
 def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 3000, https: bool = False) -> str:
     """Generate code for setting up authentication in the FastMCP app.
     This code string will be injected into the generated server.py and executed at its runtime.
     """
+    # Check for API key configuration first
+    api_key_config = get_api_key_config()
+    if api_key_config:
+        return generate_api_key_auth_code(server_name)
+    
+    # Otherwise check for OAuth configuration
     original_provider_config, required_scopes_from_config = get_auth_config()
     
     if not original_provider_config:
@@ -114,10 +121,67 @@ def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 30
     return "\n".join(generated_code_lines)
 
 
+def generate_api_key_auth_code(server_name: str) -> str:
+    """Generate code for API key authentication middleware."""
+    api_key_config = get_api_key_config()
+    if not api_key_config:
+        return f"mcp = FastMCP({repr(server_name)}) # No API key authentication configured"
+    
+    generated_code_lines = []
+    
+    # Imports
+    generated_code_lines.extend([
+        "# API key authentication setup",
+        "from golf.auth.helpers import set_api_key",
+        "from golf.auth.api_key import get_api_key_config",
+        "from starlette.middleware.base import BaseHTTPMiddleware",
+        "from starlette.requests import Request",
+        "",
+        f"mcp = FastMCP({repr(server_name)})",
+        "",
+        "# Middleware to extract API key from headers",
+        "class ApiKeyMiddleware(BaseHTTPMiddleware):",
+        "    async def dispatch(self, request: Request, call_next):",
+        "        api_key_config = get_api_key_config()",
+        "        if api_key_config:",
+        "            # Extract API key from the configured header",
+        "            header_name = api_key_config.header_name",
+        "            header_prefix = api_key_config.header_prefix",
+        "            ",
+        "            # Case-insensitive header lookup",
+        "            api_key = None",
+        "            for k, v in request.headers.items():",
+        "                if k.lower() == header_name.lower():",
+        "                    api_key = v",
+        "                    break",
+        "            ",
+        "            # Strip prefix if configured and present",
+        "            if api_key and header_prefix and api_key.startswith(header_prefix):",
+        "                api_key = api_key[len(header_prefix):]",
+        "            ",
+        "            # Store the API key in context for tools to access",
+        "            set_api_key(api_key)",
+        "        ",
+        "        # Continue with the request",
+        "        response = await call_next(request)",
+        "        return response",
+        "",
+        "# Add the middleware to the FastMCP app",
+        "mcp.app.add_middleware(ApiKeyMiddleware)",
+    ])
+    
+    return "\n".join(generated_code_lines)
+
+
 def generate_auth_routes() -> str:
     """Generate code for OAuth routes in the FastMCP app.
     These routes are added to the FastMCP instance (`mcp`) created by `generate_auth_code`.
     """
+    # API key auth doesn't need special routes
+    api_key_config = get_api_key_config()
+    if api_key_config:
+        return ""
+    
     provider_config, _ = get_auth_config() # Used to check if auth is enabled generally
     if not provider_config:
         return ""
