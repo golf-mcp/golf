@@ -624,7 +624,10 @@ class CodeGenerator:
                         registration += f"\nmcp.add_tool({full_module_path}.{component.entry_function}"
                     else:
                         registration += f"\nmcp.add_tool({full_module_path}.export"
-                        
+                    
+                    # Add the name parameter
+                    registration += f", name=\"{component.name}\""
+                    
                     # Add description from docstring
                     if component.docstring:
                         # Escape any quotes in the docstring
@@ -640,6 +643,9 @@ class CodeGenerator:
                         registration += f"\nmcp.add_resource_fn({full_module_path}.{component.entry_function}, uri=\"{component.uri_template}\""
                     else:
                         registration += f"\nmcp.add_resource_fn({full_module_path}.export, uri=\"{component.uri_template}\""
+                    
+                    # Add the name parameter
+                    registration += f", name=\"{component.name}\""
                         
                     # Add description from docstring
                     if component.docstring:
@@ -656,6 +662,9 @@ class CodeGenerator:
                         registration += f"\nmcp.add_prompt({full_module_path}.{component.entry_function}"
                     else:
                         registration += f"\nmcp.add_prompt({full_module_path}.export"
+                    
+                    # Add the name parameter
+                    registration += f", name=\"{component.name}\""
                         
                     # Add description from docstring
                     if component.docstring:

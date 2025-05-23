@@ -69,7 +69,7 @@ def init(
         None, "--output-dir", "-o", help="Directory to create the project in"
     ),
     template: str = typer.Option(
-        "basic", "--template", "-t", help="Template to use (basic or advanced)"
+        "basic", "--template", "-t", help="Template to use (basic or api_key)"
     ),
 ) -> None:
     """Initialize a new GolfMCP project.
