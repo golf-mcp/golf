@@ -17,7 +17,7 @@ console = Console()
 # PostHog configuration
 # This is a client-side API key, safe to be public
 # Users can override with GOLF_POSTHOG_API_KEY environment variable
-DEFAULT_POSTHOG_API_KEY = "phc_7ccsDDxoC5tK5hodlrs2moGC74cThRzcN63flRYPWGl"  # Replace with your actual PostHog project API key
+DEFAULT_POSTHOG_API_KEY = "phc_7ccsDDxoC5tK5hodlrs2moGC74cThRzcN63flRYPWGl"
 POSTHOG_API_KEY = os.environ.get("GOLF_POSTHOG_API_KEY", DEFAULT_POSTHOG_API_KEY)
 POSTHOG_HOST = "https://us.i.posthog.com"
 
@@ -156,8 +156,8 @@ def initialize_telemetry() -> None:
     if not is_telemetry_enabled():
         return
     
-    # Skip initialization if no valid API key
-    if not POSTHOG_API_KEY or POSTHOG_API_KEY == DEFAULT_POSTHOG_API_KEY:
+    # Skip initialization if no valid API key (empty or placeholder)
+    if not POSTHOG_API_KEY or POSTHOG_API_KEY.startswith("phc_YOUR"):
         return
     
     try:
@@ -183,8 +183,8 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
     if not is_telemetry_enabled():
         return
     
-    # Skip if no valid API key
-    if not POSTHOG_API_KEY or POSTHOG_API_KEY == DEFAULT_POSTHOG_API_KEY:
+    # Skip if no valid API key (empty or placeholder)
+    if not POSTHOG_API_KEY or POSTHOG_API_KEY.startswith("phc_YOUR"):
         return
     
     try:
