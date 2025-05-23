@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 from typing import Optional
+import atexit
 
 import typer
 from rich.console import Console
@@ -10,6 +11,7 @@ from rich.panel import Panel
 
 from golf import __version__
 from golf.core.config import load_settings, find_project_root
+from golf.core.telemetry import is_telemetry_enabled, shutdown, set_telemetry_enabled, track_event
 
 # Create console for rich output
 console = Console()
@@ -20,6 +22,9 @@ app = typer.Typer(
     help="GolfMCP: A Pythonic framework for building MCP servers with zero boilerplate",
     add_completion=False,
 )
+
+# Register telemetry shutdown on exit
+atexit.register(shutdown)
 
 
 def _version_callback(value: bool) -> None:
@@ -43,7 +48,7 @@ def callback(
         False, "--verbose", "-v", help="Increase verbosity of output."
     ),
     no_telemetry: bool = typer.Option(
-        False, "--no-telemetry", help="Disable telemetry collection."
+        False, "--no-telemetry", help="Disable telemetry collection (persists for future commands)."
     ),
 ) -> None:
     """GolfMCP: A Pythonic framework for building MCP servers with zero boilerplate."""
@@ -51,9 +56,10 @@ def callback(
     if verbose:
         os.environ["GOLF_VERBOSE"] = "1"
     
-    # Set telemetry flag
+    # Set telemetry preference if flag is used
     if no_telemetry:
-        os.environ["GOLF_TELEMETRY"] = "0"
+        set_telemetry_enabled(False, persist=True)
+        console.print("[dim]Telemetry has been disabled. You can re-enable it with: golf telemetry enable[/dim]")
 
 
 @app.command()
@@ -78,7 +84,7 @@ def init(
     if output_dir is None:
         output_dir = Path.cwd() / project_name
     
-    # Execute the initialization command
+    # Execute the initialization command (it handles its own tracking)
     initialize_project(project_name=project_name, output_dir=output_dir, template=template)
 
 
@@ -100,6 +106,7 @@ def build_dev(
     if not project_root:
         console.print("[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]")
         console.print("Run 'golf init <project_name>' to create a new project.")
+        track_event("cli_build_failed", {"success": False, "environment": "dev"})
         raise typer.Exit(code=1)
     
     # Load settings from the found project
@@ -111,9 +118,15 @@ def build_dev(
     else:
         output_dir = Path(output_dir)
     
-    # Build the project with environment variables copied
-    from golf.commands.build import build_project
-    build_project(project_root, settings, output_dir, build_env="dev", copy_env=True)
+    try:
+        # Build the project with environment variables copied
+        from golf.commands.build import build_project
+        build_project(project_root, settings, output_dir, build_env="dev", copy_env=True)
+        # Track successful build with environment
+        track_event("cli_build_success", {"success": True, "environment": "dev"})
+    except Exception:
+        track_event("cli_build_failed", {"success": False, "environment": "dev"})
+        raise
 
 
 @build_app.command("prod")
@@ -129,6 +142,7 @@ def build_prod(
     if not project_root:
         console.print("[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]")
         console.print("Run 'golf init <project_name>' to create a new project.")
+        track_event("cli_build_failed", {"success": False, "environment": "prod"})
         raise typer.Exit(code=1)
     
     # Load settings from the found project
@@ -140,9 +154,15 @@ def build_prod(
     else:
         output_dir = Path(output_dir)
     
-    # Build the project without copying environment variables
-    from golf.commands.build import build_project
-    build_project(project_root, settings, output_dir, build_env="prod", copy_env=False)
+    try:
+        # Build the project without copying environment variables
+        from golf.commands.build import build_project
+        build_project(project_root, settings, output_dir, build_env="prod", copy_env=False)
+        # Track successful build with environment
+        track_event("cli_build_success", {"success": True, "environment": "prod"})
+    except Exception:
+        track_event("cli_build_failed", {"success": False, "environment": "prod"})
+        raise
 
 
 @app.command()
@@ -171,6 +191,7 @@ def run(
     if not project_root:
         console.print("[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]")
         console.print("Run 'golf init <project_name>' to create a new project.")
+        track_event("cli_run_failed", {"success": False})
         raise typer.Exit(code=1)
     
     # Load settings from the found project
@@ -192,21 +213,49 @@ def run(
         else:
             console.print(f"[bold red]Error: Dist directory {dist_dir} not found.[/bold red]")
             console.print("Run 'golf build' first or use --build to build automatically.")
+            track_event("cli_run_failed", {"success": False})
             raise typer.Exit(code=1)
     
-    # Import and run the server
-    from golf.commands.run import run_server
-    return_code = run_server(
-        project_path=project_root,
-        settings=settings,
-        dist_dir=dist_dir,
-        host=host,
-        port=port
-    )
-    
-    # Exit with the same code as the server
-    if return_code != 0:
-        raise typer.Exit(code=return_code)
+    try:
+        # Import and run the server
+        from golf.commands.run import run_server
+        return_code = run_server(
+            project_path=project_root,
+            settings=settings,
+            dist_dir=dist_dir,
+            host=host,
+            port=port
+        )
+        
+        # Track based on return code
+        if return_code == 0:
+            track_event("cli_run_success", {"success": True})
+        else:
+            track_event("cli_run_failed", {"success": False})
+        
+        # Exit with the same code as the server
+        if return_code != 0:
+            raise typer.Exit(code=return_code)
+    except Exception:
+        track_event("cli_run_failed", {"success": False})
+        raise
+
+
+# Add telemetry command group
+@app.command()
+def telemetry(
+    action: str = typer.Argument(..., help="Action to perform: 'enable' or 'disable'")
+):
+    """Manage telemetry settings."""
+    if action.lower() == "enable":
+        set_telemetry_enabled(True, persist=True)
+        console.print("[green]✓[/green] Telemetry enabled. Thank you for helping improve Golf!")
+    elif action.lower() == "disable":
+        set_telemetry_enabled(False, persist=True)
+        console.print("[yellow]Telemetry disabled.[/yellow] You can re-enable it anytime with: golf telemetry enable")
+    else:
+        console.print(f"[red]Unknown action '{action}'. Use 'enable' or 'disable'.[/red]")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
@@ -218,6 +267,13 @@ if __name__ == "__main__":
             border_style="green",
         )
     )
+    
+    # Add telemetry notice if enabled
+    if is_telemetry_enabled():
+        console.print(
+            "[dim]📊 Anonymous usage data is collected to improve Golf. "
+            "Disable with: golf telemetry disable[/dim]\n"
+        )
     
     # Run the CLI app
     app() 

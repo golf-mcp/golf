@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "golf-mcp"
-version = "0.1.2"
+version = "0.1.5"
 description = "Framework for building MCP servers"
 authors = [
     {name = "Antoni Gmitruk", email = "antoni@golf.dev"}
@@ -33,7 +33,8 @@ dependencies = [
     "python-dotenv>=1.1.0",
     "black>=24.10.0",
     "pyjwt>=2.0.0",
-    "httpx>=0.28.1"
+    "httpx>=0.28.1",
+    "posthog>=4.1.0"
 ]
 
 [project.optional-dependencies]
@@ -63,7 +64,7 @@ golf = ["examples/**/*"]
 
 [tool.poetry]
 name = "golf-mcp"
-version = "0.1.0"
+version = "0.1.5"
 description = "Framework for building MCP servers with zero boilerplate"
 authors = ["Antoni Gmitruk <antoni@golf.dev>"]
 license = "Apache-2.0"
