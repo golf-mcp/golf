@@ -150,9 +150,18 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
   - `"stdio"` enables integration with command-line tools and scripts
 - **`host` & `port`**: Control where your server listens. Use `"127.0.0.1"` for local development or `"0.0.0.0"` to accept external connections.
 
+## Roadmap
+
+Here are the things we are working hard on:
+
+*   **Native OpenTelemetry implementation for tracing**
+*   **`golf deploy` command for one click deployments to Vercel, Blaxel and other providers**
+*   **Production-ready OAuth token management, to allow for persistent, encrypted token storage and client mapping**
+
+
 ## Privacy & Telemetry
 
-Golf collects **anonymous** usage data to help us understand how the framework is being used and improve it over time. The data collected includes:
+Golf collects **anonymous** usage data on the CLI to help us understand how the framework is being used and improve it over time. The data collected includes:
 
 - Commands run (init, build, run)
 - Success/failure status (no error details)
@@ -180,22 +189,7 @@ You can disable telemetry in several ways:
    golf init my-project --no-telemetry
    ```
 
-3. **Environment variable** (temporary override):
-   ```bash
-   export GOLF_TELEMETRY=0
-   golf init my-project
-   ```
-
 Your telemetry preference is stored in `~/.golf/telemetry.json` and persists across all Golf commands.
-
-## Roadmap
-
-Here are the things we are working hard on:
-
-*   **Native OpenTelemetry implementation for tracing**
-*   **`golf deploy` command for one click deployments to Vercel, Blaxel and other providers**
-*   **Production-ready OAuth token management, to allow for persistent, encrypted token storage and client mapping**
-
 
 <div align="center">
 Made with ❤️ in Warsaw, Poland and SF
