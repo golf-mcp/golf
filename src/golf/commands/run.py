@@ -62,7 +62,11 @@ def run_server(
             cwd=dist_dir,
             env=env,
         )
+        
         return process.returncode
     except KeyboardInterrupt:
         console.print("\n[yellow]Server stopped by user[/yellow]")
-        return 0 
+        return 0
+    except Exception as e:
+        console.print(f"\n[bold red]Error running server:[/bold red] {e}")
+        return 1 
