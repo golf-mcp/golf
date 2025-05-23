@@ -24,12 +24,13 @@ def initialize_project(
     Args:
         project_name: Name of the project
         output_dir: Directory where the project will be created
-        template: Template to use (basic or advanced)
+        template: Template to use (basic or api_key)
     """
     # Validate template
-    if template not in ("basic", "advanced"):
+    valid_templates = ("basic", "api_key")
+    if template not in valid_templates:
         console.print(f"[bold red]Error:[/bold red] Unknown template '{template}'")
-        console.print("Available templates: basic, advanced")
+        console.print(f"Available templates: {', '.join(valid_templates)}")
         track_event("cli_init_failed", {"success": False})
         return
     
