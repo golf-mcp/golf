@@ -101,15 +101,16 @@ Creating a new tool is as simple as adding a Python file to the `tools/` directo
 # tools/hello.py
 """Hello World tool {{project_name}}."""
 
-from pydantic import BaseModel
+from typing import Annotated
+from pydantic import BaseModel, Field
 
 class Output(BaseModel):
     """Response from the hello tool."""
     message: str
 
 async def hello(
-    name: str = "World",
-    greeting: str = "Hello"
+    name: Annotated[str, Field(description="The name of the person to greet")] = "World",
+    greeting: Annotated[str, Field(description="The greeting phrase to use")] = "Hello"
 ) -> Output:
     """Say hello to the given name.
     
