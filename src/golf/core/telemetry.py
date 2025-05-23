@@ -9,19 +9,16 @@ import json
 
 import posthog
 from rich.console import Console
-from dotenv import load_dotenv
 
 from golf import __version__
 
 console = Console()
 
-# Load environment variables from core/.env if it exists
-core_env_path = Path(__file__).parent / ".env"
-if core_env_path.exists():
-    load_dotenv(core_env_path)
-
 # PostHog configuration
-POSTHOG_API_KEY = os.environ.get("GOLF_POSTHOG_API_KEY", "phc_YOUR_PROJECT_API_KEY")
+# This is a client-side API key, safe to be public
+# Users can override with GOLF_POSTHOG_API_KEY environment variable
+DEFAULT_POSTHOG_API_KEY = "phc_7ccsDDxoC5tK5hodlrs2moGC74cThRzcN63flRYPWGl"  # Replace with your actual PostHog project API key
+POSTHOG_API_KEY = os.environ.get("GOLF_POSTHOG_API_KEY", DEFAULT_POSTHOG_API_KEY)
 POSTHOG_HOST = "https://us.i.posthog.com"
 
 # Telemetry state
@@ -160,7 +157,7 @@ def initialize_telemetry() -> None:
         return
     
     # Skip initialization if no valid API key
-    if not POSTHOG_API_KEY or POSTHOG_API_KEY == "phc_YOUR_PROJECT_API_KEY":
+    if not POSTHOG_API_KEY or POSTHOG_API_KEY == DEFAULT_POSTHOG_API_KEY:
         return
     
     try:
@@ -187,7 +184,7 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
         return
     
     # Skip if no valid API key
-    if not POSTHOG_API_KEY or POSTHOG_API_KEY == "phc_YOUR_PROJECT_API_KEY":
+    if not POSTHOG_API_KEY or POSTHOG_API_KEY == DEFAULT_POSTHOG_API_KEY:
         return
     
     try:
