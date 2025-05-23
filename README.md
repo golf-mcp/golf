@@ -1,9 +1,23 @@
 <div align="center">
   <img src="./golf-banner.png" alt="Golf Banner">
   
-  <h1>Golf</h1>
+  <br>
   
-  <p><strong>Easiest framework for building MCP servers.</strong></p>
+  <h1 align="center">
+    <br>
+    <span style="font-size: 80px;">⛳ Golf</span>
+    <br>
+  </h1>
+  
+  <h3 align="center">
+    🚀 Easiest framework for building MCP servers
+  </h3>
+  
+  <p align="center">
+    <i>Build powerful AI agents with just Python files and a config</i>
+  </p>
+  
+  <br>
   
   <p>
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
@@ -12,7 +26,7 @@
   </p>
   
   <p>
-    <a href="https://docs.golf.dev"><strong>📚 Documentation</strong></a> •
+    <a href="https://docs.golf.dev"><strong>📚 Documentation</strong></a>
   </p>
 </div>
 
