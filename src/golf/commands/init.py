@@ -1,11 +1,15 @@
 """Project initialization command implementation."""
 
+import os
 import shutil
 from pathlib import Path
+from typing import Optional
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
+
+from golf.core.telemetry import track_event
 
 console = Console()
 
@@ -26,6 +30,7 @@ def initialize_project(
     if template not in ("basic", "advanced"):
         console.print(f"[bold red]Error:[/bold red] Unknown template '{template}'")
         console.print("Available templates: basic, advanced")
+        track_event("cli_init_failed", {"success": False})
         return
     
     # Check if directory exists
@@ -34,6 +39,7 @@ def initialize_project(
             console.print(
                 f"[bold red]Error:[/bold red] '{output_dir}' exists but is not a directory."
             )
+            track_event("cli_init_failed", {"success": False})
             return
         
         # Check if directory is empty
@@ -43,6 +49,7 @@ def initialize_project(
                 default=False,
             ):
                 console.print("Initialization cancelled.")
+                track_event("cli_init_cancelled", {"success": False})
                 return
     else:
         # Create the directory
@@ -59,6 +66,7 @@ def initialize_project(
         console.print(
             f"[bold red]Error:[/bold red] Could not find template '{template}'"
         )
+        track_event("cli_init_failed", {"success": False})
         return
     
     # Copy template files
@@ -77,6 +85,12 @@ def initialize_project(
     console.print(f"\nTo get started, run:")
     console.print(f"  cd {output_dir.name}")
     console.print(f"  golf build dev")
+    
+    # Track successful initialization
+    track_event("cli_init_success", {
+        "success": True,
+        "template": template
+    })
 
 
 def _copy_template(source_dir: Path, target_dir: Path, project_name: str) -> None:
