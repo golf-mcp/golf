@@ -1,6 +1,7 @@
 """Hello World tool {{project_name}}."""
 
-from pydantic import BaseModel
+from typing import Annotated
+from pydantic import BaseModel, Field
 
 
 class Output(BaseModel):
@@ -10,8 +11,8 @@ class Output(BaseModel):
 
 
 async def hello(
-    name: str = "World",
-    greeting: str = "Hello"
+    name: Annotated[str, Field(description="The name of the person to greet")] = "World",
+    greeting: Annotated[str, Field(description="The greeting phrase to use")] = "Hello"
 ) -> Output:
     """Say hello to the given name.
     
