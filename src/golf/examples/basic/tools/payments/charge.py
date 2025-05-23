@@ -1,6 +1,7 @@
 """Charge payment tool"""
 
-from pydantic import BaseModel
+from typing import Annotated
+from pydantic import BaseModel, Field
 from .common import payment_client
 
 
@@ -13,9 +14,19 @@ class Output(BaseModel):
 
 
 async def charge(
-    amount: float,
-    card_token: str,
-    description: str = ""
+    amount: Annotated[float, Field(
+        description="Amount to charge in USD",
+        gt=0,  # Must be greater than 0
+        le=10000  # Maximum charge limit
+    )],
+    card_token: Annotated[str, Field(
+        description="Tokenized payment card identifier",
+        pattern=r"^tok_[a-zA-Z0-9]+$"  # Validate token format
+    )],
+    description: Annotated[str, Field(
+        description="Optional payment description for the charge",
+        max_length=200
+    )] = ""
 ) -> Output:
     """Process a payment charge.
     
