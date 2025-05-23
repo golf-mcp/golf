@@ -150,6 +150,44 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
   - `"stdio"` enables integration with command-line tools and scripts
 - **`host` & `port`**: Control where your server listens. Use `"127.0.0.1"` for local development or `"0.0.0.0"` to accept external connections.
 
+## Privacy & Telemetry
+
+Golf collects **anonymous** usage data to help us understand how the framework is being used and improve it over time. The data collected includes:
+
+- Commands run (init, build, run)
+- Success/failure status (no error details)
+- Golf version, Python version (major.minor only), and OS type
+- Template name (for init command only)
+- Build environment (dev/prod for build commands only)
+
+**No personal information, project names, code content, or error messages are ever collected.**
+
+### Opting Out
+
+You can disable telemetry in several ways:
+
+1. **Using the telemetry command** (recommended):
+   ```bash
+   golf telemetry disable
+   ```
+   This saves your preference permanently. To re-enable:
+   ```bash
+   golf telemetry enable
+   ```
+
+2. **During any command**: Add `--no-telemetry` to save your preference:
+   ```bash
+   golf init my-project --no-telemetry
+   ```
+
+3. **Environment variable** (temporary override):
+   ```bash
+   export GOLF_TELEMETRY=0
+   golf init my-project
+   ```
+
+Your telemetry preference is stored in `~/.golf/telemetry.json` and persists across all Golf commands.
+
 ## Roadmap
 
 Here are the things we are working hard on:
