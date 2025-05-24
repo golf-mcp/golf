@@ -541,8 +541,7 @@ class CodeGenerator:
         if self.settings.opentelemetry_enabled:
             imports.extend([
                 "# OpenTelemetry imports",
-                "from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware",
-                "from starlette.middleware import Middleware",
+                "# Note: OpenTelemetryMiddleware is imported where needed in the main block",
                 # otel_lifespan function will be defined from generate_otel_lifespan_code
             ])
         imports.append("")  # Add blank line after all component type imports or OTel imports
@@ -730,8 +729,6 @@ class CodeGenerator:
         # Add OpenTelemetry parameters if enabled
         if self.settings.opentelemetry_enabled:
             mcp_constructor_args.append("lifespan=otel_lifespan")
-            if self.settings.transport != "stdio":
-                mcp_constructor_args.append("middleware=[Middleware(OpenTelemetryMiddleware)]")
 
         mcp_instance_line = f"mcp = FastMCP({', '.join(mcp_constructor_args)})"
         server_code_lines.append(mcp_instance_line)
@@ -776,6 +773,17 @@ class CodeGenerator:
                 "    # Create HTTP app and run with uvicorn",
                 "    print(f\"[Server Runner] Starting streamable-http transport with host={host}, port={port}\", file=sys.stderr)",
                 "    app = mcp.http_app()",
+            ])
+            
+            # Add OpenTelemetry middleware to the HTTP app if enabled
+            if self.settings.opentelemetry_enabled:
+                main_code.extend([
+                    "    # Apply OpenTelemetry middleware to the HTTP app",
+                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware",
+                    "    app = OpenTelemetryMiddleware(app)",
+                ])
+            
+            main_code.extend([
                 "    uvicorn.run(app, host=host, port=port, log_level=\"debug\")"
             ])
         else:
