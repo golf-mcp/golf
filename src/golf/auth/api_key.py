@@ -20,6 +20,10 @@ class ApiKeyConfig(BaseModel):
         "",
         description="Optional prefix to strip from the header value (e.g., 'Bearer ')"
     )
+    required: bool = Field(
+        True,
+        description="Whether API key is required for all requests"
+    )
 
 
 # Global configuration storage
@@ -28,7 +32,8 @@ _api_key_config: Optional[ApiKeyConfig] = None
 
 def configure_api_key(
     header_name: str = "X-API-Key",
-    header_prefix: str = ""
+    header_prefix: str = "",
+    required: bool = True
 ) -> None:
     """Configure API key extraction from request headers.
     
@@ -37,21 +42,31 @@ def configure_api_key(
     Args:
         header_name: Name of the header containing the API key (default: "X-API-Key")
         header_prefix: Optional prefix to strip from the header value (e.g., "Bearer ")
-        case_sensitive: Whether header name matching should be case-sensitive
+        required: Whether API key is required for all requests (default: True)
         
     Example:
         # In pre_build.py
         from golf.auth.api_key import configure_api_key
         
+        # Require API key for all requests
         configure_api_key(
             header_name="Authorization",
-            header_prefix="Bearer "
+            header_prefix="Bearer ",
+            required=True
+        )
+        
+        # Or make API key optional (pass-through mode)
+        configure_api_key(
+            header_name="Authorization",
+            header_prefix="Bearer ",
+            required=False
         )
     """
     global _api_key_config
     _api_key_config = ApiKeyConfig(
         header_name=header_name,
-        header_prefix=header_prefix
+        header_prefix=header_prefix,
+        required=required
     )
 
 
