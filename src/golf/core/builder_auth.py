@@ -8,28 +8,34 @@ from golf.auth import get_auth_config
 from golf.auth.api_key import get_api_key_config
 
 
-def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 3000, https: bool = False) -> str:
-    """Generate code for setting up authentication in the FastMCP app.
-    This code string will be injected into the generated server.py and executed at its runtime.
+def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 3000, https: bool = False, opentelemetry_enabled: bool = False, transport: str = "streamable-http") -> dict:
+    """Generate authentication components for the FastMCP app.
+    
+    Returns a dictionary with:
+        - imports: List of import statements
+        - setup_code: Auth setup code (provider configuration, etc.)
+        - fastmcp_args: Dict of arguments to add to FastMCP constructor
+        - has_auth: Whether auth is configured
     """
     # Check for API key configuration first
     api_key_config = get_api_key_config()
     if api_key_config:
-        return generate_api_key_auth_code(server_name)
+        return generate_api_key_auth_components(server_name, opentelemetry_enabled, transport)
     
     # Otherwise check for OAuth configuration
     original_provider_config, required_scopes_from_config = get_auth_config()
     
     if not original_provider_config:
-        # If no auth config from pre_build.py, just generate basic FastMCP instantiation
-        return f"mcp = FastMCP({repr(server_name)}) # No authentication configured"
+        # If no auth config, return empty components
+        return {
+            "imports": [],
+            "setup_code": [],
+            "fastmcp_args": {},
+            "has_auth": False
+        }
 
-    # This list will hold lines of Python code to be written into server.py
-    generated_code_lines = []
-
-    # Imports needed at the top of server.py for the auth setup block
-    # Note: FastMCP itself is imported by the main server generation logic later.
-    generated_code_lines.extend([
+    # Build auth components
+    auth_imports = [
         "import os",
         "import sys  # For stderr output",
         "from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions",
@@ -37,11 +43,12 @@ def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 30
         "from golf.auth.oauth import GolfOAuthProvider",
         "# get_access_token and create_callback_handler are used by generated auth_routes",
         "from golf.auth import get_access_token, create_callback_handler",
-        "",
-    ])
+    ]
+
+    setup_code_lines = []
 
     # Code to determine runtime server address configuration
-    generated_code_lines.extend([
+    setup_code_lines.extend([
         "# Determine runtime server address configuration",
         f"runtime_host = os.environ.get('HOST', {repr(host)})",
         f"runtime_port = int(os.environ.get('PORT', {repr(port)}))",
@@ -57,7 +64,7 @@ def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 30
     ])
 
     # Code to load secrets from environment variables AT RUNTIME in server.py
-    generated_code_lines.extend([
+    setup_code_lines.extend([
         "# Load secrets from environment variables using names specified in pre_build.py ProviderConfig",
         f"runtime_client_id = os.environ.get({repr(original_provider_config.client_id_env_var)})",
         f"runtime_client_secret = os.environ.get({repr(original_provider_config.client_secret_env_var)})",
@@ -75,7 +82,7 @@ def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 30
     ])
 
     # Code to instantiate ProviderConfig using runtime-loaded secrets and other baked-in non-secrets
-    generated_code_lines.extend([
+    setup_code_lines.extend([
         "# Instantiate ProviderConfig with runtime-resolved secrets and other pre-configured values",
         f"provider_config_instance = GolfProviderConfigInternal(", # Use aliased import
         f"    provider={repr(original_provider_config.provider)},",
@@ -101,8 +108,8 @@ def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 30
         "",
     ])
 
-    # AuthSettings and FastMCP instantiation
-    generated_code_lines.extend([
+    # AuthSettings creation
+    setup_code_lines.extend([
         "# Create auth settings for FastMCP",
         "auth_settings = AuthSettings(",
         "    issuer_url=runtime_issuer_url,",
@@ -114,31 +121,51 @@ def generate_auth_code(server_name: str, host: str = "127.0.0.1", port: int = 30
         f"    required_scopes={repr(required_scopes_from_config) if required_scopes_from_config else None}",
         ")",
         "",
-        "# Create FastMCP instance with auth configuration",
-        f"mcp = FastMCP({repr(server_name)}, auth_server_provider=auth_provider, auth=auth_settings)"
     ])
+
+    # FastMCP constructor arguments
+    fastmcp_args = {
+        "auth_server_provider": "auth_provider",
+        "auth": "auth_settings"
+    }
+
+    return {
+        "imports": auth_imports,
+        "setup_code": setup_code_lines,
+        "fastmcp_args": fastmcp_args,
+        "has_auth": True
+    }
+
+
+def generate_api_key_auth_components(server_name: str, opentelemetry_enabled: bool = False, transport: str = "streamable-http") -> dict:
+    """Generate authentication components for API key authentication.
     
-    return "\n".join(generated_code_lines)
-
-
-def generate_api_key_auth_code(server_name: str) -> str:
-    """Generate code for API key authentication middleware."""
+    Returns a dictionary with:
+        - imports: List of import statements
+        - setup_code: Auth setup code (middleware setup)
+        - fastmcp_args: Dict of arguments to add to FastMCP constructor
+        - has_auth: Whether auth is configured
+        - post_init_code: Code to run after FastMCP instance is created
+    """
     api_key_config = get_api_key_config()
     if not api_key_config:
-        return f"mcp = FastMCP({repr(server_name)}) # No API key authentication configured"
+        return {
+            "imports": [],
+            "setup_code": [],
+            "fastmcp_args": {},
+            "has_auth": False,
+            "post_init_code": []
+        }
     
-    generated_code_lines = []
-    
-    # Imports
-    generated_code_lines.extend([
+    auth_imports = [
         "# API key authentication setup",
         "from golf.auth.helpers import set_api_key",
         "from golf.auth.api_key import get_api_key_config",
         "from starlette.middleware.base import BaseHTTPMiddleware",
         "from starlette.requests import Request",
-        "",
-        f"mcp = FastMCP({repr(server_name)})",
-        "",
+    ]
+    
+    setup_code_lines = [
         "# Middleware to extract API key from headers",
         "class ApiKeyMiddleware(BaseHTTPMiddleware):",
         "    async def dispatch(self, request: Request, call_next):",
@@ -166,11 +193,24 @@ def generate_api_key_auth_code(server_name: str) -> str:
         "        response = await call_next(request)",
         "        return response",
         "",
+    ]
+    
+    # API key auth is handled via middleware, not FastMCP constructor args
+    fastmcp_args = {}
+    
+    # Code to run after FastMCP instance is created
+    post_init_code = [
         "# Add the middleware to the FastMCP app",
         "mcp.app.add_middleware(ApiKeyMiddleware)",
-    ])
+    ]
     
-    return "\n".join(generated_code_lines)
+    return {
+        "imports": auth_imports,
+        "setup_code": setup_code_lines,
+        "fastmcp_args": fastmcp_args,
+        "has_auth": True,
+        "post_init_code": post_init_code
+    }
 
 
 def generate_auth_routes() -> str:
