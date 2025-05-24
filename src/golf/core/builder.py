@@ -22,8 +22,8 @@ from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.auth import get_auth_config
 from golf.auth import get_access_token
 from golf.core.builder_telemetry import (
-    generate_otel_lifespan_code, 
-    generate_otel_instrumentation_code, 
+    generate_telemetry_imports,
+    generate_component_registration_with_telemetry,
     get_otel_dependencies
 )
 
@@ -539,12 +539,8 @@ class CodeGenerator:
         
         # Add OpenTelemetry imports if enabled
         if self.settings.opentelemetry_enabled:
-            imports.extend([
-                "# OpenTelemetry imports",
-                "# Note: OpenTelemetryMiddleware is imported where needed in the main block",
-                # otel_lifespan function will be defined from generate_otel_lifespan_code
-            ])
-        imports.append("")  # Add blank line after all component type imports or OTel imports
+            imports.extend(generate_telemetry_imports())
+            imports.append("")
         
         # Add imports section for different transport methods
         if self.settings.transport == "sse":
@@ -622,62 +618,75 @@ class CodeGenerator:
                 imports.append(f"import {full_module_path}")
                 
                 # Add code to register this component
-                if component_type == ComponentType.TOOL:
-                    registration = f"# Register the tool '{component.name}' from {full_module_path}"
+                if self.settings.opentelemetry_enabled:
+                    # Use telemetry instrumentation
+                    registration = f"# Register the {component_type.value} '{component.name}' with telemetry"
+                    entry_func = component.entry_function if hasattr(component, "entry_function") and component.entry_function else "export"
                     
-                    # Use the entry_function if available, otherwise try the export variable
-                    if hasattr(component, "entry_function") and component.entry_function:
-                        registration += f"\nmcp.add_tool({full_module_path}.{component.entry_function}"
-                    else:
-                        registration += f"\nmcp.add_tool({full_module_path}.export"
-                    
-                    # Add the name parameter
-                    registration += f", name=\"{component.name}\""
-                    
-                    # Add description from docstring
-                    if component.docstring:
-                        # Escape any quotes in the docstring
-                        escaped_docstring = component.docstring.replace("\"", "\\\"")
-                        registration += f", description=\"{escaped_docstring}\""
-                    registration += ")"
-
-                elif component_type == ComponentType.RESOURCE:
-                    registration = f"# Register the resource '{component.name}' from {full_module_path}"
-                    
-                    # Use the entry_function if available, otherwise try the export variable
-                    if hasattr(component, "entry_function") and component.entry_function:
-                        registration += f"\nmcp.add_resource_fn({full_module_path}.{component.entry_function}, uri=\"{component.uri_template}\""
-                    else:
-                        registration += f"\nmcp.add_resource_fn({full_module_path}.export, uri=\"{component.uri_template}\""
-                    
-                    # Add the name parameter
-                    registration += f", name=\"{component.name}\""
+                    if component_type == ComponentType.TOOL:
+                        registration += f"\n{generate_component_registration_with_telemetry('tool', component.name, full_module_path, entry_func, component.docstring or '')}"
+                    elif component_type == ComponentType.RESOURCE:
+                        registration += f"\n{generate_component_registration_with_telemetry('resource', component.name, full_module_path, entry_func, component.docstring or '', component.uri_template)}"
+                    else:  # PROMPT
+                        registration += f"\n{generate_component_registration_with_telemetry('prompt', component.name, full_module_path, entry_func, component.docstring or '')}"
+                else:
+                    # Standard registration without telemetry
+                    if component_type == ComponentType.TOOL:
+                        registration = f"# Register the tool '{component.name}' from {full_module_path}"
                         
-                    # Add description from docstring
-                    if component.docstring:
-                        # Escape any quotes in the docstring
-                        escaped_docstring = component.docstring.replace("\"", "\\\"")
-                        registration += f", description=\"{escaped_docstring}\""
-                    registration += ")"
-
-                else:  # PROMPT
-                    registration = f"# Register the prompt '{component.name}' from {full_module_path}"
-                    
-                    # Use the entry_function if available, otherwise try the export variable
-                    if hasattr(component, "entry_function") and component.entry_function:
-                        registration += f"\nmcp.add_prompt({full_module_path}.{component.entry_function}"
-                    else:
-                        registration += f"\nmcp.add_prompt({full_module_path}.export"
-                    
-                    # Add the name parameter
-                    registration += f", name=\"{component.name}\""
+                        # Use the entry_function if available, otherwise try the export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += f"\nmcp.add_tool({full_module_path}.{component.entry_function}"
+                        else:
+                            registration += f"\nmcp.add_tool({full_module_path}.export"
                         
-                    # Add description from docstring
-                    if component.docstring:
-                        # Escape any quotes in the docstring
-                        escaped_docstring = component.docstring.replace("\"", "\\\"")
-                        registration += f", description=\"{escaped_docstring}\""
-                    registration += ")"
+                        # Add the name parameter
+                        registration += f", name=\"{component.name}\""
+                        
+                        # Add description from docstring
+                        if component.docstring:
+                            # Escape any quotes in the docstring
+                            escaped_docstring = component.docstring.replace("\"", "\\\"")
+                            registration += f", description=\"{escaped_docstring}\""
+                        registration += ")"
+
+                    elif component_type == ComponentType.RESOURCE:
+                        registration = f"# Register the resource '{component.name}' from {full_module_path}"
+                        
+                        # Use the entry_function if available, otherwise try the export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += f"\nmcp.add_resource_fn({full_module_path}.{component.entry_function}, uri=\"{component.uri_template}\""
+                        else:
+                            registration += f"\nmcp.add_resource_fn({full_module_path}.export, uri=\"{component.uri_template}\""
+                        
+                        # Add the name parameter
+                        registration += f", name=\"{component.name}\""
+                            
+                        # Add description from docstring
+                        if component.docstring:
+                            # Escape any quotes in the docstring
+                            escaped_docstring = component.docstring.replace("\"", "\\\"")
+                            registration += f", description=\"{escaped_docstring}\""
+                        registration += ")"
+
+                    else:  # PROMPT
+                        registration = f"# Register the prompt '{component.name}' from {full_module_path}"
+                        
+                        # Use the entry_function if available, otherwise try the export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += f"\nmcp.add_prompt({full_module_path}.{component.entry_function}"
+                        else:
+                            registration += f"\nmcp.add_prompt({full_module_path}.export"
+                        
+                        # Add the name parameter
+                        registration += f", name=\"{component.name}\""
+                            
+                        # Add description from docstring
+                        if component.docstring:
+                            # Escape any quotes in the docstring
+                            escaped_docstring = component.docstring.replace("\"", "\\\"")
+                            registration += f", description=\"{escaped_docstring}\""
+                        registration += ")"
                 
                 component_registrations.append(registration)
             
@@ -694,21 +703,7 @@ class CodeGenerator:
             ""
         ]
 
-        # After env_section, add OpenTelemetry lifespan code
-        otel_definitions_code = []
-        otel_instrumentation_application_code = []  # For instrumentation that runs after mcp is set up
-
-        if self.settings.opentelemetry_enabled:
-            otel_definitions_code.append(generate_otel_lifespan_code(
-                default_exporter=self.settings.opentelemetry_default_exporter,
-                project_name=self.settings.name
-            ))
-            otel_definitions_code.append("")  # Add blank line
-
-            # Prepare instrumentation code to be added after component registration
-            otel_instrumentation_application_code.append("# Apply OpenTelemetry Instrumentation")
-            otel_instrumentation_application_code.append(generate_otel_instrumentation_code())
-            otel_instrumentation_application_code.append("")
+        # OpenTelemetry setup code will be handled through imports and lifespan
 
         # Add auth setup code if auth is configured
         auth_setup_code = []
@@ -728,7 +723,7 @@ class CodeGenerator:
         
         # Add OpenTelemetry parameters if enabled
         if self.settings.opentelemetry_enabled:
-            mcp_constructor_args.append("lifespan=otel_lifespan")
+            mcp_constructor_args.append("lifespan=telemetry_lifespan")
 
         mcp_instance_line = f"mcp = FastMCP({', '.join(mcp_constructor_args)})"
         server_code_lines.append(mcp_instance_line)
@@ -794,19 +789,16 @@ class CodeGenerator:
                 "    mcp.run(transport=\"stdio\")"
             ])
         
-        # Combine all sections - move env_section to right location
-        # Order: imports, env_section, otel_definitions (lifespan func), auth_setup (auth provider config),
-        # server_code (mcp init), post_init (API key middleware), component_registrations, 
-        # otel_instrumentation (wrappers), main_code (run block)
+        # Combine all sections
+        # Order: imports, env_section, auth_setup, server_code (mcp init), 
+        # post_init (API key middleware), component_registrations, main_code (run block)
         code = "\n".join(
             imports + 
             env_section + 
-            otel_definitions_code + 
             auth_setup_code +
-            server_code_lines +  # Add back the server_code_lines with constructor
+            server_code_lines +
             post_init_code +
             component_registrations +
-            otel_instrumentation_application_code +
             main_code
         )
         
@@ -980,6 +972,25 @@ from golf.auth.helpers import get_access_token, get_provider_token, extract_toke
             shutil.copy(src_file, dst_file)
         else:
             console.print(f"[yellow]Warning: Could not find {src_file} to copy[/yellow]")
+    
+    # Copy telemetry module if OpenTelemetry is enabled
+    if settings.opentelemetry_enabled:
+        telemetry_dir = output_dir / "golf" / "telemetry"
+        telemetry_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Copy telemetry __init__.py
+        src_init = Path(__file__).parent.parent.parent / "golf" / "telemetry" / "__init__.py"
+        dst_init = telemetry_dir / "__init__.py"
+        if src_init.exists():
+            shutil.copy(src_init, dst_init)
+        
+        # Copy instrumentation module
+        src_instrumentation = Path(__file__).parent.parent.parent / "golf" / "telemetry" / "instrumentation.py"
+        dst_instrumentation = telemetry_dir / "instrumentation.py"
+        if src_instrumentation.exists():
+            shutil.copy(src_instrumentation, dst_instrumentation)
+        else:
+            console.print("[yellow]Warning: Could not find telemetry instrumentation module[/yellow]")
     
     # Check if auth routes need to be added
     provider_config, _ = get_auth_config()
