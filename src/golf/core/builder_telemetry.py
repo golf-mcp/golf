@@ -188,7 +188,7 @@ methods_to_patch = [
 for method_name, operation_suffix in methods_to_patch:
     if hasattr(mcp, method_name): # 'mcp' should be the FastMCP instance
         # print(f"[OTel Instrumentation DEBUG] Patching {{method_name}} on {{mcp}}", file=sys.stderr)
-        wrapt.wrap_function_wrapper(mcp, method_name, otel_operation_wrapper(operation_name_suffix))
+        wrapt.wrap_function_wrapper(mcp, method_name, otel_operation_wrapper(operation_suffix))
 
 print("[OTel Instrumentation] MCP method instrumentation attempted.", file=sys.stderr)
 """
