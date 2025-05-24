@@ -6,5 +6,6 @@ from golf.auth import configure_api_key
 # GitHub expects: Authorization: Bearer ghp_xxxx or Authorization: token ghp_xxxx
 configure_api_key(
     header_name="Authorization",
-    header_prefix="Bearer "  # Will handle both "Bearer " and "token " prefixes
+    header_prefix="Bearer ",  # Will handle both "Bearer " and "token " prefixes
+    required=True  # Reject requests without a valid API key
 )
