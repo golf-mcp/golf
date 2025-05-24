@@ -6,32 +6,61 @@ and instrumentation code for FastMCP servers built with GolfMCP.
 
 from golf import __version__
 
-def generate_otel_lifespan_code(default_exporter: str = "console", project_name: str = "UnknownGolfService") -> str:
+def generate_otel_lifespan_code(default_exporter: str = "console", project_name: str = "golf-mcp-server") -> str:
     """Generate code for the OpenTelemetry lifespan function.
     
     Args:
-        default_exporter: Default exporter type to use if OTEL_TRACES_EXPORTER is not set
-        project_name: The name of the project, used as default for OTEL_SERVICE_NAME
+        default_exporter: Default exporter type if not set in environment
+        project_name: Default service name if not set in environment
         
     Returns:
         Python code string for the OpenTelemetry lifespan function
     """
-    return f"""
-# --- OpenTelemetry Lifespan Start ---
-# These variables are global within the generated server.py module scope
-_golf_otel_provider_global = None
-_golf_otel_initialized_flag = False
-
-from contextlib import asynccontextmanager
+    return f'''
+# --- OpenTelemetry Early Initialization ---
+# Initialize OpenTelemetry as early as possible to prevent other modules from auto-initializing
 import os
 import sys
-import logging
 from opentelemetry import trace
-from opentelemetry.trace import NoOpTracerProvider
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from opentelemetry.sdk.resources import Resource as OtelResource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+# Initialize immediately if environment variables are set
+if os.environ.get("OTEL_SERVICE_NAME") or os.environ.get("OTEL_TRACES_EXPORTER"):
+    service_name = os.environ.get("OTEL_SERVICE_NAME", "{project_name}")
+    exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "{default_exporter}").lower()
+    
+    print(f"[OTel] Early initialization with service={{service_name}}, exporter={{exporter_type}}", file=sys.stderr)
+    
+    resource = OtelResource.create({{"service.name": service_name}})
+    provider = TracerProvider(resource=resource)
+    
+    if exporter_type == "otlp_http":
+        endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+        exporter = OTLPSpanExporter(endpoint=endpoint) if endpoint else OTLPSpanExporter()
+    else:
+        exporter = ConsoleSpanExporter(out=sys.stderr)
+    
+    processor = BatchSpanProcessor(exporter)
+    provider.add_span_processor(processor)
+    trace.set_tracer_provider(provider)
+    
+    # Store for later reference
+    _golf_otel_provider_global = provider
+    _golf_otel_initialized_flag = True
+else:
+    _golf_otel_provider_global = None
+    _golf_otel_initialized_flag = False
+
+# --- OpenTelemetry Lifespan Start ---
+# These variables are global within the generated server.py module scope
+# (Already initialized above if env vars were set)
+
+from contextlib import asynccontextmanager
+import logging
+from opentelemetry.trace import NoOpTracerProvider
 
 # Optional: Configure OpenTelemetry's own logger to be less verbose
 # logging.getLogger('opentelemetry').setLevel(logging.WARNING)
@@ -39,7 +68,7 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 @asynccontextmanager
 async def otel_lifespan(app): # 'app' is the FastMCP instance passed by _lifespan_wrapper
     global _golf_otel_provider_global, _golf_otel_initialized_flag
-
+    
     # These will be resolved when otel_lifespan runs in the generated server.py
     # .format() inserts build-time fallbacks {project_name} and {default_exporter}
     service_name_to_use = os.environ.get("OTEL_SERVICE_NAME", "{project_name}")
@@ -47,7 +76,7 @@ async def otel_lifespan(app): # 'app' is the FastMCP instance passed by _lifespa
     
     # Local variable for the provider created in this specific call, if any.
     local_provider_instance_for_shutdown = None
-
+    
     try:
         if not _golf_otel_initialized_flag:
             # Double check if a real provider is already globally set by another mechanism
@@ -64,15 +93,15 @@ async def otel_lifespan(app): # 'app' is the FastMCP instance passed by _lifespa
                     endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
                     exporter = OTLPSpanExporter(endpoint=endpoint) if endpoint else OTLPSpanExporter()
                 else: # Default to console
-                    exporter = ConsoleSpanExporter(out=sys.stderr) # Ensure console output goes to stderr
-                    
+                    exporter = ConsoleSpanExporter(out=sys.stderr)  # Ensure console output goes to stderr
+                
                 processor = BatchSpanProcessor(exporter)
                 provider_to_set.add_span_processor(processor)
                 
                 trace.set_tracer_provider(provider_to_set)
-                _golf_otel_provider_global = provider_to_set # Store it globally
+                _golf_otel_provider_global = provider_to_set  # Store it globally
                 _golf_otel_initialized_flag = True
-                local_provider_instance_for_shutdown = provider_to_set # Mark for shutdown by this invocation
+                local_provider_instance_for_shutdown = provider_to_set  # Mark for shutdown by this invocation
                 print(f"[OTel] Global OpenTelemetry provider SET (service={{service_name_to_use}}, exporter={{exporter_type_to_use}})", file=sys.stderr)
             else:
                 # A real provider is already set globally. Do not override.
@@ -80,30 +109,31 @@ async def otel_lifespan(app): # 'app' is the FastMCP instance passed by _lifespa
                 # but don't mark it for shutdown by this specific lifespan invocation.
                 if _golf_otel_provider_global is None:
                     _golf_otel_provider_global = current_global_otel_provider
-                _golf_otel_initialized_flag = True # Mark as initialized to prevent re-entry by this mechanism
-                print(f"[OTel] Global OpenTelemetry provider was ALREADY SET by another mechanism. Using existing.", file=sys.stderr)
+                _golf_otel_initialized_flag = True  # Mark as initialized to prevent re-entry by this mechanism
+                print(f"[OTel] Global OpenTelemetry provider was ALREADY SET (service={{service_name_to_use}}). Using existing.", file=sys.stderr)
         else:
             # print(f"[OTel Lifespan DEBUG] Already initialized by this mechanism. Yielding.", file=sys.stderr)
-            pass # Already initialized by this mechanism in a previous entry
-
-        yield {{}} # Application runs here
+            pass  # Already initialized by this mechanism in a previous entry
+        
+        yield {{}}  # Application runs here
         
     except Exception as e:
         print("[OTel] ERROR during OpenTelemetry setup/yield: " + str(e), file=sys.stderr)
         import traceback
         print(traceback.format_exc(), file=sys.stderr)
-        raise 
+        raise
     finally:
         # Only the instance of otel_lifespan that successfully initialized the provider
         # should be responsible for its shutdown.
         if local_provider_instance_for_shutdown:
             # print(f"[OTel Lifespan DEBUG] Shutting down OTel Provider for service={{service_name_to_use}}.", file=sys.stderr)
             local_provider_instance_for_shutdown.shutdown()
-            _golf_otel_initialized_flag = False # Allow re-init if server process truly restarts
+            _golf_otel_initialized_flag = False  # Allow re-init if server process truly restarts
             _golf_otel_provider_global = None
             print("[OTel] Provider shut down by this lifespan instance.", file=sys.stderr)
+
 # --- OpenTelemetry Lifespan End ---
-"""
+'''
 
 def generate_otel_instrumentation_code() -> str:
     """Generate code for instrumenting the FastMCP instance.
