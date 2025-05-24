@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional, Set
 import black
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.panel import Panel
 
 from golf.core.config import Settings
 from golf.core.parser import (
@@ -23,8 +22,8 @@ from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.auth import get_auth_config
 from golf.auth import get_access_token
 from golf.core.builder_telemetry import (
-    generate_otel_lifespan_code, 
-    generate_otel_instrumentation_code, 
+    generate_telemetry_imports,
+    generate_component_registration_with_telemetry,
     get_otel_dependencies
 )
 
@@ -513,6 +512,17 @@ class CodeGenerator:
         """Generate the main server entry point."""
         server_file = self.output_dir / "server.py"
         
+        # Get auth components
+        provider_config, _ = get_auth_config()
+        auth_components = generate_auth_code(
+            server_name=self.settings.name,
+            host=self.settings.host,
+            port=self.settings.port,
+            https=False,  # This could be configurable in settings
+            opentelemetry_enabled=self.settings.opentelemetry_enabled,
+            transport=self.settings.transport
+        )
+        
         # Create imports section
         imports = [
             "from fastmcp import FastMCP",
@@ -522,15 +532,15 @@ class CodeGenerator:
             ""
         ]
         
-        # For imports
+        # Add auth imports if auth is configured
+        if auth_components.get("has_auth"):
+            imports.extend(auth_components["imports"])
+            imports.append("")
+        
+        # Add OpenTelemetry imports if enabled
         if self.settings.opentelemetry_enabled:
-            imports.extend([
-                "# OpenTelemetry imports",
-                "from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware",
-                "from starlette.middleware import Middleware",
-                # otel_lifespan function will be defined from generate_otel_lifespan_code
-            ])
-        imports.append("") # Add blank line after all component type imports or OTel imports
+            imports.extend(generate_telemetry_imports())
+            imports.append("")
         
         # Add imports section for different transport methods
         if self.settings.transport == "sse":
@@ -539,14 +549,6 @@ class CodeGenerator:
         elif self.settings.transport != "stdio":
             imports.append("import uvicorn")
                 
-        # Create a new FastMCP instance for the server
-        server_code_lines = ["# Create FastMCP server"]
-        mcp_constructor_args = [f'"{self.settings.name}"']
-
-        mcp_instance_line = f"mcp = FastMCP({', '.join(mcp_constructor_args)})"
-        server_code_lines.append(mcp_instance_line)
-        server_code_lines.append("")
-        
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
         endpoint_path = transport_config["endpoint_path"]
@@ -616,62 +618,75 @@ class CodeGenerator:
                 imports.append(f"import {full_module_path}")
                 
                 # Add code to register this component
-                if component_type == ComponentType.TOOL:
-                    registration = f"# Register the tool '{component.name}' from {full_module_path}"
+                if self.settings.opentelemetry_enabled:
+                    # Use telemetry instrumentation
+                    registration = f"# Register the {component_type.value} '{component.name}' with telemetry"
+                    entry_func = component.entry_function if hasattr(component, "entry_function") and component.entry_function else "export"
                     
-                    # Use the entry_function if available, otherwise try the export variable
-                    if hasattr(component, "entry_function") and component.entry_function:
-                        registration += f"\nmcp.add_tool({full_module_path}.{component.entry_function}"
-                    else:
-                        registration += f"\nmcp.add_tool({full_module_path}.export"
-                    
-                    # Add the name parameter
-                    registration += f", name=\"{component.name}\""
-                    
-                    # Add description from docstring
-                    if component.docstring:
-                        # Escape any quotes in the docstring
-                        escaped_docstring = component.docstring.replace("\"", "\\\"")
-                        registration += f", description=\"{escaped_docstring}\""
-                    registration += ")"
-
-                elif component_type == ComponentType.RESOURCE:
-                    registration = f"# Register the resource '{component.name}' from {full_module_path}"
-                    
-                    # Use the entry_function if available, otherwise try the export variable
-                    if hasattr(component, "entry_function") and component.entry_function:
-                        registration += f"\nmcp.add_resource_fn({full_module_path}.{component.entry_function}, uri=\"{component.uri_template}\""
-                    else:
-                        registration += f"\nmcp.add_resource_fn({full_module_path}.export, uri=\"{component.uri_template}\""
-                    
-                    # Add the name parameter
-                    registration += f", name=\"{component.name}\""
+                    if component_type == ComponentType.TOOL:
+                        registration += f"\n{generate_component_registration_with_telemetry('tool', component.name, full_module_path, entry_func, component.docstring or '')}"
+                    elif component_type == ComponentType.RESOURCE:
+                        registration += f"\n{generate_component_registration_with_telemetry('resource', component.name, full_module_path, entry_func, component.docstring or '', component.uri_template)}"
+                    else:  # PROMPT
+                        registration += f"\n{generate_component_registration_with_telemetry('prompt', component.name, full_module_path, entry_func, component.docstring or '')}"
+                else:
+                    # Standard registration without telemetry
+                    if component_type == ComponentType.TOOL:
+                        registration = f"# Register the tool '{component.name}' from {full_module_path}"
                         
-                    # Add description from docstring
-                    if component.docstring:
-                        # Escape any quotes in the docstring
-                        escaped_docstring = component.docstring.replace("\"", "\\\"")
-                        registration += f", description=\"{escaped_docstring}\""
-                    registration += ")"
-
-                else:  # PROMPT
-                    registration = f"# Register the prompt '{component.name}' from {full_module_path}"
-                    
-                    # Use the entry_function if available, otherwise try the export variable
-                    if hasattr(component, "entry_function") and component.entry_function:
-                        registration += f"\nmcp.add_prompt({full_module_path}.{component.entry_function}"
-                    else:
-                        registration += f"\nmcp.add_prompt({full_module_path}.export"
-                    
-                    # Add the name parameter
-                    registration += f", name=\"{component.name}\""
+                        # Use the entry_function if available, otherwise try the export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += f"\nmcp.add_tool({full_module_path}.{component.entry_function}"
+                        else:
+                            registration += f"\nmcp.add_tool({full_module_path}.export"
                         
-                    # Add description from docstring
-                    if component.docstring:
-                        # Escape any quotes in the docstring
-                        escaped_docstring = component.docstring.replace("\"", "\\\"")
-                        registration += f", description=\"{escaped_docstring}\""
-                    registration += ")"
+                        # Add the name parameter
+                        registration += f", name=\"{component.name}\""
+                        
+                        # Add description from docstring
+                        if component.docstring:
+                            # Escape any quotes in the docstring
+                            escaped_docstring = component.docstring.replace("\"", "\\\"")
+                            registration += f", description=\"{escaped_docstring}\""
+                        registration += ")"
+
+                    elif component_type == ComponentType.RESOURCE:
+                        registration = f"# Register the resource '{component.name}' from {full_module_path}"
+                        
+                        # Use the entry_function if available, otherwise try the export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += f"\nmcp.add_resource_fn({full_module_path}.{component.entry_function}, uri=\"{component.uri_template}\""
+                        else:
+                            registration += f"\nmcp.add_resource_fn({full_module_path}.export, uri=\"{component.uri_template}\""
+                        
+                        # Add the name parameter
+                        registration += f", name=\"{component.name}\""
+                            
+                        # Add description from docstring
+                        if component.docstring:
+                            # Escape any quotes in the docstring
+                            escaped_docstring = component.docstring.replace("\"", "\\\"")
+                            registration += f", description=\"{escaped_docstring}\""
+                        registration += ")"
+
+                    else:  # PROMPT
+                        registration = f"# Register the prompt '{component.name}' from {full_module_path}"
+                        
+                        # Use the entry_function if available, otherwise try the export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += f"\nmcp.add_prompt({full_module_path}.{component.entry_function}"
+                        else:
+                            registration += f"\nmcp.add_prompt({full_module_path}.export"
+                        
+                        # Add the name parameter
+                        registration += f", name=\"{component.name}\""
+                            
+                        # Add description from docstring
+                        if component.docstring:
+                            # Escape any quotes in the docstring
+                            escaped_docstring = component.docstring.replace("\"", "\\\"")
+                            registration += f", description=\"{escaped_docstring}\""
+                        registration += ")"
                 
                 component_registrations.append(registration)
             
@@ -688,21 +703,37 @@ class CodeGenerator:
             ""
         ]
 
-        # After env_section, add OpenTelemetry lifespan code
-        otel_definitions_code = []
-        otel_instrumentation_application_code = [] # For instrumentation that runs after mcp is set up
+        # OpenTelemetry setup code will be handled through imports and lifespan
 
+        # Add auth setup code if auth is configured
+        auth_setup_code = []
+        if auth_components.get("has_auth"):
+            auth_setup_code = auth_components["setup_code"]
+
+        # Create FastMCP instance section
+        server_code_lines = ["# Create FastMCP server"]
+        
+        # Build FastMCP constructor arguments
+        mcp_constructor_args = [f'"{self.settings.name}"']
+        
+        # Add auth arguments if configured
+        if auth_components.get("has_auth") and auth_components.get("fastmcp_args"):
+            for key, value in auth_components["fastmcp_args"].items():
+                mcp_constructor_args.append(f"{key}={value}")
+        
+        # Add OpenTelemetry parameters if enabled
         if self.settings.opentelemetry_enabled:
-            otel_definitions_code.append(generate_otel_lifespan_code(
-                default_exporter=self.settings.opentelemetry_default_exporter,
-                project_name=self.settings.name
-            ))
-            otel_definitions_code.append("")  # Add blank line
+            mcp_constructor_args.append("lifespan=telemetry_lifespan")
 
-            # Prepare instrumentation code to be added after component registration
-            otel_instrumentation_application_code.append("# Apply OpenTelemetry Instrumentation")
-            otel_instrumentation_application_code.append(generate_otel_instrumentation_code())
-            otel_instrumentation_application_code.append("")
+        mcp_instance_line = f"mcp = FastMCP({', '.join(mcp_constructor_args)})"
+        server_code_lines.append(mcp_instance_line)
+        server_code_lines.append("")
+        
+        # Add any post-init code from auth
+        post_init_code = []
+        if auth_components.get("has_auth") and auth_components.get("post_init_code"):
+            post_init_code.extend(auth_components["post_init_code"])
+            post_init_code.append("")
 
         # Main entry point with transport-specific app initialization
         main_code = [
@@ -737,6 +768,17 @@ class CodeGenerator:
                 "    # Create HTTP app and run with uvicorn",
                 "    print(f\"[Server Runner] Starting streamable-http transport with host={host}, port={port}\", file=sys.stderr)",
                 "    app = mcp.http_app()",
+            ])
+            
+            # Add OpenTelemetry middleware to the HTTP app if enabled
+            if self.settings.opentelemetry_enabled:
+                main_code.extend([
+                    "    # Apply OpenTelemetry middleware to the HTTP app",
+                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware",
+                    "    app = OpenTelemetryMiddleware(app)",
+                ])
+            
+            main_code.extend([
                 "    uvicorn.run(app, host=host, port=port, log_level=\"debug\")"
             ])
         else:
@@ -747,16 +789,16 @@ class CodeGenerator:
                 "    mcp.run(transport=\"stdio\")"
             ])
         
-        # Combine all sections - move env_section to right location
-        # Order: imports, env_section, otel_definitions (lifespan func), server_code (mcp init), 
-        # component_registrations, otel_instrumentation (wrappers), main_code (run block)
+        # Combine all sections
+        # Order: imports, env_section, auth_setup, server_code (mcp init), 
+        # post_init (API key middleware), component_registrations, main_code (run block)
         code = "\n".join(
             imports + 
             env_section + 
-            otel_definitions_code + 
-            server_code_lines +  # Add back the server_code_lines with constructor
-            component_registrations + 
-            otel_instrumentation_application_code + # Added instrumentation here
+            auth_setup_code +
+            server_code_lines +
+            post_init_code +
+            component_registrations +
             main_code
         )
         
@@ -931,196 +973,56 @@ from golf.auth.helpers import get_access_token, get_provider_token, extract_toke
         else:
             console.print(f"[yellow]Warning: Could not find {src_file} to copy[/yellow]")
     
-    # Now handle the auth integration if configured
-    if provider_config:
-        
-        # Generate the auth code to inject into server.py
-        # The existing call to generate_auth_code.
-        # We need to ensure the arguments passed are sensible.
-        # server.py determines issuer_url at runtime. generate_auth_code
-        # likely uses host/port/https to construct its own version or parts of it.
-        
-        # Determine protocol for https flag based on runtime logic similar to server.py
-        # This is a bit of a guess as settings doesn't explicitly store protocol for generate_auth_code
-        # A small inconsistency here if server.py's runtime logic for issuer_url differs significantly
-        # from what generate_auth_code expects/builds.
-        # For now, let's assume False is okay, or it's handled internally by generate_auth_code
-        # based on typical dev environments.
-        is_https_proto = False # Default, adjust if settings provide this info for build time
-
-        auth_code_str = generate_auth_code( # Renamed to auth_code_str to avoid confusion
-            server_name=settings.name,
-            host=settings.host,
-            port=settings.port
-        )
-    else:
-        # If auth is not configured, create a basic FastMCP instantiation string
-        # This string will then be processed for OTel args like the auth_code_str would be
-        auth_code_str = f"mcp = FastMCP('{settings.name}')" 
-
-    # ---- Centralized OpenTelemetry Argument Injection ----
+    # Copy telemetry module if OpenTelemetry is enabled
     if settings.opentelemetry_enabled:
-        temp_mcp_lines = auth_code_str.split('\n')
-        final_mcp_lines = []
-        otel_args_injected = False
-        for line_content in temp_mcp_lines:
-            if "mcp = FastMCP(" in line_content and ")" in line_content and not otel_args_injected:
-                open_paren_pos = line_content.find("(")
-                close_paren_pos = line_content.rfind(")")
-                if open_paren_pos != -1 and close_paren_pos != -1 and open_paren_pos < close_paren_pos:
-                    existing_args_str = line_content[open_paren_pos+1:close_paren_pos].strip()
-                    otel_args_to_add = []
-                    if "lifespan=" not in existing_args_str:
-                        otel_args_to_add.append("lifespan=otel_lifespan")
-                    if settings.transport != "stdio" and "middleware=" not in existing_args_str:
-                        otel_args_to_add.append("middleware=[Middleware(OpenTelemetryMiddleware)]")
-                    
-                    if otel_args_to_add:
-                        new_args_str = existing_args_str
-                        if new_args_str and not new_args_str.endswith(','):
-                            new_args_str += ", "
-                        new_args_str += ", ".join(otel_args_to_add)
-                        new_line = f"{line_content[:open_paren_pos+1]}{new_args_str}{line_content[close_paren_pos:]}"
-                        final_mcp_lines.append(new_line)
-                        otel_args_injected = True
-                        continue
-            final_mcp_lines.append(line_content)
+        telemetry_dir = output_dir / "golf" / "telemetry"
+        telemetry_dir.mkdir(parents=True, exist_ok=True)
         
-        if otel_args_injected:
-            auth_code_str = "\n".join(final_mcp_lines)
-        elif otel_args_to_add: # Only warn if we actually tried to add something
-            console.print(f"[yellow]Warning: Could not automatically inject OpenTelemetry lifespan/middleware into FastMCP constructor. Review server.py.[/yellow]")
-    # ---- END Centralized OpenTelemetry Argument Injection ----
-
-    # ---- MODIFICATION TO auth_code_str for _set_active_golf_oauth_provider (if auth was enabled) ----
-    if provider_config: # Only run this if auth was actually processed by generate_auth_code
+        # Copy telemetry __init__.py
+        src_init = Path(__file__).parent.parent.parent / "golf" / "telemetry" / "__init__.py"
+        dst_init = telemetry_dir / "__init__.py"
+        if src_init.exists():
+            shutil.copy(src_init, dst_init)
+        
+        # Copy instrumentation module
+        src_instrumentation = Path(__file__).parent.parent.parent / "golf" / "telemetry" / "instrumentation.py"
+        dst_instrumentation = telemetry_dir / "instrumentation.py"
+        if src_instrumentation.exists():
+            shutil.copy(src_instrumentation, dst_instrumentation)
+        else:
+            console.print("[yellow]Warning: Could not find telemetry instrumentation module[/yellow]")
+    
+    # Check if auth routes need to be added
+    provider_config, _ = get_auth_config()
+    if provider_config:
         auth_routes_code = generate_auth_routes()
-
+        
         server_file = output_dir / "server.py"
         if server_file.exists():
             with open(server_file, "r") as f:
                 server_code_content = f.read()
             
-            create_marker = '# Create FastMCP server'
-            # The original logic replaces the FastMCP instantiation part.
-            # So we use the modified auth_code_str here.
-            create_pos = server_code_content.find(create_marker)
-            if create_pos != -1: # Ensure marker is found
-                create_pos += len(create_marker) # Move past the marker text itself
-                create_next_line = server_code_content.find('\n', create_pos) + 1
-                # Assuming the original mcp = FastMCP(...) line is what auth_code_str replaces
-                # Find the end of the line that starts with "mcp = FastMCP("
-                mcp_line_start_search = server_code_content.find("mcp = FastMCP(", create_next_line)
-                if mcp_line_start_search != -1:
-                    mcp_line_end = server_code_content.find('\n', mcp_line_start_search)
-                    if mcp_line_end == -1: mcp_line_end = len(server_code_content) # if it's the last line
-
-                    modified_code = (
-                        server_code_content[:create_next_line] + 
-                        auth_code_str + # Use the modified auth code string
-                        server_code_content[mcp_line_end:]
-                    )
-                else: # Fallback if "mcp = FastMCP(" line isn't found as expected
-                    console.print(f"[yellow]Warning: Could not precisely find 'mcp = FastMCP(...)' line for replacement by auth_code in {server_file}. Appending auth_code instead.[/yellow]")
-                    # This part of the logic was to replace mcp = FastMCP(...)
-                    # If the generate_auth_code ALREADY includes the mcp = FastMCP(...) line,
-                    # then the original injection logic might be different.
-                    # The example server.py shows that the auth_code INCLUDES the mcp = FastMCP(...) line.
-                    # The original code in builder.py:
-                    # create_next_line = server_code.find('\n', create_pos) + 1
-                    # mcp_line_end = server_code.find('\n', create_next_line)
-                    # This implies it replaces ONE line after '# Create FastMCP server'
-                    # This needs to be robust. If auth_code_str contains the `mcp = FastMCP(...)` line itself,
-                    # then this replacement logic is correct.
-                    
-                    # The server.py example from `new/dist` implies that auth_code effectively *is* the
-                    # whole block from "import os" for auth settings down to and including "mcp = FastMCP(...)".
-                    # The original `_generate_server` creates a very minimal `mcp = FastMCP(...)`.
-                    # The `build_project` then overwrites this with the richer `auth_code` block.
-                    # Let's assume `auth_code_str_modified` should replace from `create_next_line` up to
-                    # where the original `mcp = FastMCP(...)` definition ended.
-
-                    # Re-evaluating the injection for auth_code_str_modified.
-                    # The server.py is first generated by _generate_server.
-                    # Then, if auth is enabled, this part of build_project MODIFIES it.
-                    # It finds '# Create FastMCP server', then replaces the *next line* (which is `mcp = FastMCP(...)` from _generate_server)
-                    # with the entire `auth_code_str_modified`.
-                    
-                    # Original line to find/replace: `mcp = FastMCP("{self.settings.name}")`
-                    # OR if telemetry was on `mcp = FastMCP("{self.settings.name}", lifespan=otel_lifespan)`
-                    # The replacement logic must be robust to find the line created by _generate_server
-                    
-                    # Let's find the line starting with "mcp = FastMCP(" that _generate_server created
-                    original_mcp_instantiation_pattern = "mcp = FastMCP("
-                    start_replace_idx = server_code_content.find(original_mcp_instantiation_pattern)
-                    
-                    if start_replace_idx != -1:
-                        # We need to find the complete statement, including any continuation lines
-                        line_start = server_code_content.rfind('\n', 0, start_replace_idx) + 1
-                        
-                        # Find the closing parenthesis, handling potential multi-line calls
-                        opening_paren_pos = server_code_content.find('(', start_replace_idx)
-                        if opening_paren_pos != -1:
-                            # Count open parentheses to handle nested ones correctly
-                            paren_count = 1
-                            pos = opening_paren_pos + 1
-                            while pos < len(server_code_content) and paren_count > 0:
-                                if server_code_content[pos] == '(':
-                                    paren_count += 1
-                                elif server_code_content[pos] == ')':
-                                    paren_count -= 1
-                                pos += 1
-                            
-                            closing_paren_pos = pos - 1 if paren_count == 0 else -1
-                            
-                            if closing_paren_pos != -1:
-                                # Find the end of the statement (newline after the closing parenthesis)
-                                next_newline = server_code_content.find('\n', closing_paren_pos)
-                                if next_newline != -1:
-                                    end_replace_idx = next_newline + 1
-                                else:
-                                    end_replace_idx = len(server_code_content)
-                                
-                                # Replace the entire statement with the auth code
-                                modified_code = (
-                                    server_code_content[:line_start] +
-                                    auth_code_str + 
-                                    server_code_content[end_replace_idx:]
-                                )
-                            else:
-                                console.print(f"[red]Error: Could not find closing parenthesis for FastMCP constructor in {server_file}. Auth injection may fail.[/red]")
-                                modified_code = server_code_content
-                        else:
-                            console.print(f"[red]Error: Could not find opening parenthesis for FastMCP constructor in {server_file}. Auth injection may fail.[/red]")
-                            modified_code = server_code_content
-            
-            else: # create_marker not found (This case should ideally not happen if _generate_server works)
-                console.print(f"[red]Could not find injection marker '{create_marker}' in {server_file}. Auth injection failed.[/red]")
-                modified_code = server_code_content # No change
-
+            # Add auth routes before the main block
             app_marker = 'if __name__ == "__main__":'
-            app_pos = modified_code.find(app_marker)
-            if app_pos != -1: # Ensure marker is found
+            app_pos = server_code_content.find(app_marker)
+            if app_pos != -1:
                 modified_code = (
-                    modified_code[:app_pos] + 
-                    auth_routes_code + "\n\n" + # Ensure auth routes are injected
-                    modified_code[app_pos:]
+                    server_code_content[:app_pos] + 
+                    auth_routes_code + "\n\n" +
+                    server_code_content[app_pos:]
                 )
+                
+                # Format with black before writing
+                try:
+                    final_code_to_write = black.format_str(modified_code, mode=black.Mode())
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Could not format server.py after auth routes injection: {e}[/yellow]")
+                    final_code_to_write = modified_code
+                
+                with open(server_file, "w") as f:
+                    f.write(final_code_to_write)
             else:
                 console.print(f"[yellow]Warning: Could not find main block marker '{app_marker}' in {server_file} to inject auth routes.[/yellow]")
-
-            # Format with black before writing
-            try:
-                final_code_to_write = black.format_str(modified_code, mode=black.Mode())
-            except Exception as e:
-                console.print(f"[yellow]Warning: Could not format server.py after auth injection: {e}[/yellow]")
-                final_code_to_write = modified_code # Write unformatted if black fails
-
-            with open(server_file, "w") as f:
-                f.write(final_code_to_write)
-            
-        else: # server_file does not exist
-            console.print(f"[red]Error: {server_file} does not exist for auth modification. Ensure _generate_server runs first.[/red]")
 
 
 # Renamed function - was find_shared_modules
