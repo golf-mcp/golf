@@ -1116,9 +1116,13 @@ def build_import_map(project_path: Path, common_files: Dict[str, Path]) -> Dict[
         try:
             rel_to_component = dir_path.relative_to(component_type)
             # Create the new import path
-            new_path = f"components.{component_type}.{rel_to_component}".replace("/", ".")
-            # Fix any double dots
-            new_path = new_path.replace("..", ".")
+            if str(rel_to_component) == ".":
+                # This is at the root of the component type
+                new_path = f"components.{component_type}"
+            else:
+                # Replace path separators with dots
+                path_parts = str(rel_to_component).replace("\\", "/").split("/")
+                new_path = f"components.{component_type}.{'.'.join(path_parts)}"
             
             # Map both the directory and the common file
             orig_module = dir_path_str
