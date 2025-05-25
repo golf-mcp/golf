@@ -22,12 +22,22 @@ _tracer: Optional[trace.Tracer] = None
 _provider: Optional[TracerProvider] = None
 _instrumented_tools = []
 
-def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
-    """Initialize OpenTelemetry with environment-based configuration."""
+def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProvider]:
+    """Initialize OpenTelemetry with environment-based configuration.
+    
+    Returns None if required environment variables are not set.
+    """
     global _provider
     
-    # Configure based on environment
+    # Check for required environment variables based on exporter type
     exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "console").lower()
+    
+    # For OTLP HTTP exporter, check if endpoint is configured
+    if exporter_type == "otlp_http":
+        endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+        if not endpoint:
+            print(f"[WARNING] OpenTelemetry tracing is disabled: OTEL_EXPORTER_OTLP_ENDPOINT is not set for OTLP HTTP exporter")
+            return None
     
     # Create resource with service information
     resource_attributes = {
