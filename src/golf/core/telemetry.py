@@ -6,6 +6,8 @@ import platform
 from pathlib import Path
 from typing import Optional, Dict, Any
 import json
+import uuid
+import getpass
 
 import posthog
 from rich.console import Console
@@ -115,8 +117,7 @@ def set_telemetry_enabled(enabled: bool, persist: bool = True) -> None:
 def get_anonymous_id() -> str:
     """Get or create a persistent anonymous ID for this machine.
     
-    The ID is stored in the user's home directory and is based on
-    machine characteristics to be consistent across sessions.
+    The ID is stored in the user's home directory and is unique per installation.
     """
     global _anonymous_id
     
@@ -134,11 +135,23 @@ def get_anonymous_id() -> str:
         except Exception:
             pass
     
-    # Generate new ID based on machine characteristics
-    # This ensures the same ID across sessions on the same machine
-    machine_data = f"{platform.node()}-{platform.machine()}-{platform.system()}"
-    machine_hash = hashlib.sha256(machine_data.encode()).hexdigest()[:16]
-    _anonymous_id = f"golf-{machine_hash}"
+    # Generate new ID with more unique data
+    # Include home directory path to differentiate between users on same machine
+    # Include a random component to ensure uniqueness even with identical setups
+    
+    try:
+        username = getpass.getuser()
+    except Exception:
+        username = "unknown"
+    
+    # Combine multiple factors for uniqueness
+    machine_data = f"{platform.node()}-{platform.machine()}-{platform.system()}-{username}-{str(Path.home())}"
+    machine_hash = hashlib.sha256(machine_data.encode()).hexdigest()[:8]
+    
+    # Add a random component to ensure uniqueness
+    random_component = str(uuid.uuid4()).split('-')[0]  # First 8 chars of UUID
+    
+    _anonymous_id = f"golf-{machine_hash}{random_component}"
     
     # Try to save for next time
     try:
