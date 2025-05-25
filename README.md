@@ -139,6 +139,11 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
                                       // - "sse": Server-Sent Events (recommended for web clients)
                                       // - "streamable-http": HTTP with streaming support
                                       // - "stdio": Standard I/O (for CLI integration)
+  
+  // OpenTelemetry Configuration (optional)
+  "opentelemetry_enabled": false,     // Enable distributed tracing
+  "opentelemetry_default_exporter": "console"  // Default exporter if OTEL_TRACES_EXPORTER not set
+                                               // Options: "console", "otlp_http"
 }
 ```
 
@@ -150,12 +155,46 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
   - `"streamable-http"` provides HTTP streaming for traditional API clients
   - `"stdio"` enables integration with command-line tools and scripts
 - **`host` & `port`**: Control where your server listens. Use `"127.0.0.1"` for local development or `"0.0.0.0"` to accept external connections.
+- **`opentelemetry_enabled`**: When true, enables distributed tracing for debugging and monitoring your MCP server
+- **`opentelemetry_default_exporter`**: Sets the default trace exporter. Can be overridden by the `OTEL_TRACES_EXPORTER` environment variable
+
+## Features
+
+### 🔍 OpenTelemetry Support
+
+Golf includes built-in OpenTelemetry instrumentation for distributed tracing. When enabled, it automatically traces:
+- Tool executions with arguments and results
+- Resource reads and template expansions
+- Prompt generations
+- HTTP requests and sessions
+
+#### Configuration
+
+Enable OpenTelemetry in your `golf.json`:
+```json
+{
+  "opentelemetry_enabled": true,
+  "opentelemetry_default_exporter": "otlp_http"
+}
+```
+
+Then configure via environment variables:
+```bash
+# For OTLP HTTP exporter (e.g., Jaeger, Grafana Tempo)
+OTEL_TRACES_EXPORTER=otlp_http
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
+OTEL_SERVICE_NAME=my-golf-server  # Optional, defaults to project name
+
+# For console exporter (debugging)
+OTEL_TRACES_EXPORTER=console
+```
+
+**Note**: When using the OTLP HTTP exporter, you must set `OTEL_EXPORTER_OTLP_ENDPOINT`. If not configured, Golf will display a warning and disable tracing to avoid errors.
 
 ## Roadmap
 
 Here are the things we are working hard on:
 
-*   **Native OpenTelemetry implementation for tracing**
 *   **`golf deploy` command for one click deployments to Vercel, Blaxel and other providers**
 *   **Production-ready OAuth token management, to allow for persistent, encrypted token storage and client mapping**
 
