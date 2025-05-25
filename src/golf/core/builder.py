@@ -623,12 +623,17 @@ class CodeGenerator:
                     registration = f"# Register the {component_type.value} '{component.name}' with telemetry"
                     entry_func = component.entry_function if hasattr(component, "entry_function") and component.entry_function else "export"
                     
+                    # Debug: Add logging to verify wrapping
+                    registration += f"\n_wrapped_func = instrument_{component_type.value}({full_module_path}.{entry_func}, '{component.name}')"
+                    registration += f"\nprint(f'[Golf DEBUG] Registering {component_type.value} {component.name} with wrapper: {{_wrapped_func}}', file=sys.stderr)"
+                    registration += f"\nprint(f'[Golf DEBUG] Wrapper has _otel_wrapper_id: {{getattr(_wrapped_func, \"_otel_wrapper_id\", \"NO ID\")}}', file=sys.stderr)"
+                    
                     if component_type == ComponentType.TOOL:
-                        registration += f"\n{generate_component_registration_with_telemetry('tool', component.name, full_module_path, entry_func, component.docstring or '')}"
+                        registration += f"\nmcp.add_tool(_wrapped_func, name=\"{component.name}\", description=\"{component.docstring or ''}\")"
                     elif component_type == ComponentType.RESOURCE:
-                        registration += f"\n{generate_component_registration_with_telemetry('resource', component.name, full_module_path, entry_func, component.docstring or '', component.uri_template)}"
+                        registration += f"\nmcp.add_resource_fn(_wrapped_func, uri=\"{component.uri_template}\", name=\"{component.name}\", description=\"{component.docstring or ''}\")"
                     else:  # PROMPT
-                        registration += f"\n{generate_component_registration_with_telemetry('prompt', component.name, full_module_path, entry_func, component.docstring or '')}"
+                        registration += f"\nmcp.add_prompt(_wrapped_func, name=\"{component.name}\", description=\"{component.docstring or ''}\")"
                 else:
                     # Standard registration without telemetry
                     if component_type == ComponentType.TOOL:
@@ -868,15 +873,65 @@ def build_project(
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True) # Ensure output_dir exists after clearing
-    
-    # If dev build and copy_env flag is true, copy .env file from project root to output_dir
-    if copy_env: # The build_env string ('dev'/'prod') check can be done in the CLI layer that sets copy_env
+
+    # --- BEGIN Enhanced .env handling ---
+    env_vars_to_write = {}
+    env_file_path = output_dir / ".env"
+
+    # 1. Load from existing project .env if copy_env is true
+    if copy_env:
         project_env_file = project_path / ".env"
         if project_env_file.exists():
             try:
-                shutil.copy(project_env_file, output_dir / ".env")
+                from dotenv import dotenv_values
+                env_vars_to_write.update(dotenv_values(project_env_file))
+            except ImportError:
+                console.print("[yellow]Warning: python-dotenv is not installed. Cannot read existing .env file for rich merging. Copying directly.[/yellow]")
+                try:
+                    shutil.copy(project_env_file, env_file_path)
+                    # If direct copy happens, re-read for step 2 & 3 to respect its content
+                    if env_file_path.exists():
+                         from dotenv import dotenv_values
+                         env_vars_to_write.update(dotenv_values(env_file_path)) # Read what was copied
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Could not copy project .env file: {e}[/yellow]")
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not copy project .env file: {e}[/yellow]")
+                console.print(f"[yellow]Warning: Error reading project .env file content: {e}[/yellow]")
+
+
+    # 2. Apply Golf's OTel default exporter setting if OTEL_TRACES_EXPORTER is not already set
+    if settings.opentelemetry_enabled and settings.opentelemetry_default_exporter:
+        if "OTEL_TRACES_EXPORTER" not in env_vars_to_write:
+            env_vars_to_write["OTEL_TRACES_EXPORTER"] = settings.opentelemetry_default_exporter
+            console.print(f"[info]Setting OTEL_TRACES_EXPORTER to '{settings.opentelemetry_default_exporter}' from golf.json in built app's .env[/info]")
+
+    # 3. Apply Golf's project name as OTEL_SERVICE_NAME if not already set
+    # (Ensures service name defaults to project name if not specified in user's .env)
+    if settings.opentelemetry_enabled and settings.name:
+        if "OTEL_SERVICE_NAME" not in env_vars_to_write:
+            env_vars_to_write["OTEL_SERVICE_NAME"] = settings.name
+            console.print(f"[info]Setting OTEL_SERVICE_NAME to '{settings.name}' from golf.json in built app's .env[/info]")
+    
+    # 4. (Re-)Write the .env file in the output directory if there's anything to write
+    if env_vars_to_write:
+        try:
+            with open(env_file_path, "w") as f:
+                for key, value in env_vars_to_write.items():
+                    # Ensure values are properly quoted if they contain spaces or special characters
+                    # and handle existing quotes within the value.
+                    if isinstance(value, str):
+                        # Replace backslashes first, then double quotes
+                        processed_value = value.replace('\\', '\\\\') # Escape backslashes
+                        processed_value = processed_value.replace('"', '\\"') # Escape double quotes
+                        if ' ' in value or '#' in value or '\n' in value or '"' in value or "'" in value:
+                            f.write(f'{key}="{processed_value}"\n')
+                        else:
+                            f.write(f"{key}={processed_value}\n")
+                    else: # For non-string values, write directly
+                        f.write(f"{key}={value}\n")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not write .env file to output directory: {e}[/yellow]")
+    # --- END Enhanced .env handling ---
 
     # Show what we're building, with environment info
     console.print(f"[bold]Building [green]{settings.name}[/green] ({build_env} environment)[/bold]")
