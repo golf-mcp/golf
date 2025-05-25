@@ -1007,11 +1007,12 @@ dependencies = [
 
 from golf.auth.provider import ProviderConfig
 from golf.auth.oauth import GolfOAuthProvider, create_callback_handler
-from golf.auth.helpers import get_access_token, get_provider_token, extract_token_from_header
+from golf.auth.helpers import get_access_token, get_provider_token, extract_token_from_header, get_api_key, set_api_key
+from golf.auth.api_key import configure_api_key, get_api_key_config
 """)
     
     # Copy provider, oauth, and helper modules
-    for module in ["provider.py", "oauth.py", "helpers.py"]:
+    for module in ["provider.py", "oauth.py", "helpers.py", "api_key.py"]:
         src_file = Path(__file__).parent.parent.parent / "golf" / "auth" / module
         dst_file = auth_dir / module
         
