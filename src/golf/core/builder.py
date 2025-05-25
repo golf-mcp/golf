@@ -734,12 +734,6 @@ class CodeGenerator:
         server_code_lines.append(mcp_instance_line)
         server_code_lines.append("")
         
-        # Add any post-init code from auth
-        post_init_code = []
-        if auth_components.get("has_auth") and auth_components.get("post_init_code"):
-            post_init_code.extend(auth_components["post_init_code"])
-            post_init_code.append("")
-
         # Main entry point with transport-specific app initialization
         main_code = [
             "if __name__ == \"__main__\":",
@@ -819,7 +813,6 @@ class CodeGenerator:
             env_section + 
             auth_setup_code +
             server_code_lines +
-            post_init_code +
             component_registrations +
             main_code
         )
