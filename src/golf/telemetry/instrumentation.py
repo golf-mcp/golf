@@ -3,7 +3,7 @@
 import os
 import sys
 import functools
-from typing import Any, Callable, Optional, TypeVar
+from typing import Callable, Optional, TypeVar
 from contextlib import asynccontextmanager
 import asyncio
 
@@ -17,9 +17,6 @@ from opentelemetry import baggage
 
 T = TypeVar('T')
 
-# Debug: Confirm module is imported
-print("[OTel DEBUG] golf.telemetry.instrumentation module imported", file=sys.stderr)
-
 # Global tracer instance
 _tracer: Optional[trace.Tracer] = None
 _provider: Optional[TracerProvider] = None
@@ -29,15 +26,8 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
     """Initialize OpenTelemetry with environment-based configuration."""
     global _provider
     
-    print(f"[OTel DEBUG] init_telemetry called with service_name: {service_name}", file=sys.stderr)
-    
-    # Always initialize a new provider - OpenTelemetry SDK handles replacing the existing one
-    
     # Configure based on environment
     exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "console").lower()
-    print(f"[OTel DEBUG] OTEL_TRACES_EXPORTER={exporter_type}", file=sys.stderr)
-    print(f"[OTel DEBUG] OTEL_SERVICE_NAME={os.environ.get('OTEL_SERVICE_NAME', 'NOT SET')}", file=sys.stderr)
-    print(f"[OTel DEBUG] OTEL_EXPORTER_OTLP_ENDPOINT={os.environ.get('OTEL_EXPORTER_OTLP_ENDPOINT', 'NOT SET')}", file=sys.stderr)
     
     # Create resource with service information
     resource_attributes = {
@@ -46,11 +36,9 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
         "service.instance.id": os.environ.get("SERVICE_INSTANCE_ID", "default"),
     }
     resource = Resource.create(resource_attributes)
-    print(f"[OTel DEBUG] Created resource with attributes: {resource_attributes}", file=sys.stderr)
     
     # Create provider
     provider = TracerProvider(resource=resource)
-    print(f"[OTel DEBUG] Created TracerProvider", file=sys.stderr)
     
     # Configure exporter based on type
     try:
@@ -66,19 +54,14 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
                         key, value = header.split("=", 1)
                         header_dict[key.strip()] = value.strip()
             
-            print(f"[OTel DEBUG] Creating OTLP exporter with endpoint: {endpoint}", file=sys.stderr)
             exporter = OTLPSpanExporter(
                 endpoint=endpoint,
                 headers=header_dict if header_dict else None
             )
-            print(f"[OTel] Configured OTLP exporter to {endpoint}", file=sys.stderr)
         else:
             # Default to console exporter
-            print(f"[OTel DEBUG] Creating console exporter", file=sys.stderr)
             exporter = ConsoleSpanExporter(out=sys.stderr)
-            print(f"[OTel] Using console exporter", file=sys.stderr)
     except Exception as e:
-        print(f"[OTel ERROR] Failed to create exporter: {type(e).__name__}: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         raise
@@ -93,9 +76,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
             export_timeout_millis=5000
         )
         provider.add_span_processor(processor)
-        print(f"[OTel DEBUG] Added BatchSpanProcessor with 1s delay", file=sys.stderr)
     except Exception as e:
-        print(f"[OTel ERROR] Failed to add processor: {type(e).__name__}: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         raise
@@ -104,14 +85,10 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
     try:
         trace.set_tracer_provider(provider)
         _provider = provider
-        print(f"[OTel DEBUG] Set global tracer provider", file=sys.stderr)
     except Exception as e:
-        print(f"[OTel ERROR] Failed to set tracer provider: {type(e).__name__}: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         raise
-    
-    print(f"[OTel] Telemetry initialized for service: {service_name}", file=sys.stderr)
     
     # Create a test span to verify everything is working
     try:
@@ -121,9 +98,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
             span.set_attribute("service.name", service_name)
             span.set_attribute("exporter.type", exporter_type)
             span.set_attribute("endpoint", os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "not set"))
-            print(f"[OTel DEBUG] Created test span with trace_id={span.get_span_context().trace_id:032x}", file=sys.stderr)
     except Exception as e:
-        print(f"[OTel ERROR] Failed to create test span: {type(e).__name__}: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
     
@@ -134,7 +109,6 @@ def get_tracer() -> trace.Tracer:
     global _tracer
     if _tracer is None:
         _tracer = trace.get_tracer("golf.mcp.components", "1.0.0")
-        print(f"[OTel DEBUG] Created tracer: {_tracer}", file=sys.stderr)
     return _tracer
 
 def _add_component_attributes(span: Span, component_type: str, component_name: str, **kwargs):
@@ -149,15 +123,10 @@ def _add_component_attributes(span: Span, component_type: str, component_name: s
 
 def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     """Instrument a tool function with OpenTelemetry tracing."""
-    print(f"[OTel DEBUG] instrument_tool called for tool: {tool_name}", file=sys.stderr)
     tracer = get_tracer()
     
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
-        print(f"[OTel DEBUG] Tool {tool_name} called (async)", file=sys.stderr)
-        print(f"[OTel DEBUG] Tool {tool_name} args: {args}", file=sys.stderr)
-        print(f"[OTel DEBUG] Tool {tool_name} kwargs: {kwargs}", file=sys.stderr)
-        
         span = tracer.start_span(f"tool.{tool_name}")
         
         # Activate the span in the current context
@@ -165,7 +134,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
         token = context.attach(trace.set_span_in_context(span))
         
         try:
-            print(f"[OTel DEBUG] Created span for tool {tool_name}, trace_id={span.get_span_context().trace_id:032x}, span_id={span.get_span_context().span_id:016x}, is_recording={span.is_recording()}", file=sys.stderr)
             _add_component_attributes(span, "tool", tool_name, 
                                      args_count=len(args),
                                      kwargs_count=len(kwargs))
@@ -173,7 +141,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Extract Context parameter if present - this should have MCP session info
             ctx = kwargs.get('ctx')
             if ctx:
-                print(f"[OTel DEBUG] Found context for tool {tool_name}: {ctx}", file=sys.stderr)
                 if hasattr(ctx, 'request_id'):
                     span.set_attribute("mcp.request.id", ctx.request_id)
                 if hasattr(ctx, 'session_id'):
@@ -184,13 +151,11 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                         value = getattr(ctx, attr, None)
                         if value:
                             span.set_attribute(f"mcp.context.{attr}", str(value))
-                            print(f"[OTel DEBUG] Added context attribute {attr}={value}", file=sys.stderr)
             
             # Also check baggage for session ID
             session_id_from_baggage = baggage.get_baggage("mcp.session.id")
             if session_id_from_baggage:
                 span.set_attribute("mcp.session.id", session_id_from_baggage)
-                print(f"[OTel DEBUG] Added session ID from baggage: {session_id_from_baggage}", file=sys.stderr)
             
             # Add tool arguments as span attributes (be careful with sensitive data)
             for i, arg in enumerate(args):
@@ -235,34 +200,26 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                     # For any result, record its type
                     span.set_attribute("tool.result.class", type(result).__name__)
                 
-                print(f"[OTel DEBUG] Tool {tool_name} completed successfully with result type: {type(result).__name__}", file=sys.stderr)
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
-                print(f"[OTel DEBUG] Tool {tool_name} failed with error: {e}", file=sys.stderr)
                 raise
         finally:
             # End the span and detach context
             span.end()
             context.detach(token)
-            print(f"[OTel DEBUG] Ended span for tool {tool_name}", file=sys.stderr)
             
             # Force flush the provider to ensure spans are exported
             global _provider
             if _provider:
                 try:
                     _provider.force_flush(timeout_millis=1000)
-                    print(f"[OTel DEBUG] Force flushed provider after tool {tool_name}", file=sys.stderr)
                 except Exception as e:
-                    print(f"[OTel DEBUG] Failed to force flush: {e}", file=sys.stderr)
+                    pass
     
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
-        print(f"[OTel DEBUG] Tool {tool_name} called (sync)", file=sys.stderr)
-        print(f"[OTel DEBUG] Tool {tool_name} args: {args}", file=sys.stderr)
-        print(f"[OTel DEBUG] Tool {tool_name} kwargs: {kwargs}", file=sys.stderr)
-        
         span = tracer.start_span(f"tool.{tool_name}")
         
         # Activate the span in the current context
@@ -270,7 +227,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
         token = context.attach(trace.set_span_in_context(span))
         
         try:
-            print(f"[OTel DEBUG] Created span for tool {tool_name}, trace_id={span.get_span_context().trace_id:032x}, span_id={span.get_span_context().span_id:016x}, is_recording={span.is_recording()}", file=sys.stderr)
             _add_component_attributes(span, "tool", tool_name,
                                      args_count=len(args),
                                      kwargs_count=len(kwargs))
@@ -278,7 +234,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Extract Context parameter if present - this should have MCP session info
             ctx = kwargs.get('ctx')
             if ctx:
-                print(f"[OTel DEBUG] Found context for tool {tool_name}: {ctx}", file=sys.stderr)
                 if hasattr(ctx, 'request_id'):
                     span.set_attribute("mcp.request.id", ctx.request_id)
                 if hasattr(ctx, 'session_id'):
@@ -289,13 +244,11 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                         value = getattr(ctx, attr, None)
                         if value:
                             span.set_attribute(f"mcp.context.{attr}", str(value))
-                            print(f"[OTel DEBUG] Added context attribute {attr}={value}", file=sys.stderr)
             
             # Also check baggage for session ID
             session_id_from_baggage = baggage.get_baggage("mcp.session.id")
             if session_id_from_baggage:
                 span.set_attribute("mcp.session.id", session_id_from_baggage)
-                print(f"[OTel DEBUG] Added session ID from baggage: {session_id_from_baggage}", file=sys.stderr)
             
             # Add tool arguments as span attributes (be careful with sensitive data)
             for i, arg in enumerate(args):
@@ -340,34 +293,28 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                     # For any result, record its type
                     span.set_attribute("tool.result.class", type(result).__name__)
                 
-                print(f"[OTel DEBUG] Tool {tool_name} completed successfully with result type: {type(result).__name__}", file=sys.stderr)
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
-                print(f"[OTel DEBUG] Tool {tool_name} failed with error: {e}", file=sys.stderr)
                 raise
         finally:
             # End the span and detach context
             span.end()
             context.detach(token)
-            print(f"[OTel DEBUG] Ended span for tool {tool_name}", file=sys.stderr)
             
             # Force flush the provider to ensure spans are exported
             global _provider
             if _provider:
                 try:
                     _provider.force_flush(timeout_millis=1000)
-                    print(f"[OTel DEBUG] Force flushed provider after tool {tool_name}", file=sys.stderr)
                 except Exception as e:
-                    print(f"[OTel DEBUG] Failed to force flush: {e}", file=sys.stderr)
+                    pass
     
     # Return appropriate wrapper based on function type
     if asyncio.iscoroutinefunction(func):
-        print(f"[OTel DEBUG] Tool {tool_name} is async, returning async wrapper", file=sys.stderr)
         return async_wrapper
     else:
-        print(f"[OTel DEBUG] Tool {tool_name} is sync, returning sync wrapper", file=sys.stderr)
         return sync_wrapper
 
 def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[..., T]:
@@ -496,14 +443,8 @@ async def telemetry_lifespan(mcp_instance):
     """Simplified lifespan for telemetry initialization and cleanup."""
     global _provider, _instrumented_tools
     
-    print(f"[OTel DEBUG] telemetry_lifespan called with mcp_instance: {mcp_instance}", file=sys.stderr)
-    print(f"[OTel DEBUG] telemetry_lifespan - mcp name: {getattr(mcp_instance, 'name', 'NO NAME')}", file=sys.stderr)
-    
     # Initialize telemetry with the server name
     provider = init_telemetry(service_name=mcp_instance.name)
-    
-    # Debug: List all instrumented tools
-    print(f"[OTel DEBUG] Instrumented tools at startup: {_instrumented_tools}", file=sys.stderr)
     
     # Try to add session tracking middleware if possible
     try:
@@ -542,9 +483,8 @@ async def telemetry_lifespan(mcp_instance):
             app = getattr(mcp_instance, 'app', getattr(mcp_instance, '_app', None))
             if app and hasattr(app, 'add_middleware'):
                 app.add_middleware(SessionTracingMiddleware)
-                print("[OTel] Added session tracking middleware", file=sys.stderr)
-    except Exception as e:
-        print(f"[OTel] Could not add session tracking middleware: {e}", file=sys.stderr)
+    except Exception:
+        pass
     
     try:
         # Yield control back to FastMCP
@@ -552,7 +492,6 @@ async def telemetry_lifespan(mcp_instance):
     finally:
         # Cleanup - shutdown the provider
         if _provider and hasattr(_provider, 'shutdown'):
-            print("[OTel] Shutting down telemetry provider", file=sys.stderr)
             _provider.force_flush()
             _provider.shutdown()
             _provider = None 
