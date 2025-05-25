@@ -903,7 +903,6 @@ def build_project(
     if settings.opentelemetry_enabled and settings.name:
         if "OTEL_SERVICE_NAME" not in env_vars_to_write:
             env_vars_to_write["OTEL_SERVICE_NAME"] = settings.name
-            console.print(f"[info]Setting OTEL_SERVICE_NAME to '{settings.name}' from golf.json in built app's .env[/info]")
     
     # 4. (Re-)Write the .env file in the output directory if there's anything to write
     if env_vars_to_write:
