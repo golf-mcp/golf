@@ -22,12 +22,22 @@ _tracer: Optional[trace.Tracer] = None
 _provider: Optional[TracerProvider] = None
 _instrumented_tools = []
 
-def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
-    """Initialize OpenTelemetry with environment-based configuration."""
+def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProvider]:
+    """Initialize OpenTelemetry with environment-based configuration.
+    
+    Returns None if required environment variables are not set.
+    """
     global _provider
     
-    # Configure based on environment
+    # Check for required environment variables based on exporter type
     exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "console").lower()
+    
+    # For OTLP HTTP exporter, check if endpoint is configured
+    if exporter_type == "otlp_http":
+        endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+        if not endpoint:
+            print(f"[WARNING] OpenTelemetry tracing is disabled: OTEL_EXPORTER_OTLP_ENDPOINT is not set for OTLP HTTP exporter")
+            return None
     
     # Create resource with service information
     resource_attributes = {
@@ -83,7 +93,11 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
     
     # Set as global provider
     try:
-        trace.set_tracer_provider(provider)
+        # Check if a provider is already set to avoid the warning
+        existing_provider = trace.get_tracer_provider()
+        if existing_provider is None or str(type(existing_provider).__name__) == 'ProxyTracerProvider':
+            # Only set if no provider exists or it's the default proxy provider
+            trace.set_tracer_provider(provider)
         _provider = provider
     except Exception as e:
         import traceback
@@ -106,7 +120,12 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
 
 def get_tracer() -> trace.Tracer:
     """Get or create the global tracer instance."""
-    global _tracer
+    global _tracer, _provider
+    
+    # If no provider is set, telemetry is disabled - return no-op tracer
+    if _provider is None:
+        return trace.get_tracer("golf.mcp.components.noop", "1.0.0")
+    
     if _tracer is None:
         _tracer = trace.get_tracer("golf.mcp.components", "1.0.0")
     return _tracer
@@ -123,6 +142,12 @@ def _add_component_attributes(span: Span, component_type: str, component_name: s
 
 def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     """Instrument a tool function with OpenTelemetry tracing."""
+    global _provider
+    
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+    
     tracer = get_tracer()
     
     @functools.wraps(func)
@@ -319,6 +344,12 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
 def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[..., T]:
     """Instrument a resource function with OpenTelemetry tracing."""
+    global _provider
+    
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+    
     tracer = get_tracer()
     
     # Determine if this is a template based on URI pattern
@@ -383,6 +414,12 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
 
 def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[..., T]:
     """Instrument a prompt function with OpenTelemetry tracing."""
+    global _provider
+    
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+    
     tracer = get_tracer()
     
     @functools.wraps(func)
@@ -445,6 +482,12 @@ async def telemetry_lifespan(mcp_instance):
     
     # Initialize telemetry with the server name
     provider = init_telemetry(service_name=mcp_instance.name)
+    
+    # If provider is None, telemetry is disabled
+    if provider is None:
+        # Just yield without any telemetry setup
+        yield
+        return
     
     # Try to add session tracking middleware if possible
     try:

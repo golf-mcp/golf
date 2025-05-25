@@ -6,6 +6,8 @@ import platform
 from pathlib import Path
 from typing import Optional, Dict, Any
 import json
+import uuid
+import getpass
 
 import posthog
 from rich.console import Console
@@ -115,8 +117,7 @@ def set_telemetry_enabled(enabled: bool, persist: bool = True) -> None:
 def get_anonymous_id() -> str:
     """Get or create a persistent anonymous ID for this machine.
     
-    The ID is stored in the user's home directory and is based on
-    machine characteristics to be consistent across sessions.
+    The ID is stored in the user's home directory and is unique per installation.
     """
     global _anonymous_id
     
@@ -129,16 +130,35 @@ def get_anonymous_id() -> str:
     if id_file.exists():
         try:
             _anonymous_id = id_file.read_text().strip()
-            if _anonymous_id:
+            # Check if ID is in the old format (no hyphen between hash and random component)
+            # Old format: golf-[8 chars hash][8 chars random]
+            # New format: golf-[8 chars hash]-[8 chars random]
+            if _anonymous_id and _anonymous_id.startswith("golf-") and len(_anonymous_id) == 21:
+                # This is likely the old format, regenerate
+                _anonymous_id = None
+            elif _anonymous_id:
                 return _anonymous_id
         except Exception:
             pass
     
-    # Generate new ID based on machine characteristics
-    # This ensures the same ID across sessions on the same machine
-    machine_data = f"{platform.node()}-{platform.machine()}-{platform.system()}"
-    machine_hash = hashlib.sha256(machine_data.encode()).hexdigest()[:16]
-    _anonymous_id = f"golf-{machine_hash}"
+    # Generate new ID with more unique data
+    # Include home directory path to differentiate between users on same machine
+    # Include a random component to ensure uniqueness even with identical setups
+    
+    try:
+        username = getpass.getuser()
+    except Exception:
+        username = "unknown"
+    
+    # Combine multiple factors for uniqueness
+    machine_data = f"{platform.node()}-{platform.machine()}-{platform.system()}-{username}-{str(Path.home())}"
+    machine_hash = hashlib.sha256(machine_data.encode()).hexdigest()[:8]
+    
+    # Add a random component to ensure uniqueness
+    random_component = str(uuid.uuid4()).split('-')[0]  # First 8 chars of UUID
+    
+    # Use hyphen separator for clarity and ensure PostHog treats these as different IDs
+    _anonymous_id = f"golf-{machine_hash}-{random_component}"
     
     # Try to save for next time
     try:
@@ -194,6 +214,28 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
         
         # Get anonymous ID
         anonymous_id = get_anonymous_id()
+        
+        # Set person properties to differentiate installations
+        # This helps PostHog understand these are different users
+        try:
+            hostname = platform.node()
+        except Exception:
+            hostname = "unknown"
+            
+        person_properties = {
+            "$set": {
+                "golf_version": __version__,
+                "os": platform.system(),
+                "hostname": hostname,
+                "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
+            }
+        }
+        
+        # Identify the user with properties
+        posthog.identify(
+            distinct_id=anonymous_id,
+            properties=person_properties
+        )
         
         # Only include minimal, non-identifying properties
         safe_properties = {
