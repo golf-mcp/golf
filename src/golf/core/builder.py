@@ -527,6 +527,11 @@ class CodeGenerator:
             "import os",
             "import sys",
             "from dotenv import load_dotenv",
+            "import logging",
+            "",
+            "# Suppress FastMCP INFO logs",
+            "logging.getLogger('fastmcp').setLevel(logging.WARNING)",
+            "logging.getLogger('mcp').setLevel(logging.WARNING)",
             ""
         ]
         
