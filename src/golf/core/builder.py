@@ -20,6 +20,7 @@ from golf.core.parser import (
 from golf.core.transformer import transform_component
 from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.auth import get_auth_config
+from golf.auth.api_key import get_api_key_config
 from golf.core.builder_telemetry import (
     generate_telemetry_imports,
     get_otel_dependencies
