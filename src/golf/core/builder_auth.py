@@ -145,7 +145,6 @@ def generate_api_key_auth_components(server_name: str, opentelemetry_enabled: bo
         - setup_code: Auth setup code (middleware setup)
         - fastmcp_args: Dict of arguments to add to FastMCP constructor
         - has_auth: Whether auth is configured
-        - post_init_code: Code to run after FastMCP instance is created
     """
     api_key_config = get_api_key_config()
     if not api_key_config:
@@ -153,8 +152,7 @@ def generate_api_key_auth_components(server_name: str, opentelemetry_enabled: bo
             "imports": [],
             "setup_code": [],
             "fastmcp_args": {},
-            "has_auth": False,
-            "post_init_code": []
+            "has_auth": False
         }
     
     auth_imports = [
@@ -219,32 +217,11 @@ def generate_api_key_auth_components(server_name: str, opentelemetry_enabled: bo
     # API key auth is handled via middleware, not FastMCP constructor args
     fastmcp_args = {}
     
-    # Code to run after FastMCP instance is created
-    post_init_code = []
-    
-    # For all transports, add middleware to the app after getting it
-    post_init_code = [
-        "# Add API key middleware to the FastMCP app",
-        "# Get the HTTP app from FastMCP",
-        f"if '{transport}' in ['streamable-http', 'http']:",
-        "    # For streamable-http/http, get the app directly",
-        "    app = mcp.http_app()",
-        "    app.add_middleware(ApiKeyMiddleware)",
-        f"elif '{transport}' == 'sse':",
-        "    # For SSE, we need to add middleware before running",
-        "    # This will be handled in the run method",
-        "    pass",
-        "else:",
-        "    # For stdio transport, API key auth doesn't apply",
-        "    pass",
-    ]
-    
     return {
         "imports": auth_imports,
         "setup_code": setup_code_lines,
         "fastmcp_args": fastmcp_args,
-        "has_auth": True,
-        "post_init_code": post_init_code
+        "has_auth": True
     }
 
 
