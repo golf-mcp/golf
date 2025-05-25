@@ -20,10 +20,8 @@ from golf.core.parser import (
 from golf.core.transformer import transform_component
 from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.auth import get_auth_config
-from golf.auth import get_access_token
 from golf.core.builder_telemetry import (
     generate_telemetry_imports,
-    generate_component_registration_with_telemetry,
     get_otel_dependencies
 )
 
@@ -625,8 +623,6 @@ class CodeGenerator:
                     
                     # Debug: Add logging to verify wrapping
                     registration += f"\n_wrapped_func = instrument_{component_type.value}({full_module_path}.{entry_func}, '{component.name}')"
-                    registration += f"\nprint(f'[Golf DEBUG] Registering {component_type.value} {component.name} with wrapper: {{_wrapped_func}}', file=sys.stderr)"
-                    registration += f"\nprint(f'[Golf DEBUG] Wrapper has _otel_wrapper_id: {{getattr(_wrapped_func, \"_otel_wrapper_id\", \"NO ID\")}}', file=sys.stderr)"
                     
                     if component_type == ComponentType.TOOL:
                         registration += f"\nmcp.add_tool(_wrapped_func, name=\"{component.name}\", description=\"{component.docstring or ''}\")"
@@ -765,13 +761,11 @@ class CodeGenerator:
         if self.settings.transport == "sse":
             main_code.extend([
                 "    # For SSE, FastMCP's run method handles auth integration better",
-                "    print(f\"[Server Runner] Using mcp.run() for SSE transport with host={host}, port={port}\", file=sys.stderr)",
                 "    mcp.run(transport=\"sse\", host=host, port=port, log_level=\"debug\")"
             ])
         elif self.settings.transport == "streamable-http":
             main_code.extend([
                 "    # Create HTTP app and run with uvicorn",
-                "    print(f\"[Server Runner] Starting streamable-http transport with host={host}, port={port}\", file=sys.stderr)",
                 "    app = mcp.http_app()",
             ])
             
@@ -790,7 +784,6 @@ class CodeGenerator:
             # For stdio transport, use mcp.run()
             main_code.extend([
                 "    # Run with stdio transport",
-                "    print(f\"[Server Runner] Starting stdio transport\", file=sys.stderr)",
                 "    mcp.run(transport=\"stdio\")"
             ])
         
