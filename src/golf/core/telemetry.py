@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import json
 import uuid
-import getpass
 
 import posthog
 from rich.console import Console
@@ -26,6 +25,7 @@ POSTHOG_HOST = "https://us.i.posthog.com"
 # Telemetry state
 _telemetry_enabled: Optional[bool] = None
 _anonymous_id: Optional[str] = None
+_user_identified: bool = False  # Track if we've already identified the user
 
 
 def get_telemetry_config_path() -> Path:
@@ -142,16 +142,10 @@ def get_anonymous_id() -> str:
             pass
     
     # Generate new ID with more unique data
-    # Include home directory path to differentiate between users on same machine
-    # Include a random component to ensure uniqueness even with identical setups
+    # Use only non-identifying system information
     
-    try:
-        username = getpass.getuser()
-    except Exception:
-        username = "unknown"
-    
-    # Combine multiple factors for uniqueness
-    machine_data = f"{platform.node()}-{platform.machine()}-{platform.system()}-{username}-{str(Path.home())}"
+    # Combine non-identifying factors for uniqueness
+    machine_data = f"{platform.machine()}-{platform.system()}-{platform.python_version()}"
     machine_hash = hashlib.sha256(machine_data.encode()).hexdigest()[:8]
     
     # Add a random component to ensure uniqueness
@@ -200,6 +194,8 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
         event_name: Name of the event (e.g., "cli_init", "cli_build")
         properties: Optional properties to include with the event
     """
+    global _user_identified
+    
     if not is_telemetry_enabled():
         return
     
@@ -215,33 +211,33 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
         # Get anonymous ID
         anonymous_id = get_anonymous_id()
         
-        # Set person properties to differentiate installations
-        # This helps PostHog understand these are different users
-        try:
-            hostname = platform.node()
-        except Exception:
-            hostname = "unknown"
-            
-        person_properties = {
-            "$set": {
-                "golf_version": __version__,
-                "os": platform.system(),
-                "hostname": hostname,
-                "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
+        # Only identify the user once per session
+        if not _user_identified:
+            # Set person properties to differentiate installations
+            # Only include non-identifying information
+            person_properties = {
+                "$set": {
+                    "golf_version": __version__,
+                    "os": platform.system(),
+                    "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
+                }
             }
-        }
-        
-        # Identify the user with properties
-        posthog.identify(
-            distinct_id=anonymous_id,
-            properties=person_properties
-        )
+            
+            # Identify the user with properties
+            posthog.identify(
+                distinct_id=anonymous_id,
+                properties=person_properties
+            )
+            
+            _user_identified = True
         
         # Only include minimal, non-identifying properties
         safe_properties = {
             "golf_version": __version__,
             "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
             "os": platform.system(),
+            # Explicitly disable IP tracking
+            "$ip": None,
         }
         
         # Filter properties to only include safe ones
