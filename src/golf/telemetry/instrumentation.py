@@ -344,6 +344,12 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
 def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[..., T]:
     """Instrument a resource function with OpenTelemetry tracing."""
+    global _provider
+    
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+    
     tracer = get_tracer()
     
     # Determine if this is a template based on URI pattern
@@ -408,6 +414,12 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
 
 def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[..., T]:
     """Instrument a prompt function with OpenTelemetry tracing."""
+    global _provider
+    
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+    
     tracer = get_tracer()
     
     @functools.wraps(func)
