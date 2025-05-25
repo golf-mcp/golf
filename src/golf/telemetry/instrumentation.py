@@ -120,7 +120,12 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProv
 
 def get_tracer() -> trace.Tracer:
     """Get or create the global tracer instance."""
-    global _tracer
+    global _tracer, _provider
+    
+    # If no provider is set, telemetry is disabled - return no-op tracer
+    if _provider is None:
+        return trace.get_tracer("golf.mcp.components.noop", "1.0.0")
+    
     if _tracer is None:
         _tracer = trace.get_tracer("golf.mcp.components", "1.0.0")
     return _tracer
@@ -137,6 +142,12 @@ def _add_component_attributes(span: Span, component_type: str, component_name: s
 
 def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     """Instrument a tool function with OpenTelemetry tracing."""
+    global _provider
+    
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+    
     tracer = get_tracer()
     
     @functools.wraps(func)
@@ -459,6 +470,12 @@ async def telemetry_lifespan(mcp_instance):
     
     # Initialize telemetry with the server name
     provider = init_telemetry(service_name=mcp_instance.name)
+    
+    # If provider is None, telemetry is disabled
+    if provider is None:
+        # Just yield without any telemetry setup
+        yield
+        return
     
     # Try to add session tracking middleware if possible
     try:
