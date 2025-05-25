@@ -766,7 +766,7 @@ class CodeGenerator:
         if self.settings.transport == "sse":
             main_code.extend([
                 "    # For SSE, FastMCP's run method handles auth integration better",
-                "    mcp.run(transport=\"sse\", host=host, port=port, log_level=\"error\")"
+                "    mcp.run(transport=\"sse\", host=host, port=port, log_level=\"info\")"
             ])
         elif self.settings.transport == "streamable-http":
             main_code.extend([
@@ -783,7 +783,7 @@ class CodeGenerator:
                 ])
             
             main_code.extend([
-                "    uvicorn.run(app, host=host, port=port, log_level=\"error\")"
+                "    uvicorn.run(app, host=host, port=port, log_level=\"info\")"
             ])
         else:
             # For stdio transport, use mcp.run()
