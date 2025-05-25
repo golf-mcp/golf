@@ -785,6 +785,14 @@ class CodeGenerator:
                 "    app = mcp.http_app()",
             ])
             
+            # Check if we need to add API key middleware
+            api_key_config = get_api_key_config()
+            if auth_components.get("has_auth") and api_key_config:
+                main_code.extend([
+                    "    # Add API key middleware",
+                    "    app.add_middleware(ApiKeyMiddleware)",
+                ])
+            
             # Add OpenTelemetry middleware to the HTTP app if enabled
             if self.settings.opentelemetry_enabled:
                 main_code.extend([
