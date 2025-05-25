@@ -130,7 +130,13 @@ def get_anonymous_id() -> str:
     if id_file.exists():
         try:
             _anonymous_id = id_file.read_text().strip()
-            if _anonymous_id:
+            # Check if ID is in the old format (no hyphen between hash and random component)
+            # Old format: golf-[8 chars hash][8 chars random]
+            # New format: golf-[8 chars hash]-[8 chars random]
+            if _anonymous_id and _anonymous_id.startswith("golf-") and len(_anonymous_id) == 21:
+                # This is likely the old format, regenerate
+                _anonymous_id = None
+            elif _anonymous_id:
                 return _anonymous_id
         except Exception:
             pass
@@ -151,7 +157,8 @@ def get_anonymous_id() -> str:
     # Add a random component to ensure uniqueness
     random_component = str(uuid.uuid4()).split('-')[0]  # First 8 chars of UUID
     
-    _anonymous_id = f"golf-{machine_hash}{random_component}"
+    # Use hyphen separator for clarity and ensure PostHog treats these as different IDs
+    _anonymous_id = f"golf-{machine_hash}-{random_component}"
     
     # Try to save for next time
     try:
@@ -207,6 +214,28 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
         
         # Get anonymous ID
         anonymous_id = get_anonymous_id()
+        
+        # Set person properties to differentiate installations
+        # This helps PostHog understand these are different users
+        try:
+            hostname = platform.node()
+        except Exception:
+            hostname = "unknown"
+            
+        person_properties = {
+            "$set": {
+                "golf_version": __version__,
+                "os": platform.system(),
+                "hostname": hostname,
+                "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
+            }
+        }
+        
+        # Identify the user with properties
+        posthog.identify(
+            distinct_id=anonymous_id,
+            properties=person_properties
+        )
         
         # Only include minimal, non-identifying properties
         safe_properties = {
