@@ -83,7 +83,11 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider:
     
     # Set as global provider
     try:
-        trace.set_tracer_provider(provider)
+        # Check if a provider is already set to avoid the warning
+        existing_provider = trace.get_tracer_provider()
+        if existing_provider is None or str(type(existing_provider).__name__) == 'ProxyTracerProvider':
+            # Only set if no provider exists or it's the default proxy provider
+            trace.set_tracer_provider(provider)
         _provider = provider
     except Exception as e:
         import traceback
