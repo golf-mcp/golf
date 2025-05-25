@@ -94,4 +94,59 @@ def get_api_key() -> Optional[str]:
             headers = {"Authorization": f"Bearer {api_key}"}
             ...
     """
+    # First try to get from context variable (works in most cases)
+    api_key = _current_api_key.get()
+    if api_key:
+        return api_key
+    
+    # Try to get from task-based store (works across async boundaries)
+    try:
+        import asyncio
+        # Check if we're in an async context
+        task = asyncio.current_task()
+        if task:
+            # Try to access the task-based store from the generated server
+            import sys
+            # Look for the get_api_key_for_task function in the main module
+            main_module = sys.modules.get('__main__')
+            if main_module and hasattr(main_module, 'get_api_key_for_task'):
+                api_key = main_module.get_api_key_for_task()
+                if api_key:
+                    return api_key
+    except Exception:
+        pass
+    
+    # If not found, try to get from FastMCP's request context
+    # This requires accessing the current request state
+    try:
+        from starlette.requests import Request
+        from contextvars import copy_context
+        
+        # Try to find the request in the current context
+        context = copy_context()
+        for var in context:
+            value = context.get(var)
+            if isinstance(value, Request) and hasattr(value, 'state') and hasattr(value.state, 'api_key'):
+                return value.state.api_key
+    except Exception:
+        pass
+    
+    return None
+
+def get_api_key_from_request(request) -> Optional[str]:
+    """Get the API key from a specific request object.
+    
+    This is useful when you have direct access to the request object.
+    
+    Args:
+        request: The Starlette Request object
+        
+    Returns:
+        The API key if available, None otherwise
+    """
+    # Check request state first (set by our middleware)
+    if hasattr(request, 'state') and hasattr(request.state, 'api_key'):
+        return request.state.api_key
+    
+    # Fall back to context variable
     return _current_api_key.get() 
