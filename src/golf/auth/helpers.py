@@ -1,6 +1,6 @@
 """Helper functions for working with authentication in MCP context."""
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from contextvars import ContextVar
 
 # Re-export get_access_token from the MCP SDK
@@ -99,15 +99,32 @@ def get_api_key() -> Optional[str]:
     if api_key:
         return api_key
     
-    # Try to get from task-based store (works across async boundaries)
+    # Try to get from the enhanced storage mechanism using request ID
     try:
         import asyncio
+        import sys
+        
+        # Look for the request_id_context in the main module
+        main_module = sys.modules.get('__main__')
+        if main_module and hasattr(main_module, 'request_id_context'):
+            request_id_context = getattr(main_module, 'request_id_context')
+            request_id = request_id_context.get()
+            
+            # If we have a request ID, try to get the API key from storage
+            if request_id and hasattr(main_module, 'api_key_storage'):
+                api_key_storage = getattr(main_module, 'api_key_storage')
+                api_key = api_key_storage.get_api_key(request_id)
+                if api_key:
+                    return api_key
+    except Exception:
+        pass
+    
+    # Try to get from task-based store (legacy compatibility)
+    try:
         # Check if we're in an async context
         task = asyncio.current_task()
         if task:
             # Try to access the task-based store from the generated server
-            import sys
-            # Look for the get_api_key_for_task function in the main module
             main_module = sys.modules.get('__main__')
             if main_module and hasattr(main_module, 'get_api_key_for_task'):
                 api_key = main_module.get_api_key_for_task()
@@ -131,7 +148,9 @@ def get_api_key() -> Optional[str]:
     except Exception:
         pass
     
-    return None
+    # Final fallback: environment variable (for development/testing)
+    import os
+    return os.environ.get('API_KEY')
 
 def get_api_key_from_request(request) -> Optional[str]:
     """Get the API key from a specific request object.
@@ -149,4 +168,52 @@ def get_api_key_from_request(request) -> Optional[str]:
         return request.state.api_key
     
     # Fall back to context variable
-    return _current_api_key.get() 
+    return _current_api_key.get()
+
+def debug_api_key_context() -> Dict[str, Any]:
+    """Debug function to inspect API key context.
+    
+    Returns a dictionary with debugging information about the current
+    API key context. Useful for troubleshooting authentication issues.
+    
+    Returns:
+        Dictionary with debug information
+    """
+    import asyncio
+    import sys
+    import os
+    
+    debug_info = {
+        "context_var_value": _current_api_key.get(),
+        "has_async_task": False,
+        "task_id": None,
+        "main_module_has_storage": False,
+        "main_module_has_context": False,
+        "request_id_from_context": None,
+        "env_vars": {
+            "API_KEY": bool(os.environ.get('API_KEY')),
+            "GOLF_API_KEY_DEBUG": os.environ.get('GOLF_API_KEY_DEBUG', 'false')
+        }
+    }
+    
+    try:
+        task = asyncio.current_task()
+        if task:
+            debug_info["has_async_task"] = True
+            debug_info["task_id"] = id(task)
+    except:
+        pass
+    
+    try:
+        main_module = sys.modules.get('__main__')
+        if main_module:
+            debug_info["main_module_has_storage"] = hasattr(main_module, 'api_key_storage')
+            debug_info["main_module_has_context"] = hasattr(main_module, 'request_id_context')
+            
+            if hasattr(main_module, 'request_id_context'):
+                request_id_context = getattr(main_module, 'request_id_context')
+                debug_info["request_id_from_context"] = request_id_context.get()
+    except:
+        pass
+    
+    return debug_info 
