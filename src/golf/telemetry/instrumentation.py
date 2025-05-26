@@ -786,30 +786,97 @@ async def telemetry_lifespan(mcp_instance):
         
         class SessionTracingMiddleware(BaseHTTPMiddleware):
             async def dispatch(self, request: Request, call_next):
-                # Extract session ID from query params
+                # Extract session ID from query params or headers
                 session_id = request.query_params.get('session_id')
-                if session_id:
-                    # Add to baggage for propagation
-                    ctx = baggage.set_baggage("mcp.session.id", session_id)
-                    from opentelemetry import context
-                    token = context.attach(ctx)
+                if not session_id:
+                    # Check headers as fallback
+                    session_id = request.headers.get('x-session-id')
+                
+                # Create a descriptive span name based on the request
+                method = request.method
+                path = request.url.path
+                
+                # Determine the operation type from the path
+                operation_type = "unknown"
+                if "/mcp" in path:
+                    operation_type = "mcp.request"
+                elif "/sse" in path:
+                    operation_type = "sse.stream"
+                elif "/auth" in path:
+                    operation_type = "auth"
+                
+                span_name = f"{operation_type}.{method.lower()}"
+                
+                tracer = get_tracer()
+                with tracer.start_as_current_span(span_name) as span:
+                    # Add comprehensive HTTP attributes
+                    span.set_attribute("http.method", method)
+                    span.set_attribute("http.url", str(request.url))
+                    span.set_attribute("http.scheme", request.url.scheme)
+                    span.set_attribute("http.host", request.url.hostname or "unknown")
+                    span.set_attribute("http.target", path)
+                    span.set_attribute("http.user_agent", request.headers.get("user-agent", "unknown"))
                     
-                    # Also create a span for the HTTP request
-                    tracer = get_tracer()
-                    with tracer.start_as_current_span(f"http.{request.method} {request.url.path}") as span:
-                        span.set_attribute("http.method", request.method)
-                        span.set_attribute("http.url", str(request.url))
-                        span.set_attribute("http.session_id", session_id)
+                    # Add session tracking
+                    if session_id:
                         span.set_attribute("mcp.session.id", session_id)
+                        # Add to baggage for propagation
+                        ctx = baggage.set_baggage("mcp.session.id", session_id)
+                        from opentelemetry import context
+                        token = context.attach(ctx)
+                    else:
+                        token = None
+                    
+                    # Add request size if available
+                    content_length = request.headers.get("content-length")
+                    if content_length:
+                        span.set_attribute("http.request.size", int(content_length))
+                    
+                    # Add event for request start
+                    span.add_event("http.request.started", {
+                        "method": method,
+                        "path": path,
+                        "timestamp": trace.time_ns()
+                    })
+                    
+                    try:
+                        response = await call_next(request)
                         
-                        try:
-                            response = await call_next(request)
-                            span.set_attribute("http.status_code", response.status_code)
-                            return response
-                        finally:
+                        # Add response attributes
+                        span.set_attribute("http.status_code", response.status_code)
+                        span.set_attribute("http.status_class", f"{response.status_code // 100}xx")
+                        
+                        # Set span status based on HTTP status
+                        if response.status_code >= 400:
+                            span.set_status(Status(StatusCode.ERROR, f"HTTP {response.status_code}"))
+                        else:
+                            span.set_status(Status(StatusCode.OK))
+                        
+                        # Add event for request completion
+                        span.add_event("http.request.completed", {
+                            "method": method,
+                            "path": path,
+                            "status_code": response.status_code,
+                            "timestamp": trace.time_ns()
+                        })
+                        
+                        return response
+                    except Exception as e:
+                        span.record_exception(e)
+                        span.set_status(Status(StatusCode.ERROR, str(e)))
+                        
+                        # Add event for error
+                        span.add_event("http.request.error", {
+                            "method": method,
+                            "path": path,
+                            "error.type": type(e).__name__,
+                            "error.message": str(e),
+                            "timestamp": trace.time_ns()
+                        })
+                        raise
+                    finally:
+                        if token:
                             context.detach(token)
-                else:
-                    return await call_next(request)
         
         # Try to add middleware to FastMCP app if it has Starlette app
         if hasattr(mcp_instance, 'app') or hasattr(mcp_instance, '_app'):
