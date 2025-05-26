@@ -759,7 +759,6 @@ class CodeGenerator:
         # Transport-specific run methods
         if self.settings.transport == "sse":
             # Check if we need to add API key middleware for SSE
-            from golf.auth.api_key import get_api_key_config
             api_key_config = get_api_key_config()
             if auth_components.get("has_auth") and api_key_config:
                 main_code.extend([
