@@ -94,63 +94,93 @@ def get_api_key() -> Optional[str]:
             headers = {"Authorization": f"Bearer {api_key}"}
             ...
     """
-    # First try to get from context variable (works in most cases)
-    api_key = _current_api_key.get()
-    if api_key:
-        return api_key
+    debug = True  # Force debug for now
     
-    # Try to get from the enhanced storage mechanism using request ID
+    if debug:
+        print("[get_api_key] Starting API key retrieval")
+    
+    # Try to get directly from HTTP request if available (FastMCP pattern)
     try:
-        import asyncio
-        import sys
+        # This follows the FastMCP pattern for accessing HTTP requests
+        from fastmcp.server.dependencies import get_http_request
+        request = get_http_request()
         
-        # Look for the request_id_context in the main module
-        main_module = sys.modules.get('__main__')
-        if main_module and hasattr(main_module, 'request_id_context'):
-            request_id_context = getattr(main_module, 'request_id_context')
-            request_id = request_id_context.get()
+        if debug:
+            print(f"[get_api_key] FastMCP request available: {request is not None}")
+            if request:
+                print(f"[get_api_key] Request type: {type(request)}")
+                print(f"[get_api_key] Request has state: {hasattr(request, 'state')}")
+                if hasattr(request, 'state'):
+                    print(f"[get_api_key] Request state attrs: {dir(request.state) if hasattr(request, 'state') else 'No state'}")
+                    # Check what's actually in the state
+                    try:
+                        state_dict = request.state._state if hasattr(request.state, '_state') else {}
+                        print(f"[get_api_key] Request state contents: {state_dict}")
+                    except Exception as e:
+                        print(f"[get_api_key] Could not access state contents: {e}")
+                    if hasattr(request.state, 'api_key'):
+                        print(f"[get_api_key] Found api_key in request.state!")
+        
+        if request and hasattr(request, 'state') and hasattr(request.state, 'api_key'):
+            api_key = request.state.api_key
+            if debug:
+                print(f"[get_api_key] Retrieved API key from request.state: {api_key[:10]}...")
+            return api_key
+        
+        # Get the API key configuration
+        from golf.auth.api_key import get_api_key_config
+        api_key_config = get_api_key_config()
+        
+        if api_key_config and request:
+            # Extract API key from headers
+            header_name = api_key_config.header_name
+            header_prefix = api_key_config.header_prefix
             
-            # If we have a request ID, try to get the API key from storage
-            if request_id and hasattr(main_module, 'api_key_storage'):
-                api_key_storage = getattr(main_module, 'api_key_storage')
-                api_key = api_key_storage.get_api_key(request_id)
-                if api_key:
-                    return api_key
-    except Exception:
+            if debug:
+                print(f"[get_api_key] Looking for header: {header_name} with prefix: {header_prefix}")
+                print(f"[get_api_key] Available headers: {list(request.headers.keys())}")
+            
+            # Case-insensitive header lookup
+            api_key = None
+            for k, v in request.headers.items():
+                if k.lower() == header_name.lower():
+                    api_key = v
+                    break
+            
+            if debug and api_key:
+                print(f"[get_api_key] Found raw API key in header: {api_key[:20]}...")
+            
+            # Strip prefix if configured
+            if api_key and header_prefix and api_key.startswith(header_prefix):
+                api_key = api_key[len(header_prefix):]
+                if debug:
+                    print(f"[get_api_key] Stripped prefix, final API key: {api_key[:10]}...")
+            
+            if api_key:
+                return api_key
+    except (ImportError, RuntimeError) as e:
+        # FastMCP not available or not in HTTP context
+        if debug:
+            print(f"[get_api_key] FastMCP error: {type(e).__name__}: {e}")
         pass
-    
-    # Try to get from task-based store (legacy compatibility)
-    try:
-        # Check if we're in an async context
-        task = asyncio.current_task()
-        if task:
-            # Try to access the task-based store from the generated server
-            main_module = sys.modules.get('__main__')
-            if main_module and hasattr(main_module, 'get_api_key_for_task'):
-                api_key = main_module.get_api_key_for_task()
-                if api_key:
-                    return api_key
-    except Exception:
-        pass
-    
-    # If not found, try to get from FastMCP's request context
-    # This requires accessing the current request state
-    try:
-        from starlette.requests import Request
-        from contextvars import copy_context
-        
-        # Try to find the request in the current context
-        context = copy_context()
-        for var in context:
-            value = context.get(var)
-            if isinstance(value, Request) and hasattr(value, 'state') and hasattr(value.state, 'api_key'):
-                return value.state.api_key
-    except Exception:
-        pass
+    except Exception as e:
+        if debug:
+            print(f"[get_api_key] Unexpected error: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
     
     # Final fallback: environment variable (for development/testing)
     import os
-    return os.environ.get('API_KEY')
+    env_api_key = os.environ.get('API_KEY')
+    if env_api_key:
+        if debug:
+            print(f"[get_api_key] Using API key from environment: {env_api_key[:10]}...")
+        return env_api_key
+    
+    if debug:
+        print("[get_api_key] No API key found anywhere!")
+    
+    return None
 
 def get_api_key_from_request(request) -> Optional[str]:
     """Get the API key from a specific request object.
