@@ -94,37 +94,14 @@ def get_api_key() -> Optional[str]:
             headers = {"Authorization": f"Bearer {api_key}"}
             ...
     """
-    debug = True  # Force debug for now
-    
-    if debug:
-        print("[get_api_key] Starting API key retrieval")
-    
     # Try to get directly from HTTP request if available (FastMCP pattern)
     try:
         # This follows the FastMCP pattern for accessing HTTP requests
         from fastmcp.server.dependencies import get_http_request
         request = get_http_request()
         
-        if debug:
-            print(f"[get_api_key] FastMCP request available: {request is not None}")
-            if request:
-                print(f"[get_api_key] Request type: {type(request)}")
-                print(f"[get_api_key] Request has state: {hasattr(request, 'state')}")
-                if hasattr(request, 'state'):
-                    print(f"[get_api_key] Request state attrs: {dir(request.state) if hasattr(request, 'state') else 'No state'}")
-                    # Check what's actually in the state
-                    try:
-                        state_dict = request.state._state if hasattr(request.state, '_state') else {}
-                        print(f"[get_api_key] Request state contents: {state_dict}")
-                    except Exception as e:
-                        print(f"[get_api_key] Could not access state contents: {e}")
-                    if hasattr(request.state, 'api_key'):
-                        print(f"[get_api_key] Found api_key in request.state!")
-        
         if request and hasattr(request, 'state') and hasattr(request.state, 'api_key'):
             api_key = request.state.api_key
-            if debug:
-                print(f"[get_api_key] Retrieved API key from request.state: {api_key[:10]}...")
             return api_key
         
         # Get the API key configuration
@@ -136,10 +113,6 @@ def get_api_key() -> Optional[str]:
             header_name = api_key_config.header_name
             header_prefix = api_key_config.header_prefix
             
-            if debug:
-                print(f"[get_api_key] Looking for header: {header_name} with prefix: {header_prefix}")
-                print(f"[get_api_key] Available headers: {list(request.headers.keys())}")
-            
             # Case-insensitive header lookup
             api_key = None
             for k, v in request.headers.items():
@@ -147,38 +120,23 @@ def get_api_key() -> Optional[str]:
                     api_key = v
                     break
             
-            if debug and api_key:
-                print(f"[get_api_key] Found raw API key in header: {api_key[:20]}...")
-            
             # Strip prefix if configured
             if api_key and header_prefix and api_key.startswith(header_prefix):
                 api_key = api_key[len(header_prefix):]
-                if debug:
-                    print(f"[get_api_key] Stripped prefix, final API key: {api_key[:10]}...")
             
             if api_key:
                 return api_key
     except (ImportError, RuntimeError) as e:
         # FastMCP not available or not in HTTP context
-        if debug:
-            print(f"[get_api_key] FastMCP error: {type(e).__name__}: {e}")
         pass
     except Exception as e:
-        if debug:
-            print(f"[get_api_key] Unexpected error: {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
+        pass
     
     # Final fallback: environment variable (for development/testing)
     import os
     env_api_key = os.environ.get('API_KEY')
     if env_api_key:
-        if debug:
-            print(f"[get_api_key] Using API key from environment: {env_api_key[:10]}...")
         return env_api_key
-    
-    if debug:
-        print("[get_api_key] No API key found anywhere!")
     
     return None
 
