@@ -20,6 +20,7 @@ from golf.core.parser import (
 from golf.core.transformer import transform_component
 from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.auth import get_auth_config
+from golf.auth.api_key import get_api_key_config
 from golf.core.builder_telemetry import (
     generate_telemetry_imports,
     get_otel_dependencies
@@ -548,8 +549,7 @@ class CodeGenerator:
         # Add imports section for different transport methods
         if self.settings.transport == "sse":
             imports.append("import uvicorn")
-            imports.append("from fastmcp.server.http import create_sse_app")
-        elif self.settings.transport != "stdio":
+        elif self.settings.transport in ["streamable-http", "http"]:
             imports.append("import uvicorn")
                 
         # Get transport-specific configuration
@@ -735,12 +735,6 @@ class CodeGenerator:
         server_code_lines.append(mcp_instance_line)
         server_code_lines.append("")
         
-        # Add any post-init code from auth
-        post_init_code = []
-        if auth_components.get("has_auth") and auth_components.get("post_init_code"):
-            post_init_code.extend(auth_components["post_init_code"])
-            post_init_code.append("")
-
         # Main entry point with transport-specific app initialization
         main_code = [
             "if __name__ == \"__main__\":",
@@ -764,15 +758,34 @@ class CodeGenerator:
         
         # Transport-specific run methods
         if self.settings.transport == "sse":
-            main_code.extend([
-                "    # For SSE, FastMCP's run method handles auth integration better",
-                "    mcp.run(transport=\"sse\", host=host, port=port, log_level=\"info\")"
-            ])
-        elif self.settings.transport == "streamable-http":
+            # Check if we need to add API key middleware for SSE
+            api_key_config = get_api_key_config()
+            if auth_components.get("has_auth") and api_key_config:
+                main_code.extend([
+                    "    # For SSE with API key auth, we need to get the app and add middleware",
+                    "    app = mcp.http_app(transport=\"sse\")",
+                    "    app.add_middleware(ApiKeyMiddleware)",
+                    "    # Run with the configured app",
+                    "    uvicorn.run(app, host=host, port=port, log_level=\"info\")"
+                ])
+            else:
+                main_code.extend([
+                    "    # For SSE, FastMCP's run method handles auth integration better",
+                    "    mcp.run(transport=\"sse\", host=host, port=port, log_level=\"info\")"
+                ])
+        elif self.settings.transport in ["streamable-http", "http"]:
             main_code.extend([
                 "    # Create HTTP app and run with uvicorn",
                 "    app = mcp.http_app()",
             ])
+            
+            # Check if we need to add API key middleware
+            api_key_config = get_api_key_config()
+            if auth_components.get("has_auth") and api_key_config:
+                main_code.extend([
+                    "    # Add API key middleware",
+                    "    app.add_middleware(ApiKeyMiddleware)",
+                ])
             
             # Add OpenTelemetry middleware to the HTTP app if enabled
             if self.settings.opentelemetry_enabled:
@@ -800,7 +813,6 @@ class CodeGenerator:
             env_section + 
             auth_setup_code +
             server_code_lines +
-            post_init_code +
             component_registrations +
             main_code
         )

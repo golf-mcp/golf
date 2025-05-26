@@ -11,7 +11,7 @@ from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
 
 from .provider import ProviderConfig
 from .oauth import GolfOAuthProvider, create_callback_handler
-from .helpers import get_access_token, get_provider_token, extract_token_from_header, get_api_key, set_api_key
+from .helpers import get_access_token, get_provider_token, extract_token_from_header, get_api_key, set_api_key, debug_api_key_context
 from .api_key import configure_api_key, get_api_key_config, is_api_key_configured
 
 class AuthConfig:

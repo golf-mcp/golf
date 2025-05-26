@@ -145,7 +145,6 @@ def generate_api_key_auth_components(server_name: str, opentelemetry_enabled: bo
         - setup_code: Auth setup code (middleware setup)
         - fastmcp_args: Dict of arguments to add to FastMCP constructor
         - has_auth: Whether auth is configured
-        - post_init_code: Code to run after FastMCP instance is created
     """
     api_key_config = get_api_key_config()
     if not api_key_config:
@@ -153,24 +152,35 @@ def generate_api_key_auth_components(server_name: str, opentelemetry_enabled: bo
             "imports": [],
             "setup_code": [],
             "fastmcp_args": {},
-            "has_auth": False,
-            "post_init_code": []
+            "has_auth": False
         }
     
     auth_imports = [
         "# API key authentication setup",
-        "from golf.auth.helpers import set_api_key",
-        "from golf.auth.api_key import get_api_key_config",
+        "from golf.auth.api_key import get_api_key_config, configure_api_key",
+        "from golf.auth import set_api_key",
         "from starlette.middleware.base import BaseHTTPMiddleware",
         "from starlette.requests import Request",
         "from starlette.responses import JSONResponse",
+        "import os",
     ]
     
     setup_code_lines = [
-        "# Middleware to extract API key from headers",
+        "# Recreate API key configuration from pre_build.py",
+        f"configure_api_key(",
+        f"    header_name={repr(api_key_config.header_name)},",
+        f"    header_prefix={repr(api_key_config.header_prefix)},",
+        f"    required={repr(api_key_config.required)}",
+        f")",
+        "",
+        "# Simplified API key middleware that validates presence",
         "class ApiKeyMiddleware(BaseHTTPMiddleware):",
         "    async def dispatch(self, request: Request, call_next):",
+        "        # Debug mode from environment",
+        "        debug = os.environ.get('GOLF_API_KEY_DEBUG', '').lower() == 'true'",
+        "        ",
         "        api_key_config = get_api_key_config()",
+        "        ",
         "        if api_key_config:",
         "            # Extract API key from the configured header",
         "            header_name = api_key_config.header_name",
@@ -183,109 +193,39 @@ def generate_api_key_auth_components(server_name: str, opentelemetry_enabled: bo
         "                    api_key = v",
         "                    break",
         "            ",
-        "            # Check if API key is required and missing",
+        "            # Process the API key if found",
+        "            if api_key:",
+        "                # Strip prefix if configured",
+        "                if header_prefix and api_key.startswith(header_prefix):",
+        "                    api_key = api_key[len(header_prefix):]",
+        "                ",
+        "                # Store the API key in request state for tools to access",
+        "                request.state.api_key = api_key",
+        "                ",
+        "                # Also store in context variable for tools",
+        "                set_api_key(api_key)",
+        "            ",
+        "            # Check if API key is required but missing",
         "            if api_key_config.required and not api_key:",
         "                return JSONResponse(",
         "                    {'error': 'unauthorized', 'detail': f'Missing required {header_name} header'},",
         "                    status_code=401,",
         "                    headers={'WWW-Authenticate': f'{header_name} realm=\"MCP Server\"'}",
         "                )",
-        "            ",
-        "            # Strip prefix if configured and present",
-        "            if api_key and header_prefix and api_key.startswith(header_prefix):",
-        "                api_key = api_key[len(header_prefix):]",
-        "            elif api_key and header_prefix and api_key_config.required:",
-        "                # Has API key but wrong format when required",
-        "                return JSONResponse(",
-        "                    {'error': 'unauthorized', 'detail': f'Invalid {header_name} format, expected prefix: {header_prefix}'},",
-        "                    status_code=401,",
-        "                    headers={'WWW-Authenticate': f'{header_name} realm=\"MCP Server\"'}",
-        "                )",
-        "            ",
-        "            # Store the API key in context for tools to access",
-        "            set_api_key(api_key)",
         "        ",
         "        # Continue with the request",
-        "        response = await call_next(request)",
-        "        return response",
+        "        return await call_next(request)",
         "",
     ]
     
     # API key auth is handled via middleware, not FastMCP constructor args
     fastmcp_args = {}
     
-    # Code to run after FastMCP instance is created
-    # FastMCP doesn't expose .app directly, so we need to use custom_route
-    # to add a middleware-like functionality
-    post_init_code = [
-        "# API key authentication via custom middleware function",
-        "# Since FastMCP doesn't expose .app, we'll use a different approach",
-        "import functools",
-        "from starlette.responses import JSONResponse",
-        "",
-        "# Store original method references",
-        "_original_call_tool = mcp._mcp_call_tool if hasattr(mcp, '_mcp_call_tool') else None",
-        "_original_read_resource = mcp._mcp_read_resource if hasattr(mcp, '_mcp_read_resource') else None",
-        "_original_get_prompt = mcp._mcp_get_prompt if hasattr(mcp, '_mcp_get_prompt') else None",
-        "",
-        "# Wrapper to extract API key before processing",
-        "def with_api_key_extraction(original_method):",
-        "    @functools.wraps(original_method)",
-        "    async def wrapper(request, *args, **kwargs):",
-        "        # Extract API key from request headers",
-        "        api_key_config = get_api_key_config()",
-        "        if api_key_config and hasattr(request, 'headers'):",
-        "            header_name = api_key_config.header_name",
-        "            header_prefix = api_key_config.header_prefix",
-        "            ",
-        "            # Case-insensitive header lookup",
-        "            api_key = None",
-        "            for k, v in request.headers.items():",
-        "                if k.lower() == header_name.lower():",
-        "                    api_key = v",
-        "                    break",
-        "            ",
-        "            # Check if API key is required and missing",
-        "            if api_key_config.required and not api_key:",
-        "                return JSONResponse(",
-        "                    {'error': 'unauthorized', 'detail': f'Missing required {header_name} header'},",
-        "                    status_code=401,",
-        "                    headers={'WWW-Authenticate': f'{header_name} realm=\"MCP Server\"'}",
-        "                )",
-        "            ",
-        "            # Strip prefix if configured and present",
-        "            if api_key and header_prefix and api_key.startswith(header_prefix):",
-        "                api_key = api_key[len(header_prefix):]",
-        "            elif api_key and header_prefix and api_key_config.required:",
-        "                # Has API key but wrong format when required",
-        "                return JSONResponse(",
-        "                    {'error': 'unauthorized', 'detail': f'Invalid {header_name} format, expected prefix: {header_prefix}'},",
-        "                    status_code=401,",
-        "                    headers={'WWW-Authenticate': f'{header_name} realm=\"MCP Server\"'}",
-        "                )",
-        "            ",
-        "            # Store the API key in context for tools to access",
-        "            set_api_key(api_key)",
-        "        ",
-        "        # Call the original method",
-        "        return await original_method(request, *args, **kwargs)",
-        "    return wrapper",
-        "",
-        "# Wrap the MCP methods if they exist",
-        "if _original_call_tool:",
-        "    mcp._mcp_call_tool = with_api_key_extraction(_original_call_tool)",
-        "if _original_read_resource:",
-        "    mcp._mcp_read_resource = with_api_key_extraction(_original_read_resource)",
-        "if _original_get_prompt:",
-        "    mcp._mcp_get_prompt = with_api_key_extraction(_original_get_prompt)",
-    ]
-    
     return {
         "imports": auth_imports,
         "setup_code": setup_code_lines,
         "fastmcp_args": fastmcp_args,
-        "has_auth": True,
-        "post_init_code": post_init_code
+        "has_auth": True
     }
 
 

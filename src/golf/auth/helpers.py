@@ -1,6 +1,6 @@
 """Helper functions for working with authentication in MCP context."""
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from contextvars import ContextVar
 
 # Re-export get_access_token from the MCP SDK
@@ -94,4 +94,114 @@ def get_api_key() -> Optional[str]:
             headers = {"Authorization": f"Bearer {api_key}"}
             ...
     """
-    return _current_api_key.get() 
+    # Try to get directly from HTTP request if available (FastMCP pattern)
+    try:
+        # This follows the FastMCP pattern for accessing HTTP requests
+        from fastmcp.server.dependencies import get_http_request
+        request = get_http_request()
+        
+        if request and hasattr(request, 'state') and hasattr(request.state, 'api_key'):
+            api_key = request.state.api_key
+            return api_key
+        
+        # Get the API key configuration
+        from golf.auth.api_key import get_api_key_config
+        api_key_config = get_api_key_config()
+        
+        if api_key_config and request:
+            # Extract API key from headers
+            header_name = api_key_config.header_name
+            header_prefix = api_key_config.header_prefix
+            
+            # Case-insensitive header lookup
+            api_key = None
+            for k, v in request.headers.items():
+                if k.lower() == header_name.lower():
+                    api_key = v
+                    break
+            
+            # Strip prefix if configured
+            if api_key and header_prefix and api_key.startswith(header_prefix):
+                api_key = api_key[len(header_prefix):]
+            
+            if api_key:
+                return api_key
+    except (ImportError, RuntimeError) as e:
+        # FastMCP not available or not in HTTP context
+        pass
+    except Exception as e:
+        pass
+    
+    # Final fallback: environment variable (for development/testing)
+    import os
+    env_api_key = os.environ.get('API_KEY')
+    if env_api_key:
+        return env_api_key
+    
+    return None
+
+def get_api_key_from_request(request) -> Optional[str]:
+    """Get the API key from a specific request object.
+    
+    This is useful when you have direct access to the request object.
+    
+    Args:
+        request: The Starlette Request object
+        
+    Returns:
+        The API key if available, None otherwise
+    """
+    # Check request state first (set by our middleware)
+    if hasattr(request, 'state') and hasattr(request.state, 'api_key'):
+        return request.state.api_key
+    
+    # Fall back to context variable
+    return _current_api_key.get()
+
+def debug_api_key_context() -> Dict[str, Any]:
+    """Debug function to inspect API key context.
+    
+    Returns a dictionary with debugging information about the current
+    API key context. Useful for troubleshooting authentication issues.
+    
+    Returns:
+        Dictionary with debug information
+    """
+    import asyncio
+    import sys
+    import os
+    
+    debug_info = {
+        "context_var_value": _current_api_key.get(),
+        "has_async_task": False,
+        "task_id": None,
+        "main_module_has_storage": False,
+        "main_module_has_context": False,
+        "request_id_from_context": None,
+        "env_vars": {
+            "API_KEY": bool(os.environ.get('API_KEY')),
+            "GOLF_API_KEY_DEBUG": os.environ.get('GOLF_API_KEY_DEBUG', 'false')
+        }
+    }
+    
+    try:
+        task = asyncio.current_task()
+        if task:
+            debug_info["has_async_task"] = True
+            debug_info["task_id"] = id(task)
+    except:
+        pass
+    
+    try:
+        main_module = sys.modules.get('__main__')
+        if main_module:
+            debug_info["main_module_has_storage"] = hasattr(main_module, 'api_key_storage')
+            debug_info["main_module_has_context"] = hasattr(main_module, 'request_id_context')
+            
+            if hasattr(main_module, 'request_id_context'):
+                request_id_context = getattr(main_module, 'request_id_context')
+                debug_info["request_id_from_context"] = request_id_context.get()
+    except:
+        pass
+    
+    return debug_info 
