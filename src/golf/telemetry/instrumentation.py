@@ -594,50 +594,170 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
     
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
-        with tracer.start_as_current_span(f"prompt.{prompt_name}") as span:
-            _add_component_attributes(span, "prompt", prompt_name)
+        # Create a more descriptive span name
+        span_name = f"mcp.prompt.{prompt_name}.generate"
+        with tracer.start_as_current_span(span_name) as span:
+            # Add comprehensive attributes
+            span.set_attribute("mcp.component.type", "prompt")
+            span.set_attribute("mcp.component.name", prompt_name)
+            span.set_attribute("mcp.prompt.name", prompt_name)
+            span.set_attribute("mcp.prompt.function", func.__name__)
+            span.set_attribute("mcp.prompt.module", func.__module__ if hasattr(func, '__module__') else "unknown")
+            span.set_attribute("mcp.execution.async", True)
             
             # Extract Context parameter if present
             ctx = kwargs.get('ctx')
-            if ctx and hasattr(ctx, 'request_id'):
-                span.set_attribute("mcp.request.id", ctx.request_id)
+            if ctx:
+                if hasattr(ctx, 'request_id'):
+                    span.set_attribute("mcp.request.id", ctx.request_id)
+                if hasattr(ctx, 'session_id'):
+                    span.set_attribute("mcp.session.id", ctx.session_id)
+                if hasattr(ctx, 'client_id'):
+                    span.set_attribute("mcp.client.id", ctx.client_id)
+            
+            # Add prompt arguments
+            for key, value in kwargs.items():
+                if key != 'ctx':
+                    if isinstance(value, (str, int, float, bool)) or value is None:
+                        span.set_attribute(f"mcp.prompt.arg.{key}", str(value))
+                    else:
+                        span.set_attribute(f"mcp.prompt.arg.{key}.type", type(value).__name__)
+            
+            # Add event for prompt generation start
+            span.add_event("prompt.generation.started", {
+                "prompt.name": prompt_name,
+                "timestamp": trace.time_ns()
+            })
             
             try:
                 result = await func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 
-                # Add message count if result is a list
+                # Add event for successful generation
+                span.add_event("prompt.generation.completed", {
+                    "prompt.name": prompt_name,
+                    "timestamp": trace.time_ns()
+                })
+                
+                # Add message count and type information
                 if isinstance(result, list):
-                    span.set_attribute("mcp.prompt.message_count", len(result))
+                    span.set_attribute("mcp.prompt.result.message_count", len(result))
+                    span.set_attribute("mcp.prompt.result.type", "message_list")
+                    
+                    # Analyze message types if they have role attributes
+                    roles = []
+                    for msg in result:
+                        if hasattr(msg, 'role'):
+                            roles.append(msg.role)
+                        elif isinstance(msg, dict) and 'role' in msg:
+                            roles.append(msg['role'])
+                    
+                    if roles:
+                        unique_roles = list(set(roles))
+                        span.set_attribute("mcp.prompt.result.roles", ",".join(unique_roles))
+                        span.set_attribute("mcp.prompt.result.role_counts", str({role: roles.count(role) for role in unique_roles}))
+                elif isinstance(result, str):
+                    span.set_attribute("mcp.prompt.result.type", "string")
+                    span.set_attribute("mcp.prompt.result.length", len(result))
+                else:
+                    span.set_attribute("mcp.prompt.result.type", type(result).__name__)
                     
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
+                
+                # Add event for error
+                span.add_event("prompt.generation.error", {
+                    "prompt.name": prompt_name,
+                    "error.type": type(e).__name__,
+                    "error.message": str(e),
+                    "timestamp": trace.time_ns()
+                })
                 raise
     
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
-        with tracer.start_as_current_span(f"prompt.{prompt_name}") as span:
-            _add_component_attributes(span, "prompt", prompt_name)
+        # Create a more descriptive span name
+        span_name = f"mcp.prompt.{prompt_name}.generate"
+        with tracer.start_as_current_span(span_name) as span:
+            # Add comprehensive attributes
+            span.set_attribute("mcp.component.type", "prompt")
+            span.set_attribute("mcp.component.name", prompt_name)
+            span.set_attribute("mcp.prompt.name", prompt_name)
+            span.set_attribute("mcp.prompt.function", func.__name__)
+            span.set_attribute("mcp.prompt.module", func.__module__ if hasattr(func, '__module__') else "unknown")
+            span.set_attribute("mcp.execution.async", False)
             
             # Extract Context parameter if present
             ctx = kwargs.get('ctx')
-            if ctx and hasattr(ctx, 'request_id'):
-                span.set_attribute("mcp.request.id", ctx.request_id)
+            if ctx:
+                if hasattr(ctx, 'request_id'):
+                    span.set_attribute("mcp.request.id", ctx.request_id)
+                if hasattr(ctx, 'session_id'):
+                    span.set_attribute("mcp.session.id", ctx.session_id)
+                if hasattr(ctx, 'client_id'):
+                    span.set_attribute("mcp.client.id", ctx.client_id)
+            
+            # Add prompt arguments
+            for key, value in kwargs.items():
+                if key != 'ctx':
+                    if isinstance(value, (str, int, float, bool)) or value is None:
+                        span.set_attribute(f"mcp.prompt.arg.{key}", str(value))
+                    else:
+                        span.set_attribute(f"mcp.prompt.arg.{key}.type", type(value).__name__)
+            
+            # Add event for prompt generation start
+            span.add_event("prompt.generation.started", {
+                "prompt.name": prompt_name,
+                "timestamp": trace.time_ns()
+            })
             
             try:
                 result = func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 
-                # Add message count if result is a list
+                # Add event for successful generation
+                span.add_event("prompt.generation.completed", {
+                    "prompt.name": prompt_name,
+                    "timestamp": trace.time_ns()
+                })
+                
+                # Add message count and type information
                 if isinstance(result, list):
-                    span.set_attribute("mcp.prompt.message_count", len(result))
+                    span.set_attribute("mcp.prompt.result.message_count", len(result))
+                    span.set_attribute("mcp.prompt.result.type", "message_list")
+                    
+                    # Analyze message types if they have role attributes
+                    roles = []
+                    for msg in result:
+                        if hasattr(msg, 'role'):
+                            roles.append(msg.role)
+                        elif isinstance(msg, dict) and 'role' in msg:
+                            roles.append(msg['role'])
+                    
+                    if roles:
+                        unique_roles = list(set(roles))
+                        span.set_attribute("mcp.prompt.result.roles", ",".join(unique_roles))
+                        span.set_attribute("mcp.prompt.result.role_counts", str({role: roles.count(role) for role in unique_roles}))
+                elif isinstance(result, str):
+                    span.set_attribute("mcp.prompt.result.type", "string")
+                    span.set_attribute("mcp.prompt.result.length", len(result))
+                else:
+                    span.set_attribute("mcp.prompt.result.type", type(result).__name__)
                     
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
+                
+                # Add event for error
+                span.add_event("prompt.generation.error", {
+                    "prompt.name": prompt_name,
+                    "error.type": type(e).__name__,
+                    "error.message": str(e),
+                    "timestamp": trace.time_ns()
+                })
                 raise
     
     if asyncio.iscoroutinefunction(func):
