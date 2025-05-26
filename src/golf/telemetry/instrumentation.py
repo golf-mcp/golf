@@ -20,7 +20,6 @@ T = TypeVar('T')
 # Global tracer instance
 _tracer: Optional[trace.Tracer] = None
 _provider: Optional[TracerProvider] = None
-_instrumented_tools = []
 
 def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProvider]:
     """Initialize OpenTelemetry with environment-based configuration.
@@ -130,16 +129,6 @@ def get_tracer() -> trace.Tracer:
         _tracer = trace.get_tracer("golf.mcp.components", "1.0.0")
     return _tracer
 
-def _add_component_attributes(span: Span, component_type: str, component_name: str, **kwargs):
-    """Add standard component attributes to a span."""
-    span.set_attribute("mcp.component.type", component_type)
-    span.set_attribute("mcp.component.name", component_name)
-    
-    # Add any additional attributes
-    for key, value in kwargs.items():
-        if value is not None:
-            span.set_attribute(f"mcp.component.{key}", str(value))
-
 def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     """Instrument a tool function with OpenTelemetry tracing."""
     global _provider
@@ -150,31 +139,39 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     
     tracer = get_tracer()
     
+    # Add debug logging
+    print(f"[TELEMETRY DEBUG] Instrumenting tool: {tool_name} (function: {func.__name__})")
+    
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
-        span = tracer.start_span(f"tool.{tool_name}")
+        print(f"[TELEMETRY DEBUG] Executing async tool: {tool_name}")
         
-        # Activate the span in the current context
-        from opentelemetry import context
-        token = context.attach(trace.set_span_in_context(span))
+        # Create a more descriptive span name
+        span_name = f"mcp.tool.{tool_name}.execute"
         
-        try:
-            _add_component_attributes(span, "tool", tool_name, 
-                                     args_count=len(args),
-                                     kwargs_count=len(kwargs))
+        # start_as_current_span automatically uses the current context and manages it
+        with tracer.start_as_current_span(span_name) as span:
+            # Add comprehensive attributes
+            span.set_attribute("mcp.component.type", "tool")
+            span.set_attribute("mcp.component.name", tool_name)
+            span.set_attribute("mcp.tool.name", tool_name)
+            span.set_attribute("mcp.tool.function", func.__name__)
+            span.set_attribute("mcp.tool.module", func.__module__ if hasattr(func, '__module__') else "unknown")
             
-            # Extract Context parameter if present - this should have MCP session info
+            # Add execution context
+            span.set_attribute("mcp.execution.args_count", len(args))
+            span.set_attribute("mcp.execution.kwargs_count", len(kwargs))
+            span.set_attribute("mcp.execution.async", True)
+            
+            # Extract Context parameter if present
             ctx = kwargs.get('ctx')
             if ctx:
-                if hasattr(ctx, 'request_id'):
-                    span.set_attribute("mcp.request.id", ctx.request_id)
-                if hasattr(ctx, 'session_id'):
-                    span.set_attribute("mcp.session.id", ctx.session_id)
-                # Try to find any session-related attributes
-                for attr in dir(ctx):
-                    if 'session' in attr.lower() and not attr.startswith('_'):
-                        value = getattr(ctx, attr, None)
-                        if value:
+                # Only extract known MCP context attributes
+                ctx_attrs = ['request_id', 'session_id', 'client_id', 'user_id', 'tenant_id']
+                for attr in ctx_attrs:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
                             span.set_attribute(f"mcp.context.{attr}", str(value))
             
             # Also check baggage for session ID
@@ -185,89 +182,118 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Add tool arguments as span attributes (be careful with sensitive data)
             for i, arg in enumerate(args):
                 if isinstance(arg, (str, int, float, bool)) or arg is None:
-                    span.set_attribute(f"tool.arg.{i}", str(arg))
+                    span.set_attribute(f"mcp.tool.arg.{i}", str(arg))
                 elif hasattr(arg, '__dict__'):
                     # For objects, just record the type
-                    span.set_attribute(f"tool.arg.{i}.type", type(arg).__name__)
+                    span.set_attribute(f"mcp.tool.arg.{i}.type", type(arg).__name__)
             
-            # Add named arguments
+            # Add named arguments with better naming
             for key, value in kwargs.items():
                 if key != 'ctx':
                     if value is None:
-                        span.set_attribute(f"tool.kwarg.{key}", "null")
+                        span.set_attribute(f"mcp.tool.input.{key}", "null")
                     elif isinstance(value, (str, int, float, bool)):
-                        span.set_attribute(f"tool.kwarg.{key}", str(value))
+                        span.set_attribute(f"mcp.tool.input.{key}", str(value))
                     elif isinstance(value, (list, tuple)):
-                        span.set_attribute(f"tool.kwarg.{key}", f"[{len(value)} items]")
+                        span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
+                        span.set_attribute(f"mcp.tool.input.{key}.type", "array")
                     elif isinstance(value, dict):
-                        span.set_attribute(f"tool.kwarg.{key}", f"{{dict with {len(value)} keys}}")
+                        span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
+                        span.set_attribute(f"mcp.tool.input.{key}.type", "object")
+                        # Only show first few keys to avoid exceeding attribute limits
+                        if len(value) > 0 and len(value) <= 5:
+                            keys_list = list(value.keys())[:5]
+                            # Limit key length and join
+                            truncated_keys = [str(k)[:20] + "..." if len(str(k)) > 20 else str(k) for k in keys_list]
+                            span.set_attribute(f"mcp.tool.input.{key}.sample_keys", ",".join(truncated_keys))
                     else:
                         # For other types, at least record the type
-                        span.set_attribute(f"tool.kwarg.{key}.type", type(value).__name__)
+                        span.set_attribute(f"mcp.tool.input.{key}.type", type(value).__name__)
+            
+            # Add event for tool execution start
+            span.add_event("tool.execution.started", {
+                "tool.name": tool_name
+            })
+            
+            print(f"[TELEMETRY DEBUG] Tool span created: {span_name} (span_id: {span.get_span_context().span_id:016x})")
             
             try:
                 result = await func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 
-                # Capture result metadata
+                # Add event for successful completion
+                span.add_event("tool.execution.completed", {
+                    "tool.name": tool_name
+                })
+                
+                # Capture result metadata with better structure
                 if result is not None:
                     if isinstance(result, (str, int, float, bool)):
-                        span.set_attribute("tool.result", str(result))
+                        span.set_attribute("mcp.tool.result.value", str(result))
+                        span.set_attribute("mcp.tool.result.type", type(result).__name__)
                     elif isinstance(result, list):
-                        span.set_attribute("tool.result.count", len(result))
-                        span.set_attribute("tool.result.type", "list")
+                        span.set_attribute("mcp.tool.result.count", len(result))
+                        span.set_attribute("mcp.tool.result.type", "array")
                     elif isinstance(result, dict):
-                        span.set_attribute("tool.result.keys", ",".join(result.keys()) if len(result) < 10 else f"{len(result)} keys")
-                        span.set_attribute("tool.result.type", "dict")
+                        span.set_attribute("mcp.tool.result.count", len(result))
+                        span.set_attribute("mcp.tool.result.type", "object")
+                        # Only show first few keys to avoid exceeding attribute limits
+                        if len(result) > 0 and len(result) <= 5:
+                            keys_list = list(result.keys())[:5]
+                            # Limit key length and join
+                            truncated_keys = [str(k)[:20] + "..." if len(str(k)) > 20 else str(k) for k in keys_list]
+                            span.set_attribute("mcp.tool.result.sample_keys", ",".join(truncated_keys))
                     elif hasattr(result, '__len__'):
-                        span.set_attribute("tool.result.length", len(result))
+                        span.set_attribute("mcp.tool.result.length", len(result))
                     
                     # For any result, record its type
-                    span.set_attribute("tool.result.class", type(result).__name__)
+                    span.set_attribute("mcp.tool.result.class", type(result).__name__)
                 
+                print(f"[TELEMETRY DEBUG] Tool execution completed successfully: {tool_name}")
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
+                
+                # Add event for error
+                span.add_event("tool.execution.error", {
+                    "tool.name": tool_name,
+                    "error.type": type(e).__name__,
+                    "error.message": str(e)
+                })
+                print(f"[TELEMETRY DEBUG] Tool execution failed: {tool_name} - {e}")
                 raise
-        finally:
-            # End the span and detach context
-            span.end()
-            context.detach(token)
-            
-            # Force flush the provider to ensure spans are exported
-            global _provider
-            if _provider:
-                try:
-                    _provider.force_flush(timeout_millis=1000)
-                except Exception as e:
-                    pass
     
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
-        span = tracer.start_span(f"tool.{tool_name}")
+        print(f"[TELEMETRY DEBUG] Executing sync tool: {tool_name}")
         
-        # Activate the span in the current context
-        from opentelemetry import context
-        token = context.attach(trace.set_span_in_context(span))
+        # Create a more descriptive span name
+        span_name = f"mcp.tool.{tool_name}.execute"
         
-        try:
-            _add_component_attributes(span, "tool", tool_name,
-                                     args_count=len(args),
-                                     kwargs_count=len(kwargs))
+        # start_as_current_span automatically uses the current context and manages it
+        with tracer.start_as_current_span(span_name) as span:
+            # Add comprehensive attributes
+            span.set_attribute("mcp.component.type", "tool")
+            span.set_attribute("mcp.component.name", tool_name)
+            span.set_attribute("mcp.tool.name", tool_name)
+            span.set_attribute("mcp.tool.function", func.__name__)
+            span.set_attribute("mcp.tool.module", func.__module__ if hasattr(func, '__module__') else "unknown")
             
-            # Extract Context parameter if present - this should have MCP session info
+            # Add execution context
+            span.set_attribute("mcp.execution.args_count", len(args))
+            span.set_attribute("mcp.execution.kwargs_count", len(kwargs))
+            span.set_attribute("mcp.execution.async", False)
+            
+            # Extract Context parameter if present
             ctx = kwargs.get('ctx')
             if ctx:
-                if hasattr(ctx, 'request_id'):
-                    span.set_attribute("mcp.request.id", ctx.request_id)
-                if hasattr(ctx, 'session_id'):
-                    span.set_attribute("mcp.session.id", ctx.session_id)
-                # Try to find any session-related attributes
-                for attr in dir(ctx):
-                    if 'session' in attr.lower() and not attr.startswith('_'):
-                        value = getattr(ctx, attr, None)
-                        if value:
+                # Only extract known MCP context attributes
+                ctx_attrs = ['request_id', 'session_id', 'client_id', 'user_id', 'tenant_id']
+                for attr in ctx_attrs:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
                             span.set_attribute(f"mcp.context.{attr}", str(value))
             
             # Also check baggage for session ID
@@ -278,63 +304,87 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Add tool arguments as span attributes (be careful with sensitive data)
             for i, arg in enumerate(args):
                 if isinstance(arg, (str, int, float, bool)) or arg is None:
-                    span.set_attribute(f"tool.arg.{i}", str(arg))
+                    span.set_attribute(f"mcp.tool.arg.{i}", str(arg))
                 elif hasattr(arg, '__dict__'):
                     # For objects, just record the type
-                    span.set_attribute(f"tool.arg.{i}.type", type(arg).__name__)
+                    span.set_attribute(f"mcp.tool.arg.{i}.type", type(arg).__name__)
             
-            # Add named arguments
+            # Add named arguments with better naming
             for key, value in kwargs.items():
                 if key != 'ctx':
                     if value is None:
-                        span.set_attribute(f"tool.kwarg.{key}", "null")
+                        span.set_attribute(f"mcp.tool.input.{key}", "null")
                     elif isinstance(value, (str, int, float, bool)):
-                        span.set_attribute(f"tool.kwarg.{key}", str(value))
+                        span.set_attribute(f"mcp.tool.input.{key}", str(value))
                     elif isinstance(value, (list, tuple)):
-                        span.set_attribute(f"tool.kwarg.{key}", f"[{len(value)} items]")
+                        span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
+                        span.set_attribute(f"mcp.tool.input.{key}.type", "array")
                     elif isinstance(value, dict):
-                        span.set_attribute(f"tool.kwarg.{key}", f"{{dict with {len(value)} keys}}")
+                        span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
+                        span.set_attribute(f"mcp.tool.input.{key}.type", "object")
+                        # Only show first few keys to avoid exceeding attribute limits
+                        if len(value) > 0 and len(value) <= 5:
+                            keys_list = list(value.keys())[:5]
+                            # Limit key length and join
+                            truncated_keys = [str(k)[:20] + "..." if len(str(k)) > 20 else str(k) for k in keys_list]
+                            span.set_attribute(f"mcp.tool.input.{key}.sample_keys", ",".join(truncated_keys))
                     else:
                         # For other types, at least record the type
-                        span.set_attribute(f"tool.kwarg.{key}.type", type(value).__name__)
+                        span.set_attribute(f"mcp.tool.input.{key}.type", type(value).__name__)
+            
+            # Add event for tool execution start
+            span.add_event("tool.execution.started", {
+                "tool.name": tool_name
+            })
+            
+            print(f"[TELEMETRY DEBUG] Tool span created: {span_name} (span_id: {span.get_span_context().span_id:016x})")
             
             try:
                 result = func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 
-                # Capture result metadata
+                # Add event for successful completion
+                span.add_event("tool.execution.completed", {
+                    "tool.name": tool_name
+                })
+                
+                # Capture result metadata with better structure
                 if result is not None:
                     if isinstance(result, (str, int, float, bool)):
-                        span.set_attribute("tool.result", str(result))
+                        span.set_attribute("mcp.tool.result.value", str(result))
+                        span.set_attribute("mcp.tool.result.type", type(result).__name__)
                     elif isinstance(result, list):
-                        span.set_attribute("tool.result.count", len(result))
-                        span.set_attribute("tool.result.type", "list")
+                        span.set_attribute("mcp.tool.result.count", len(result))
+                        span.set_attribute("mcp.tool.result.type", "array")
                     elif isinstance(result, dict):
-                        span.set_attribute("tool.result.keys", ",".join(result.keys()) if len(result) < 10 else f"{len(result)} keys")
-                        span.set_attribute("tool.result.type", "dict")
+                        span.set_attribute("mcp.tool.result.count", len(result))
+                        span.set_attribute("mcp.tool.result.type", "object")
+                        # Only show first few keys to avoid exceeding attribute limits
+                        if len(result) > 0 and len(result) <= 5:
+                            keys_list = list(result.keys())[:5]
+                            # Limit key length and join
+                            truncated_keys = [str(k)[:20] + "..." if len(str(k)) > 20 else str(k) for k in keys_list]
+                            span.set_attribute("mcp.tool.result.sample_keys", ",".join(truncated_keys))
                     elif hasattr(result, '__len__'):
-                        span.set_attribute("tool.result.length", len(result))
+                        span.set_attribute("mcp.tool.result.length", len(result))
                     
                     # For any result, record its type
-                    span.set_attribute("tool.result.class", type(result).__name__)
+                    span.set_attribute("mcp.tool.result.class", type(result).__name__)
                 
+                print(f"[TELEMETRY DEBUG] Tool execution completed successfully: {tool_name}")
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
+                
+                # Add event for error
+                span.add_event("tool.execution.error", {
+                    "tool.name": tool_name,
+                    "error.type": type(e).__name__,
+                    "error.message": str(e)
+                })
+                print(f"[TELEMETRY DEBUG] Tool execution failed: {tool_name} - {e}")
                 raise
-        finally:
-            # End the span and detach context
-            span.end()
-            context.detach(token)
-            
-            # Force flush the provider to ensure spans are exported
-            global _provider
-            if _provider:
-                try:
-                    _provider.force_flush(timeout_millis=1000)
-                except Exception as e:
-                    pass
     
     # Return appropriate wrapper based on function type
     if asyncio.iscoroutinefunction(func):
@@ -357,54 +407,152 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
     
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
-        span_name = "resource.template.read" if is_template else "resource.read"
+        # Create a more descriptive span name
+        span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
-            _add_component_attributes(span, "resource", resource_uri,
-                                     is_template=is_template)
+            # Add comprehensive attributes
+            span.set_attribute("mcp.component.type", "resource")
+            span.set_attribute("mcp.component.name", resource_uri)
+            span.set_attribute("mcp.resource.uri", resource_uri)
+            span.set_attribute("mcp.resource.is_template", is_template)
+            span.set_attribute("mcp.resource.function", func.__name__)
+            span.set_attribute("mcp.resource.module", func.__module__ if hasattr(func, '__module__') else "unknown")
+            span.set_attribute("mcp.execution.async", True)
             
             # Extract Context parameter if present
             ctx = kwargs.get('ctx')
-            if ctx and hasattr(ctx, 'request_id'):
-                span.set_attribute("mcp.request.id", ctx.request_id)
+            if ctx:
+                # Only extract known MCP context attributes
+                ctx_attrs = ['request_id', 'session_id', 'client_id', 'user_id', 'tenant_id']
+                for attr in ctx_attrs:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
+                            span.set_attribute(f"mcp.context.{attr}", str(value))
+            
+            # Also check baggage for session ID
+            session_id_from_baggage = baggage.get_baggage("mcp.session.id")
+            if session_id_from_baggage:
+                span.set_attribute("mcp.session.id", session_id_from_baggage)
+            
+            # Add event for resource read start
+            span.add_event("resource.read.started", {
+                "resource.uri": resource_uri
+            })
             
             try:
                 result = await func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 
-                # Add result size if applicable
+                # Add event for successful read
+                span.add_event("resource.read.completed", {
+                    "resource.uri": resource_uri
+                })
+                
+                # Add result metadata
                 if hasattr(result, '__len__'):
-                    span.set_attribute("mcp.resource.size", len(result))
+                    span.set_attribute("mcp.resource.result.size", len(result))
+                
+                # Determine content type if possible
+                if isinstance(result, str):
+                    span.set_attribute("mcp.resource.result.type", "text")
+                    span.set_attribute("mcp.resource.result.length", len(result))
+                elif isinstance(result, bytes):
+                    span.set_attribute("mcp.resource.result.type", "binary")
+                    span.set_attribute("mcp.resource.result.size_bytes", len(result))
+                elif isinstance(result, dict):
+                    span.set_attribute("mcp.resource.result.type", "object")
+                    span.set_attribute("mcp.resource.result.keys_count", len(result))
+                elif isinstance(result, list):
+                    span.set_attribute("mcp.resource.result.type", "array")
+                    span.set_attribute("mcp.resource.result.items_count", len(result))
                 
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
+                
+                # Add event for error
+                span.add_event("resource.read.error", {
+                    "resource.uri": resource_uri,
+                    "error.type": type(e).__name__,
+                    "error.message": str(e)
+                })
                 raise
     
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
-        span_name = "resource.template.read" if is_template else "resource.read"
+        # Create a more descriptive span name
+        span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
-            _add_component_attributes(span, "resource", resource_uri,
-                                     is_template=is_template)
+            # Add comprehensive attributes
+            span.set_attribute("mcp.component.type", "resource")
+            span.set_attribute("mcp.component.name", resource_uri)
+            span.set_attribute("mcp.resource.uri", resource_uri)
+            span.set_attribute("mcp.resource.is_template", is_template)
+            span.set_attribute("mcp.resource.function", func.__name__)
+            span.set_attribute("mcp.resource.module", func.__module__ if hasattr(func, '__module__') else "unknown")
+            span.set_attribute("mcp.execution.async", False)
             
             # Extract Context parameter if present
             ctx = kwargs.get('ctx')
-            if ctx and hasattr(ctx, 'request_id'):
-                span.set_attribute("mcp.request.id", ctx.request_id)
+            if ctx:
+                # Only extract known MCP context attributes
+                ctx_attrs = ['request_id', 'session_id', 'client_id', 'user_id', 'tenant_id']
+                for attr in ctx_attrs:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
+                            span.set_attribute(f"mcp.context.{attr}", str(value))
+            
+            # Also check baggage for session ID
+            session_id_from_baggage = baggage.get_baggage("mcp.session.id")
+            if session_id_from_baggage:
+                span.set_attribute("mcp.session.id", session_id_from_baggage)
+            
+            # Add event for resource read start
+            span.add_event("resource.read.started", {
+                "resource.uri": resource_uri
+            })
             
             try:
                 result = func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 
-                # Add result size if applicable
+                # Add event for successful read
+                span.add_event("resource.read.completed", {
+                    "resource.uri": resource_uri
+                })
+                
+                # Add result metadata
                 if hasattr(result, '__len__'):
-                    span.set_attribute("mcp.resource.size", len(result))
+                    span.set_attribute("mcp.resource.result.size", len(result))
+                
+                # Determine content type if possible
+                if isinstance(result, str):
+                    span.set_attribute("mcp.resource.result.type", "text")
+                    span.set_attribute("mcp.resource.result.length", len(result))
+                elif isinstance(result, bytes):
+                    span.set_attribute("mcp.resource.result.type", "binary")
+                    span.set_attribute("mcp.resource.result.size_bytes", len(result))
+                elif isinstance(result, dict):
+                    span.set_attribute("mcp.resource.result.type", "object")
+                    span.set_attribute("mcp.resource.result.keys_count", len(result))
+                elif isinstance(result, list):
+                    span.set_attribute("mcp.resource.result.type", "array")
+                    span.set_attribute("mcp.resource.result.items_count", len(result))
                     
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
+                
+                # Add event for error
+                span.add_event("resource.read.error", {
+                    "resource.uri": resource_uri,
+                    "error.type": type(e).__name__,
+                    "error.message": str(e)
+                })
                 raise
     
     if asyncio.iscoroutinefunction(func):
@@ -424,50 +572,176 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
     
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
-        with tracer.start_as_current_span(f"prompt.{prompt_name}") as span:
-            _add_component_attributes(span, "prompt", prompt_name)
+        # Create a more descriptive span name
+        span_name = f"mcp.prompt.{prompt_name}.generate"
+        with tracer.start_as_current_span(span_name) as span:
+            # Add comprehensive attributes
+            span.set_attribute("mcp.component.type", "prompt")
+            span.set_attribute("mcp.component.name", prompt_name)
+            span.set_attribute("mcp.prompt.name", prompt_name)
+            span.set_attribute("mcp.prompt.function", func.__name__)
+            span.set_attribute("mcp.prompt.module", func.__module__ if hasattr(func, '__module__') else "unknown")
+            span.set_attribute("mcp.execution.async", True)
             
             # Extract Context parameter if present
             ctx = kwargs.get('ctx')
-            if ctx and hasattr(ctx, 'request_id'):
-                span.set_attribute("mcp.request.id", ctx.request_id)
+            if ctx:
+                # Only extract known MCP context attributes
+                ctx_attrs = ['request_id', 'session_id', 'client_id', 'user_id', 'tenant_id']
+                for attr in ctx_attrs:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
+                            span.set_attribute(f"mcp.context.{attr}", str(value))
+            
+            # Also check baggage for session ID
+            session_id_from_baggage = baggage.get_baggage("mcp.session.id")
+            if session_id_from_baggage:
+                span.set_attribute("mcp.session.id", session_id_from_baggage)
+            
+            # Add prompt arguments
+            for key, value in kwargs.items():
+                if key != 'ctx':
+                    if isinstance(value, (str, int, float, bool)) or value is None:
+                        span.set_attribute(f"mcp.prompt.arg.{key}", str(value))
+                    else:
+                        span.set_attribute(f"mcp.prompt.arg.{key}.type", type(value).__name__)
+            
+            # Add event for prompt generation start
+            span.add_event("prompt.generation.started", {
+                "prompt.name": prompt_name
+            })
             
             try:
                 result = await func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 
-                # Add message count if result is a list
+                # Add event for successful generation
+                span.add_event("prompt.generation.completed", {
+                    "prompt.name": prompt_name
+                })
+                
+                # Add message count and type information
                 if isinstance(result, list):
-                    span.set_attribute("mcp.prompt.message_count", len(result))
+                    span.set_attribute("mcp.prompt.result.message_count", len(result))
+                    span.set_attribute("mcp.prompt.result.type", "message_list")
+                    
+                    # Analyze message types if they have role attributes
+                    roles = []
+                    for msg in result:
+                        if hasattr(msg, 'role'):
+                            roles.append(msg.role)
+                        elif isinstance(msg, dict) and 'role' in msg:
+                            roles.append(msg['role'])
+                    
+                    if roles:
+                        unique_roles = list(set(roles))
+                        span.set_attribute("mcp.prompt.result.roles", ",".join(unique_roles))
+                        span.set_attribute("mcp.prompt.result.role_counts", str({role: roles.count(role) for role in unique_roles}))
+                elif isinstance(result, str):
+                    span.set_attribute("mcp.prompt.result.type", "string")
+                    span.set_attribute("mcp.prompt.result.length", len(result))
+                else:
+                    span.set_attribute("mcp.prompt.result.type", type(result).__name__)
                     
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
+                
+                # Add event for error
+                span.add_event("prompt.generation.error", {
+                    "prompt.name": prompt_name,
+                    "error.type": type(e).__name__,
+                    "error.message": str(e)
+                })
                 raise
     
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
-        with tracer.start_as_current_span(f"prompt.{prompt_name}") as span:
-            _add_component_attributes(span, "prompt", prompt_name)
+        # Create a more descriptive span name
+        span_name = f"mcp.prompt.{prompt_name}.generate"
+        with tracer.start_as_current_span(span_name) as span:
+            # Add comprehensive attributes
+            span.set_attribute("mcp.component.type", "prompt")
+            span.set_attribute("mcp.component.name", prompt_name)
+            span.set_attribute("mcp.prompt.name", prompt_name)
+            span.set_attribute("mcp.prompt.function", func.__name__)
+            span.set_attribute("mcp.prompt.module", func.__module__ if hasattr(func, '__module__') else "unknown")
+            span.set_attribute("mcp.execution.async", False)
             
             # Extract Context parameter if present
             ctx = kwargs.get('ctx')
-            if ctx and hasattr(ctx, 'request_id'):
-                span.set_attribute("mcp.request.id", ctx.request_id)
+            if ctx:
+                # Only extract known MCP context attributes
+                ctx_attrs = ['request_id', 'session_id', 'client_id', 'user_id', 'tenant_id']
+                for attr in ctx_attrs:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
+                            span.set_attribute(f"mcp.context.{attr}", str(value))
+            
+            # Also check baggage for session ID
+            session_id_from_baggage = baggage.get_baggage("mcp.session.id")
+            if session_id_from_baggage:
+                span.set_attribute("mcp.session.id", session_id_from_baggage)
+            
+            # Add prompt arguments
+            for key, value in kwargs.items():
+                if key != 'ctx':
+                    if isinstance(value, (str, int, float, bool)) or value is None:
+                        span.set_attribute(f"mcp.prompt.arg.{key}", str(value))
+                    else:
+                        span.set_attribute(f"mcp.prompt.arg.{key}.type", type(value).__name__)
+            
+            # Add event for prompt generation start
+            span.add_event("prompt.generation.started", {
+                "prompt.name": prompt_name
+            })
             
             try:
                 result = func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
                 
-                # Add message count if result is a list
+                # Add event for successful generation
+                span.add_event("prompt.generation.completed", {
+                    "prompt.name": prompt_name
+                })
+                
+                # Add message count and type information
                 if isinstance(result, list):
-                    span.set_attribute("mcp.prompt.message_count", len(result))
+                    span.set_attribute("mcp.prompt.result.message_count", len(result))
+                    span.set_attribute("mcp.prompt.result.type", "message_list")
+                    
+                    # Analyze message types if they have role attributes
+                    roles = []
+                    for msg in result:
+                        if hasattr(msg, 'role'):
+                            roles.append(msg.role)
+                        elif isinstance(msg, dict) and 'role' in msg:
+                            roles.append(msg['role'])
+                    
+                    if roles:
+                        unique_roles = list(set(roles))
+                        span.set_attribute("mcp.prompt.result.roles", ",".join(unique_roles))
+                        span.set_attribute("mcp.prompt.result.role_counts", str({role: roles.count(role) for role in unique_roles}))
+                elif isinstance(result, str):
+                    span.set_attribute("mcp.prompt.result.type", "string")
+                    span.set_attribute("mcp.prompt.result.length", len(result))
+                else:
+                    span.set_attribute("mcp.prompt.result.type", type(result).__name__)
                     
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
+                
+                # Add event for error
+                span.add_event("prompt.generation.error", {
+                    "prompt.name": prompt_name,
+                    "error.type": type(e).__name__,
+                    "error.message": str(e)
+                })
                 raise
     
     if asyncio.iscoroutinefunction(func):
@@ -478,7 +752,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
 @asynccontextmanager
 async def telemetry_lifespan(mcp_instance):
     """Simplified lifespan for telemetry initialization and cleanup."""
-    global _provider, _instrumented_tools
+    global _provider
     
     # Initialize telemetry with the server name
     provider = init_telemetry(service_name=mcp_instance.name)
@@ -496,38 +770,124 @@ async def telemetry_lifespan(mcp_instance):
         
         class SessionTracingMiddleware(BaseHTTPMiddleware):
             async def dispatch(self, request: Request, call_next):
-                # Extract session ID from query params
+                # Extract session ID from query params or headers
                 session_id = request.query_params.get('session_id')
-                if session_id:
-                    # Add to baggage for propagation
-                    ctx = baggage.set_baggage("mcp.session.id", session_id)
-                    from opentelemetry import context
-                    token = context.attach(ctx)
+                if not session_id:
+                    # Check headers as fallback
+                    session_id = request.headers.get('x-session-id')
+                
+                # Create a descriptive span name based on the request
+                method = request.method
+                path = request.url.path
+                
+                # Determine the operation type from the path
+                operation_type = "unknown"
+                if "/mcp" in path:
+                    operation_type = "mcp.request"
+                elif "/sse" in path:
+                    operation_type = "sse.stream"
+                elif "/auth" in path:
+                    operation_type = "auth"
+                
+                span_name = f"{operation_type}.{method.lower()}"
+                
+                tracer = get_tracer()
+                with tracer.start_as_current_span(span_name) as span:
+                    # Add comprehensive HTTP attributes
+                    span.set_attribute("http.method", method)
+                    span.set_attribute("http.url", str(request.url))
+                    span.set_attribute("http.scheme", request.url.scheme)
+                    span.set_attribute("http.host", request.url.hostname or "unknown")
+                    span.set_attribute("http.target", path)
+                    span.set_attribute("http.user_agent", request.headers.get("user-agent", "unknown"))
                     
-                    # Also create a span for the HTTP request
-                    tracer = get_tracer()
-                    with tracer.start_as_current_span(f"http.{request.method} {request.url.path}") as span:
-                        span.set_attribute("http.method", request.method)
-                        span.set_attribute("http.url", str(request.url))
-                        span.set_attribute("http.session_id", session_id)
+                    # Add session tracking
+                    if session_id:
                         span.set_attribute("mcp.session.id", session_id)
+                        # Add to baggage for propagation
+                        ctx = baggage.set_baggage("mcp.session.id", session_id)
+                        from opentelemetry import context
+                        token = context.attach(ctx)
+                    else:
+                        token = None
+                    
+                    # Add request size if available
+                    content_length = request.headers.get("content-length")
+                    if content_length:
+                        span.set_attribute("http.request.size", int(content_length))
+                    
+                    # Add event for request start
+                    span.add_event("http.request.started", {
+                        "method": method,
+                        "path": path
+                    })
+                    
+                    try:
+                        response = await call_next(request)
                         
-                        try:
-                            response = await call_next(request)
-                            span.set_attribute("http.status_code", response.status_code)
-                            return response
-                        finally:
+                        # Add response attributes
+                        span.set_attribute("http.status_code", response.status_code)
+                        span.set_attribute("http.status_class", f"{response.status_code // 100}xx")
+                        
+                        # Set span status based on HTTP status
+                        if response.status_code >= 400:
+                            span.set_status(Status(StatusCode.ERROR, f"HTTP {response.status_code}"))
+                        else:
+                            span.set_status(Status(StatusCode.OK))
+                        
+                        # Add event for request completion
+                        span.add_event("http.request.completed", {
+                            "method": method,
+                            "path": path,
+                            "status_code": response.status_code
+                        })
+                        
+                        return response
+                    except Exception as e:
+                        span.record_exception(e)
+                        span.set_status(Status(StatusCode.ERROR, str(e)))
+                        
+                        # Add event for error
+                        span.add_event("http.request.error", {
+                            "method": method,
+                            "path": path,
+                            "error.type": type(e).__name__,
+                            "error.message": str(e)
+                        })
+                        raise
+                    finally:
+                        if token:
                             context.detach(token)
-                else:
-                    return await call_next(request)
         
         # Try to add middleware to FastMCP app if it has Starlette app
         if hasattr(mcp_instance, 'app') or hasattr(mcp_instance, '_app'):
             app = getattr(mcp_instance, 'app', getattr(mcp_instance, '_app', None))
             if app and hasattr(app, 'add_middleware'):
                 app.add_middleware(SessionTracingMiddleware)
-    except Exception:
-        pass
+                print("[TELEMETRY DEBUG] Added SessionTracingMiddleware to FastMCP app")
+        
+        # Also try to instrument FastMCP's internal handlers
+        if hasattr(mcp_instance, '_tool_manager') and hasattr(mcp_instance._tool_manager, 'tools'):
+            print(f"[TELEMETRY DEBUG] Found {len(mcp_instance._tool_manager.tools)} tools in FastMCP")
+            # The tools should already be instrumented when they were registered
+        
+        # Try to patch FastMCP's request handling to ensure context propagation
+        if hasattr(mcp_instance, 'handle_request'):
+            original_handle_request = mcp_instance.handle_request
+            
+            async def traced_handle_request(*args, **kwargs):
+                tracer = get_tracer()
+                with tracer.start_as_current_span("mcp.handle_request") as span:
+                    span.set_attribute("mcp.request.handler", "handle_request")
+                    return await original_handle_request(*args, **kwargs)
+            
+            mcp_instance.handle_request = traced_handle_request
+            print("[TELEMETRY DEBUG] Patched FastMCP handle_request method")
+            
+    except Exception as e:
+        print(f"[TELEMETRY DEBUG] Error setting up telemetry middleware: {e}")
+        import traceback
+        traceback.print_exc()
     
     try:
         # Yield control back to FastMCP
