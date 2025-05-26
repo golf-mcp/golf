@@ -765,14 +765,25 @@ class CodeGenerator:
                     "    # For SSE with API key auth, we need to get the app and add middleware",
                     "    app = mcp.http_app(transport=\"sse\")",
                     "    app.add_middleware(ApiKeyMiddleware)",
-                    "    # Run with the configured app",
-                    "    uvicorn.run(app, host=host, port=port, log_level=\"info\")"
                 ])
             else:
                 main_code.extend([
-                    "    # For SSE, FastMCP's run method handles auth integration better",
-                    "    mcp.run(transport=\"sse\", host=host, port=port, log_level=\"info\")"
+                    "    # For SSE, get the app to add middleware",
+                    "    app = mcp.http_app(transport=\"sse\")",
                 ])
+            
+            # Add OpenTelemetry middleware to the SSE app if enabled
+            if self.settings.opentelemetry_enabled:
+                main_code.extend([
+                    "    # Apply OpenTelemetry middleware to the SSE app",
+                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware",
+                    "    app = OpenTelemetryMiddleware(app)",
+                ])
+            
+            main_code.extend([
+                "    # Run with the configured app",
+                "    uvicorn.run(app, host=host, port=port, log_level=\"info\")"
+            ])
         elif self.settings.transport in ["streamable-http", "http"]:
             main_code.extend([
                 "    # Create HTTP app and run with uvicorn",
