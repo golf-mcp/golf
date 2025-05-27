@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 
-from golf.core.telemetry import track_event
+from golf.core.telemetry import track_event, track_command
 
 console = Console()
 
@@ -26,72 +26,83 @@ def initialize_project(
         output_dir: Directory where the project will be created
         template: Template to use (basic or api_key)
     """
-    # Validate template
-    valid_templates = ("basic", "api_key")
-    if template not in valid_templates:
-        console.print(f"[bold red]Error:[/bold red] Unknown template '{template}'")
-        console.print(f"Available templates: {', '.join(valid_templates)}")
-        track_event("cli_init_failed", {"success": False})
-        return
-    
-    # Check if directory exists
-    if output_dir.exists():
-        if not output_dir.is_dir():
-            console.print(
-                f"[bold red]Error:[/bold red] '{output_dir}' exists but is not a directory."
-            )
-            track_event("cli_init_failed", {"success": False})
+    try:
+        # Validate template
+        valid_templates = ("basic", "api_key")
+        if template not in valid_templates:
+            console.print(f"[bold red]Error:[/bold red] Unknown template '{template}'")
+            console.print(f"Available templates: {', '.join(valid_templates)}")
+            track_command("init", success=False, error_type="InvalidTemplate", error_message=f"Unknown template: {template}")
             return
         
-        # Check if directory is empty
-        if any(output_dir.iterdir()):
-            if not Confirm.ask(
-                f"Directory '{output_dir}' is not empty. Continue anyway?",
-                default=False,
-            ):
-                console.print("Initialization cancelled.")
-                track_event("cli_init_cancelled", {"success": False})
+        # Check if directory exists
+        if output_dir.exists():
+            if not output_dir.is_dir():
+                console.print(
+                    f"[bold red]Error:[/bold red] '{output_dir}' exists but is not a directory."
+                )
+                track_command("init", success=False, error_type="NotADirectory", error_message="Target exists but is not a directory")
                 return
-    else:
-        # Create the directory
-        output_dir.mkdir(parents=True)
-    
-    # Find template directory within the installed package
-    import golf
-    package_init_file = Path(golf.__file__)
-    # The 'examples' directory is now inside the 'golf' package directory
-    # e.g. golf/examples/basic, so go up one from __init__.py to get to 'golf'
-    template_dir = package_init_file.parent / "examples" / template
-    
-    if not template_dir.exists():
-        console.print(
-            f"[bold red]Error:[/bold red] Could not find template '{template}'"
-        )
-        track_event("cli_init_failed", {"success": False})
-        return
-    
-    # Copy template files
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold green]Creating project structure...[/bold green]"),
-        transient=True,
-    ) as progress:
-        progress.add_task("copying", total=None)
+            
+            # Check if directory is empty
+            if any(output_dir.iterdir()):
+                if not Confirm.ask(
+                    f"Directory '{output_dir}' is not empty. Continue anyway?",
+                    default=False,
+                ):
+                    console.print("Initialization cancelled.")
+                    track_event("cli_init_cancelled", {"success": False})
+                    return
+        else:
+            # Create the directory
+            output_dir.mkdir(parents=True)
         
-        # Copy directory structure
-        _copy_template(template_dir, output_dir, project_name)
-    
-    # Create virtual environment
-    console.print("[bold green]Project initialized successfully![/bold green]")
-    console.print(f"\nTo get started, run:")
-    console.print(f"  cd {output_dir.name}")
-    console.print(f"  golf build dev")
-    
-    # Track successful initialization
-    track_event("cli_init_success", {
-        "success": True,
-        "template": template
-    })
+        # Find template directory within the installed package
+        import golf
+        package_init_file = Path(golf.__file__)
+        # The 'examples' directory is now inside the 'golf' package directory
+        # e.g. golf/examples/basic, so go up one from __init__.py to get to 'golf'
+        template_dir = package_init_file.parent / "examples" / template
+        
+        if not template_dir.exists():
+            console.print(
+                f"[bold red]Error:[/bold red] Could not find template '{template}'"
+            )
+            track_command("init", success=False, error_type="TemplateNotFound", error_message=f"Template directory not found: {template}")
+            return
+        
+        # Copy template files
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold green]Creating project structure...[/bold green]"),
+            transient=True,
+        ) as progress:
+            progress.add_task("copying", total=None)
+            
+            # Copy directory structure
+            _copy_template(template_dir, output_dir, project_name)
+        
+        # Create virtual environment
+        console.print("[bold green]Project initialized successfully![/bold green]")
+        console.print(f"\nTo get started, run:")
+        console.print(f"  cd {output_dir.name}")
+        console.print(f"  golf build dev")
+        
+        # Track successful initialization
+        track_event("cli_init_success", {
+            "success": True,
+            "template": template
+        })
+    except Exception as e:
+        # Capture error details for telemetry
+        error_type = type(e).__name__
+        error_message = str(e)
+        
+        console.print(f"[bold red]Error during initialization:[/bold red] {error_message}")
+        track_command("init", success=False, error_type=error_type, error_message=error_message)
+        
+        # Re-raise to maintain existing behavior
+        raise
 
 
 def _copy_template(source_dir: Path, target_dir: Path, project_name: str) -> None:

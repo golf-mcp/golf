@@ -106,7 +106,7 @@ def build_dev(
     if not project_root:
         console.print("[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]")
         console.print("Run 'golf init <project_name>' to create a new project.")
-        track_event("cli_build_failed", {"success": False, "environment": "dev"})
+        track_event("cli_build_failed", {"success": False, "environment": "dev", "error_type": "NoProjectFound", "error_message": "No GolfMCP project found"})
         raise typer.Exit(code=1)
     
     # Load settings from the found project
@@ -124,8 +124,10 @@ def build_dev(
         build_project(project_root, settings, output_dir, build_env="dev", copy_env=True)
         # Track successful build with environment
         track_event("cli_build_success", {"success": True, "environment": "dev"})
-    except Exception:
-        track_event("cli_build_failed", {"success": False, "environment": "dev"})
+    except Exception as e:
+        error_type = type(e).__name__
+        error_message = str(e)
+        track_event("cli_build_failed", {"success": False, "environment": "dev", "error_type": error_type, "error_message": error_message})
         raise
 
 
@@ -142,7 +144,7 @@ def build_prod(
     if not project_root:
         console.print("[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]")
         console.print("Run 'golf init <project_name>' to create a new project.")
-        track_event("cli_build_failed", {"success": False, "environment": "prod"})
+        track_event("cli_build_failed", {"success": False, "environment": "prod", "error_type": "NoProjectFound", "error_message": "No GolfMCP project found"})
         raise typer.Exit(code=1)
     
     # Load settings from the found project
@@ -160,8 +162,10 @@ def build_prod(
         build_project(project_root, settings, output_dir, build_env="prod", copy_env=False)
         # Track successful build with environment
         track_event("cli_build_success", {"success": True, "environment": "prod"})
-    except Exception:
-        track_event("cli_build_failed", {"success": False, "environment": "prod"})
+    except Exception as e:
+        error_type = type(e).__name__
+        error_message = str(e)
+        track_event("cli_build_failed", {"success": False, "environment": "prod", "error_type": error_type, "error_message": error_message})
         raise
 
 
@@ -191,7 +195,7 @@ def run(
     if not project_root:
         console.print("[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]")
         console.print("Run 'golf init <project_name>' to create a new project.")
-        track_event("cli_run_failed", {"success": False})
+        track_event("cli_run_failed", {"success": False, "error_type": "NoProjectFound", "error_message": "No GolfMCP project found"})
         raise typer.Exit(code=1)
     
     # Load settings from the found project
@@ -207,13 +211,20 @@ def run(
     if not dist_dir.exists():
         if build_first:
             console.print(f"[yellow]Dist directory {dist_dir} not found. Building first...[/yellow]")
-            # Build the project
-            from golf.commands.build import build_project
-            build_project(project_root, settings, dist_dir)
+            try:
+                # Build the project
+                from golf.commands.build import build_project
+                build_project(project_root, settings, dist_dir)
+            except Exception as e:
+                error_type = type(e).__name__
+                error_message = str(e)
+                console.print(f"[bold red]Error building project:[/bold red] {error_message}")
+                track_event("cli_run_failed", {"success": False, "error_type": f"BuildError.{error_type}", "error_message": error_message})
+                raise
         else:
             console.print(f"[bold red]Error: Dist directory {dist_dir} not found.[/bold red]")
             console.print("Run 'golf build' first or use --build to build automatically.")
-            track_event("cli_run_failed", {"success": False})
+            track_event("cli_run_failed", {"success": False, "error_type": "DistNotFound", "error_message": "Dist directory not found"})
             raise typer.Exit(code=1)
     
     try:
@@ -231,13 +242,15 @@ def run(
         if return_code == 0:
             track_event("cli_run_success", {"success": True})
         else:
-            track_event("cli_run_failed", {"success": False})
+            track_event("cli_run_failed", {"success": False, "error_type": "NonZeroExit", "error_message": f"Server exited with code {return_code}"})
         
         # Exit with the same code as the server
         if return_code != 0:
             raise typer.Exit(code=return_code)
-    except Exception:
-        track_event("cli_run_failed", {"success": False})
+    except Exception as e:
+        error_type = type(e).__name__
+        error_message = str(e)
+        track_event("cli_run_failed", {"success": False, "error_type": error_type, "error_message": error_message})
         raise
 
 
