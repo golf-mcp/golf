@@ -243,7 +243,7 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
         # Filter properties to only include safe ones
         if properties:
             # Only include specific safe properties
-            safe_keys = {"success", "environment", "template", "command_type"}
+            safe_keys = {"success", "environment", "template", "command_type", "error_type", "error_message"}
             for key in safe_keys:
                 if key in properties:
                     safe_properties[key] = properties[key]
@@ -260,15 +260,68 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
         pass
 
 
-def track_command(command: str, success: bool = True) -> None:
+def track_command(command: str, success: bool = True, error_type: Optional[str] = None, error_message: Optional[str] = None) -> None:
     """Track a CLI command execution with minimal info.
     
     Args:
         command: The command being executed (e.g., "init", "build", "run")
         success: Whether the command was successful
+        error_type: Type of error if command failed (e.g., "ValueError", "FileNotFoundError")
+        error_message: Sanitized error message (no sensitive data)
     """
-    # Simplify the event to just command and success
-    track_event(f"cli_{command}", {"success": success})
+    properties = {"success": success}
+    
+    # Add error details if command failed
+    if not success and (error_type or error_message):
+        if error_type:
+            properties["error_type"] = error_type
+        if error_message:
+            # Sanitize error message - remove file paths and sensitive info
+            sanitized_message = _sanitize_error_message(error_message)
+            properties["error_message"] = sanitized_message
+    
+    track_event(f"cli_{command}", properties)
+
+
+def _sanitize_error_message(message: str) -> str:
+    """Sanitize error message to remove sensitive information.
+    
+    Args:
+        message: Raw error message
+        
+    Returns:
+        Sanitized error message
+    """
+    import re
+    
+    # Remove absolute file paths but keep the filename
+    # Unix-style paths
+    message = re.sub(r'/(?:Users|home|var|tmp|opt|usr|etc)/[^\s"\']+/([^/\s"\']+)', r'\1', message)
+    # Windows-style paths
+    message = re.sub(r'[A-Za-z]:\\[^\s"\']+\\([^\\s"\']+)', r'\1', message)
+    # Generic path pattern (catches remaining paths)
+    message = re.sub(r'(?:^|[\s"])(/[^\s"\']+/)+([^/\s"\']+)', r'\2', message)
+    
+    # Remove potential API keys or tokens (common patterns)
+    # Generic API keys (20+ alphanumeric with underscores/hyphens)
+    message = re.sub(r'\b[a-zA-Z0-9_-]{32,}\b', '[REDACTED]', message)
+    # Bearer tokens
+    message = re.sub(r'Bearer\s+[a-zA-Z0-9_.-]+', 'Bearer [REDACTED]', message)
+    
+    # Remove email addresses
+    message = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', message)
+    
+    # Remove IP addresses
+    message = re.sub(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', '[IP]', message)
+    
+    # Remove port numbers in URLs
+    message = re.sub(r':[0-9]{2,5}(?=/|$|\s)', ':[PORT]', message)
+    
+    # Truncate to reasonable length
+    if len(message) > 200:
+        message = message[:197] + "..."
+    
+    return message
 
 
 def flush() -> None:
