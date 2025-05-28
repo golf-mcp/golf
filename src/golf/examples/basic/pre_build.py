@@ -16,9 +16,9 @@ github_provider = ProviderConfig(
     token_url="https://github.com/login/oauth/access_token",
     userinfo_url="https://api.github.com/user",
     scopes=["read:user", "user:email"],
-    issuer_url="http://127.0.0.1:3000", # This should be your Golf server's accessible URL
-    callback_path="/auth/callback",     # Golf's callback path
-    token_expiration=3600  # 1 hour
+    issuer_url="http://127.0.0.1:3000",  # This should be your Golf server's accessible URL
+    callback_path="/auth/callback",  # Golf's callback path
+    token_expiration=3600,  # 1 hour
 )
 
 # Configure authentication with the provider

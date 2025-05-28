@@ -2,14 +2,14 @@
 
 import platform
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 resource_uri = "info://system"
 
 
-async def info() -> Dict[str, Any]:
+async def info() -> dict[str, Any]:
     """Provide system information as a resource.
-    
+
     This is a simple example resource that demonstrates how to expose
     data to an LLM client through the MCP protocol.
     """
@@ -20,8 +20,9 @@ async def info() -> Dict[str, Any]:
             "system": platform.system(),
             "python_version": platform.python_version(),
             "architecture": platform.machine(),
-        }
+        },
     }
 
+
 # Designate the entry point function
-export = info 
+export = info

@@ -1,1 +1,1 @@
-"""Core functionality for the GolfMCP framework.""" 
+"""Core functionality for the GolfMCP framework."""

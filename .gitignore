@@ -7,3 +7,5 @@ pyrightconfig.json
 .vscode/
 .env
 dist/
+.coverage
+Makefile

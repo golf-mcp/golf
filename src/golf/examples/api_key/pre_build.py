@@ -7,5 +7,5 @@ from golf.auth import configure_api_key
 configure_api_key(
     header_name="Authorization",
     header_prefix="Bearer ",  # Will handle both "Bearer " and "token " prefixes
-    required=True  # Reject requests without a valid API key
+    required=True,  # Reject requests without a valid API key
 )
