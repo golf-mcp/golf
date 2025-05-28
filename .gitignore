@@ -8,3 +8,4 @@ pyrightconfig.json
 .env
 dist/
 .coverage
+Makefile
