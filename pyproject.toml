@@ -122,6 +122,13 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "C4", "C90", "UP", "N", "ANN", "SIM", "TID"]
 ignore = ["ANN401"]
 
+[tool.ruff.format]
+# Use Black-compatible formatting
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
 [tool.mypy]
 python_version = "3.11"
 disallow_untyped_defs = true
