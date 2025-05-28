@@ -115,10 +115,12 @@ pytest-cov = "^4.1.0"
 line-length = 88
 
 [tool.ruff]
-select = ["E", "F", "I", "B", "C4", "C90", "UP", "N", "ANN", "SIM", "TID"]
-ignore = ["ANN101", "ANN102", "ANN401"]
 line-length = 88
 target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C4", "C90", "UP", "N", "ANN", "SIM", "TID"]
+ignore = ["ANN401"]
 
 [tool.mypy]
 python_version = "3.11"
