@@ -12,9 +12,7 @@ from .oauth import GolfOAuthProvider
 _active_golf_oauth_provider: GolfOAuthProvider | None = None
 
 # Context variable to store the current request's API key
-_current_api_key: ContextVar[str | None] = ContextVar(
-    "current_api_key", default=None
-)
+_current_api_key: ContextVar[str | None] = ContextVar("current_api_key", default=None)
 
 
 def _set_active_golf_oauth_provider(provider: GolfOAuthProvider) -> None:

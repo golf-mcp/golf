@@ -559,7 +559,10 @@ class CodeGenerator:
             imports.append("")
 
         # Add imports section for different transport methods
-        if self.settings.transport == "sse" or self.settings.transport in ["streamable-http", "http"]:
+        if self.settings.transport == "sse" or self.settings.transport in [
+            "streamable-http",
+            "http",
+        ]:
             imports.append("import uvicorn")
 
         # Get transport-specific configuration
@@ -659,11 +662,11 @@ class CodeGenerator:
                     registration += f"\n_wrapped_func = instrument_{component_type.value}({full_module_path}.{entry_func}, '{component.name}')"
 
                     if component_type == ComponentType.TOOL:
-                        registration += f"\nmcp.add_tool(_wrapped_func, name=\"{component.name}\", description=\"{component.docstring or ''}\")"
+                        registration += f'\nmcp.add_tool(_wrapped_func, name="{component.name}", description="{component.docstring or ""}")'
                     elif component_type == ComponentType.RESOURCE:
-                        registration += f"\nmcp.add_resource_fn(_wrapped_func, uri=\"{component.uri_template}\", name=\"{component.name}\", description=\"{component.docstring or ''}\")"
+                        registration += f'\nmcp.add_resource_fn(_wrapped_func, uri="{component.uri_template}", name="{component.name}", description="{component.docstring or ""}")'
                     else:  # PROMPT
-                        registration += f"\nmcp.add_prompt(_wrapped_func, name=\"{component.name}\", description=\"{component.docstring or ''}\")"
+                        registration += f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", description="{component.docstring or ""}")'
                 else:
                     # Standard registration without telemetry
                     if component_type == ComponentType.TOOL:

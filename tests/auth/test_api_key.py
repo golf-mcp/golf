@@ -1,7 +1,5 @@
 """Tests for API key authentication."""
 
-
-
 from golf.auth.api_key import (
     configure_api_key,
     get_api_key_config,

@@ -14,7 +14,9 @@ PAYMENT_API_URL = os.environ.get("PAYMENT_API_URL", "https://api.example.com/pay
 class PaymentClient:
     """Mock payment provider client."""
 
-    def __init__(self, api_key: str = PAYMENT_API_KEY, api_url: str = PAYMENT_API_URL) -> None:
+    def __init__(
+        self, api_key: str = PAYMENT_API_KEY, api_url: str = PAYMENT_API_URL
+    ) -> None:
         self.api_key = api_key
         self.api_url = api_url
 

@@ -46,9 +46,7 @@ class TokenStorage:
         self.access_tokens = {}  # token_str -> AccessToken
         self.clients = {}  # client_id -> OAuthClientInformationFull
         self.provider_tokens = {}  # mcp_access_token_str -> provider_access_token_str
-        self.auth_code_to_provider_token = (
-            {}
-        )  # auth_code_str -> provider_access_token_str
+        self.auth_code_to_provider_token = {}  # auth_code_str -> provider_access_token_str
 
     def store_auth_code(
         self, code: str, auth_code_obj: AuthorizationCode

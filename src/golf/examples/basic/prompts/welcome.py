@@ -1,7 +1,6 @@
 """Welcome prompt for new users."""
 
 
-
 async def welcome() -> list[dict]:
     """Provide a welcome prompt for new users.
 

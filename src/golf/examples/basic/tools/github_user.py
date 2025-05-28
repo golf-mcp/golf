@@ -1,6 +1,5 @@
 """Tool for fetching GitHub user information."""
 
-
 import httpx
 from pydantic import BaseModel
 

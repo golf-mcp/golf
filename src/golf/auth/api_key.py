@@ -5,7 +5,6 @@ allowing tools to access API keys from request headers and forward them to
 upstream services.
 """
 
-
 from pydantic import BaseModel, Field
 
 

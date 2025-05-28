@@ -107,7 +107,7 @@ app.add_typer(build_app, name="build")
 def build_dev(
     output_dir: str | None = typer.Option(
         None, "--output-dir", "-o", help="Directory to output the built project"
-    )
+    ),
 ) -> None:
     """Build a development version with environment variables copied."""
     # Find project root directory
@@ -163,7 +163,7 @@ def build_dev(
 def build_prod(
     output_dir: str | None = typer.Option(
         None, "--output-dir", "-o", help="Directory to output the built project"
-    )
+    ),
 ) -> None:
     """Build a production version without copying environment variables."""
     # Find project root directory
@@ -347,7 +347,7 @@ def run(
 # Add telemetry command group
 @app.command()
 def telemetry(
-    action: str = typer.Argument(..., help="Action to perform: 'enable' or 'disable'")
+    action: str = typer.Argument(..., help="Action to perform: 'enable' or 'disable'"),
 ) -> None:
     """Manage telemetry settings."""
     if action.lower() == "enable":
