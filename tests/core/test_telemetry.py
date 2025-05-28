@@ -17,6 +17,20 @@ class TestTelemetryConfiguration:
         # Note: isolate_telemetry fixture already sets GOLF_TELEMETRY=0
         assert not is_telemetry_enabled()
 
+    def test_telemetry_disabled_by_test_mode_env(self, monkeypatch) -> None:
+        """Test that telemetry is disabled when GOLF_TEST_MODE is set."""
+        # Clear the telemetry env var set by fixture
+        monkeypatch.delenv("GOLF_TELEMETRY", raising=False)
+        # Set test mode
+        monkeypatch.setenv("GOLF_TEST_MODE", "1")
+        
+        # Reset cached state
+        from golf.core import telemetry
+        telemetry._telemetry_enabled = None
+        
+        # Should be disabled due to test mode
+        assert not is_telemetry_enabled()
+
     def test_set_telemetry_enabled(self, monkeypatch) -> None:
         """Test enabling/disabling telemetry programmatically."""
         # Start with telemetry disabled by fixture

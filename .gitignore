@@ -9,3 +9,5 @@ pyrightconfig.json
 dist/
 .coverage
 Makefile
+htmlcov/
+.ruff_cache/

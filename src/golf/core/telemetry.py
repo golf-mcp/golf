@@ -28,6 +28,17 @@ _anonymous_id: str | None = None
 _user_identified: bool = False  # Track if we've already identified the user
 
 
+def _is_test_mode() -> bool:
+    """Check if we're in test mode."""
+    return os.environ.get("GOLF_TEST_MODE", "").lower() in ("1", "true", "yes", "on")
+
+
+def _ensure_posthog_disabled_in_test_mode() -> None:
+    """Ensure PostHog is disabled when in test mode."""
+    if _is_test_mode() and not posthog.disabled:
+        posthog.disabled = True
+
+
 def get_telemetry_config_path() -> Path:
     """Get the path to the telemetry configuration file."""
     return Path.home() / ".golf" / "telemetry.json"
@@ -68,16 +79,22 @@ def is_telemetry_enabled() -> bool:
 
     Checks in order:
     1. Cached value
-    2. GOLF_TELEMETRY environment variable
-    3. Persistent preference file
-    4. Default to True (opt-out model)
+    2. GOLF_TEST_MODE environment variable (always disabled in test mode)
+    3. GOLF_TELEMETRY environment variable
+    4. Persistent preference file
+    5. Default to True (opt-out model)
     """
     global _telemetry_enabled
 
     if _telemetry_enabled is not None:
         return _telemetry_enabled
 
-    # Check environment variables (highest priority)
+    # Check if we're in test mode (highest priority after cache)
+    if _is_test_mode():
+        _telemetry_enabled = False
+        return False
+
+    # Check environment variables (second highest priority)
     env_telemetry = os.environ.get("GOLF_TELEMETRY", "").lower()
     if env_telemetry in ("0", "false", "no", "off"):
         _telemetry_enabled = False
@@ -170,6 +187,13 @@ def get_anonymous_id() -> str:
 
 def initialize_telemetry() -> None:
     """Initialize PostHog telemetry if enabled."""
+    # Ensure PostHog is disabled in test mode
+    _ensure_posthog_disabled_in_test_mode()
+    
+    # Don't initialize if PostHog is disabled (test mode)
+    if posthog.disabled:
+        return
+        
     if not is_telemetry_enabled():
         return
 
@@ -198,6 +222,13 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         properties: Optional properties to include with the event
     """
     global _user_identified
+
+    # Ensure PostHog is disabled in test mode
+    _ensure_posthog_disabled_in_test_mode()
+
+    # Early return if PostHog is disabled (test mode)
+    if posthog.disabled:
+        return
 
     if not is_telemetry_enabled():
         return
