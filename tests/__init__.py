@@ -1,1 +1,1 @@
-"""Tests for the Golf MCP framework.""" 
+"""Tests for the Golf MCP framework."""

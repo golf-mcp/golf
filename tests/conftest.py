@@ -23,22 +23,24 @@ def sample_project(temp_dir: Path) -> Path:
     """Create a minimal Golf project structure for testing."""
     project_dir = temp_dir / "test_project"
     project_dir.mkdir()
-    
+
     # Create golf.json
     golf_json = project_dir / "golf.json"
-    golf_json.write_text("""{
+    golf_json.write_text(
+        """{
     "name": "TestProject",
     "description": "A test Golf project",
     "host": "127.0.0.1",
     "port": 3000,
     "transport": "sse"
-}""")
-    
+}"""
+    )
+
     # Create component directories
     (project_dir / "tools").mkdir()
     (project_dir / "resources").mkdir()
     (project_dir / "prompts").mkdir()
-    
+
     return project_dir
 
 
@@ -46,7 +48,8 @@ def sample_project(temp_dir: Path) -> Path:
 def sample_tool_file(sample_project: Path) -> Path:
     """Create a sample tool file."""
     tool_file = sample_project / "tools" / "hello.py"
-    tool_file.write_text('''"""A simple hello tool."""
+    tool_file.write_text(
+        '''"""A simple hello tool."""
 
 from typing import Annotated
 from pydantic import BaseModel, Field
@@ -65,7 +68,8 @@ async def hello(
 
 
 export = hello
-''')
+'''
+    )
     return tool_file
 
 
@@ -74,4 +78,4 @@ def isolate_telemetry(monkeypatch):
     """Isolate telemetry for tests to prevent actual tracking."""
     monkeypatch.setenv("GOLF_TELEMETRY", "0")
     # Also prevent any file system telemetry operations
-    monkeypatch.setenv("HOME", str(Path(tempfile.mkdtemp()))) 
+    monkeypatch.setenv("HOME", str(Path(tempfile.mkdtemp())))

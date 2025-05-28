@@ -11,9 +11,9 @@ from golf.telemetry.instrumentation import (
 
 __all__ = [
     "instrument_tool",
-    "instrument_resource", 
+    "instrument_resource",
     "instrument_prompt",
     "telemetry_lifespan",
     "init_telemetry",
     "get_tracer",
-] 
+]

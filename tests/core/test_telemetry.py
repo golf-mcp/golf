@@ -11,36 +11,36 @@ from golf.core.telemetry import (
 
 class TestTelemetryConfiguration:
     """Test telemetry configuration and preferences."""
-    
+
     def test_telemetry_disabled_by_env(self, monkeypatch):
         """Test that telemetry respects environment variable."""
         # Note: isolate_telemetry fixture already sets GOLF_TELEMETRY=0
         assert not is_telemetry_enabled()
-    
+
     def test_set_telemetry_enabled(self, monkeypatch):
         """Test enabling/disabling telemetry programmatically."""
         # Start with telemetry disabled by fixture
         assert not is_telemetry_enabled()
-        
+
         # Enable telemetry (without persisting)
         set_telemetry_enabled(True, persist=False)
         assert is_telemetry_enabled()
-        
+
         # Disable again
         set_telemetry_enabled(False, persist=False)
         assert not is_telemetry_enabled()
-    
+
     def test_anonymous_id_generation(self):
         """Test that anonymous ID is generated correctly."""
         id1 = get_anonymous_id()
         assert id1 is not None
         assert id1.startswith("golf-")
         assert len(id1) > 10  # Should have some reasonable length
-        
+
         # Should return same ID on subsequent calls
         id2 = get_anonymous_id()
         assert id1 == id2
-    
+
     def test_anonymous_id_format(self):
         """Test that anonymous ID follows expected format."""
         anon_id = get_anonymous_id()
@@ -54,7 +54,7 @@ class TestTelemetryConfiguration:
 
 class TestErrorSanitization:
     """Test error message sanitization."""
-    
+
     def test_sanitizes_file_paths(self):
         """Test that file paths are sanitized."""
         # Unix paths
@@ -62,34 +62,34 @@ class TestErrorSanitization:
         sanitized = _sanitize_error_message(msg)
         assert "/Users/john" not in sanitized
         assert "secret.py" in sanitized
-        
+
         # Windows paths
         msg = "Error in C:\\Users\\john\\projects\\app.py"
         sanitized = _sanitize_error_message(msg)
         assert "C:\\Users\\john" not in sanitized
         assert "app.py" in sanitized
-    
+
     def test_sanitizes_api_keys(self):
         """Test that API keys are sanitized."""
         msg = "Invalid API key: sk_test_abcdef1234567890abcdef1234567890"
         sanitized = _sanitize_error_message(msg)
         assert "sk_test_abcdef1234567890abcdef1234567890" not in sanitized
         assert "[REDACTED]" in sanitized
-    
+
     def test_sanitizes_email_addresses(self):
         """Test that email addresses are sanitized."""
         msg = "User john.doe@example.com not found"
         sanitized = _sanitize_error_message(msg)
         assert "john.doe@example.com" not in sanitized
         assert "[EMAIL]" in sanitized
-    
+
     def test_sanitizes_ip_addresses(self):
         """Test that IP addresses are sanitized."""
         msg = "Connection failed to 192.168.1.100"
         sanitized = _sanitize_error_message(msg)
         assert "192.168.1.100" not in sanitized
         assert "[IP]" in sanitized
-    
+
     def test_truncates_long_messages(self):
         """Test that long messages are truncated."""
         # Use a message that won't trigger redaction patterns
@@ -103,31 +103,34 @@ class TestErrorSanitization:
 
 class TestEventTracking:
     """Test event tracking functionality."""
-    
+
     def test_track_event_when_disabled(self):
         """Test that events are not tracked when telemetry is disabled."""
         # Telemetry is disabled by fixture
         assert not is_telemetry_enabled()
-        
+
         # This should not raise any errors
         track_event("test_event", {"key": "value"})
-        
+
         # No way to verify it wasn't sent without mocking
         # but at least it shouldn't crash
-    
+
     def test_track_event_filters_properties(self):
         """Test that event properties are filtered."""
         # Even though telemetry is disabled, we can test the logic
         # by enabling it temporarily
         set_telemetry_enabled(True, persist=False)
-        
+
         # This should filter out unsafe properties
-        track_event("test_event", {
-            "success": True,
-            "environment": "test",
-            "sensitive_data": "should_be_filtered",
-            "user_email": "test@example.com"
-        })
-        
+        track_event(
+            "test_event",
+            {
+                "success": True,
+                "environment": "test",
+                "sensitive_data": "should_be_filtered",
+                "user_email": "test@example.com",
+            },
+        )
+
         # Reset
-        set_telemetry_enabled(False, persist=False) 
+        set_telemetry_enabled(False, persist=False)

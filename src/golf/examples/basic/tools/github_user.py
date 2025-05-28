@@ -8,7 +8,7 @@ from golf.auth import get_provider_token
 
 class GitHubUserResponse(BaseModel):
     """Response model for GitHub user information."""
-    
+
     login: str
     id: int
     name: Optional[str] = None
@@ -27,24 +27,24 @@ async def get_github_user() -> GitHubUserResponse:
     try:
         # Get GitHub token using our abstraction
         github_token = get_provider_token()
-        
+
         if not github_token:
             return GitHubUserResponse(
                 login="anonymous",
                 id=0,
-                message="Not authenticated. Please login first."
+                message="Not authenticated. Please login first.",
             )
-        
+
         # Call GitHub API to get user info
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 "https://api.github.com/user",
                 headers={
                     "Authorization": f"Bearer {github_token}",
-                    "Accept": "application/vnd.github.v3+json"
-                }
+                    "Accept": "application/vnd.github.v3+json",
+                },
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
                 return GitHubUserResponse(**data)
@@ -52,16 +52,14 @@ async def get_github_user() -> GitHubUserResponse:
                 return GitHubUserResponse(
                     login="error",
                     id=0,
-                    message=f"GitHub API error: {response.status_code} - {response.text[:100]}"
+                    message=f"GitHub API error: {response.status_code} - {response.text[:100]}",
                 )
-    
+
     except Exception as e:
         return GitHubUserResponse(
-            login="error",
-            id=0,
-            message=f"Error fetching GitHub data: {str(e)}"
+            login="error", id=0, message=f"Error fetching GitHub data: {str(e)}"
         )
 
 
 # Export the tool
-export = get_github_user 
+export = get_github_user

@@ -1,1 +1,1 @@
-"""CLI package for the GolfMCP framework.""" 
+"""CLI package for the GolfMCP framework."""
