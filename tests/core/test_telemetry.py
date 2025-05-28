@@ -23,11 +23,12 @@ class TestTelemetryConfiguration:
         monkeypatch.delenv("GOLF_TELEMETRY", raising=False)
         # Set test mode
         monkeypatch.setenv("GOLF_TEST_MODE", "1")
-        
+
         # Reset cached state
         from golf.core import telemetry
+
         telemetry._telemetry_enabled = None
-        
+
         # Should be disabled due to test mode
         assert not is_telemetry_enabled()
 

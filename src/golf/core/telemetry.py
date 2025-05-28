@@ -189,11 +189,11 @@ def initialize_telemetry() -> None:
     """Initialize PostHog telemetry if enabled."""
     # Ensure PostHog is disabled in test mode
     _ensure_posthog_disabled_in_test_mode()
-    
+
     # Don't initialize if PostHog is disabled (test mode)
     if posthog.disabled:
         return
-        
+
     if not is_telemetry_enabled():
         return
 
