@@ -1,8 +1,9 @@
 """List GitHub repositories for a user or organization."""
 
-from typing import Annotated, List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Annotated, Any
+
 import httpx
+from pydantic import BaseModel, Field
 
 from golf.auth import get_api_key
 
@@ -10,19 +11,19 @@ from golf.auth import get_api_key
 class Output(BaseModel):
     """List of repositories."""
 
-    repositories: List[Dict[str, Any]]
+    repositories: list[dict[str, Any]]
     total_count: int
 
 
 async def list(
     username: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description="GitHub username (lists public repos, or all repos if authenticated as this user)"
         ),
     ] = None,
     org: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description="GitHub organization name (lists public repos, or all repos if authenticated member)"
         ),

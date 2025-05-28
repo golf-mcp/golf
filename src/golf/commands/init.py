@@ -1,15 +1,13 @@
 """Project initialization command implementation."""
 
-import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 
-from golf.core.telemetry import track_event, track_command
+from golf.core.telemetry import track_command, track_event
 
 console = Console()
 
@@ -55,14 +53,13 @@ def initialize_project(
                 return
 
             # Check if directory is empty
-            if any(output_dir.iterdir()):
-                if not Confirm.ask(
-                    f"Directory '{output_dir}' is not empty. Continue anyway?",
-                    default=False,
-                ):
-                    console.print("Initialization cancelled.")
-                    track_event("cli_init_cancelled", {"success": False})
-                    return
+            if any(output_dir.iterdir()) and not Confirm.ask(
+                f"Directory '{output_dir}' is not empty. Continue anyway?",
+                default=False,
+            ):
+                console.print("Initialization cancelled.")
+                track_event("cli_init_cancelled", {"success": False})
+                return
         else:
             # Create the directory
             output_dir.mkdir(parents=True)
@@ -100,9 +97,9 @@ def initialize_project(
 
         # Create virtual environment
         console.print("[bold green]Project initialized successfully![/bold green]")
-        console.print(f"\nTo get started, run:")
+        console.print("\nTo get started, run:")
         console.print(f"  cd {output_dir.name}")
-        console.print(f"  golf build dev")
+        console.print("  golf build dev")
 
         # Track successful initialization
         track_event("cli_init_success", {"success": True, "template": template})
@@ -150,7 +147,7 @@ def _copy_template(source_dir: Path, target_dir: Path, project_name: str) -> Non
 
         # Copy and substitute content for text files
         if _is_text_file(source_path):
-            with open(source_path, "r", encoding="utf-8") as f:
+            with open(source_path, encoding="utf-8") as f:
                 content = f.read()
 
             # Replace template variables
@@ -247,7 +244,7 @@ def _is_text_file(path: Path) -> bool:
 
     # Try to detect if it's a text file by reading a bit of it
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             f.read(1024)
         return True
     except UnicodeDecodeError:

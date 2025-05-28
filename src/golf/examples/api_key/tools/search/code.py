@@ -1,8 +1,9 @@
 """Search GitHub code."""
 
-from typing import Annotated, List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Annotated, Any
+
 import httpx
+from pydantic import BaseModel, Field
 
 from golf.auth import get_api_key
 
@@ -10,7 +11,7 @@ from golf.auth import get_api_key
 class Output(BaseModel):
     """Code search results."""
 
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
     total_count: int
 
 
@@ -19,17 +20,17 @@ async def search(
         str, Field(description="Search query (e.g., 'addClass', 'TODO', etc.)")
     ],
     language: Annotated[
-        Optional[str],
+        str | None,
         Field(
             description="Filter by programming language (e.g., 'python', 'javascript')"
         ),
     ] = None,
     repo: Annotated[
-        Optional[str],
+        str | None,
         Field(description="Search within a specific repository (format: 'owner/repo')"),
     ] = None,
     org: Annotated[
-        Optional[str],
+        str | None,
         Field(description="Search within repositories of a specific organization"),
     ] = None,
     per_page: Annotated[

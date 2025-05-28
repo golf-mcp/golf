@@ -1,7 +1,9 @@
 """Refund payment tool"""
 
-from typing import Annotated, Optional
+from typing import Annotated
+
 from pydantic import BaseModel, Field
+
 from .common import payment_client
 
 
@@ -21,7 +23,7 @@ async def refund(
         ),
     ],
     amount: Annotated[
-        Optional[float],
+        float | None,
         Field(
             description="Amount to refund in USD. If not specified, refunds the full charge amount",
             gt=0,

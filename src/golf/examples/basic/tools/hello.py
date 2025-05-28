@@ -1,6 +1,7 @@
 """Hello World tool {{project_name}}."""
 
 from typing import Annotated
+
 from pydantic import BaseModel, Field
 
 

@@ -9,17 +9,17 @@ from typing import List, Optional, Tuple
 
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
 
-from .provider import ProviderConfig
-from .oauth import GolfOAuthProvider, create_callback_handler
-from .helpers import (
-    get_access_token,
-    get_provider_token,
-    extract_token_from_header,
-    get_api_key,
-    set_api_key,
-    debug_api_key_context,
-)
 from .api_key import configure_api_key, get_api_key_config, is_api_key_configured
+from .helpers import (
+    debug_api_key_context,
+    extract_token_from_header,
+    get_access_token,
+    get_api_key,
+    get_provider_token,
+    set_api_key,
+)
+from .oauth import GolfOAuthProvider, create_callback_handler
+from .provider import ProviderConfig
 
 
 class AuthConfig:
@@ -28,11 +28,11 @@ class AuthConfig:
     def __init__(
         self,
         provider_config: ProviderConfig,
-        required_scopes: List[str],
+        required_scopes: list[str],
         callback_path: str = "/auth/callback",
         login_path: str = "/login",
         error_path: str = "/auth-error",
-    ):
+    ) -> None:
         """Initialize authentication configuration.
 
         Args:
@@ -64,13 +64,13 @@ class AuthConfig:
 
 
 # Global state for the build process
-_auth_config: Optional[AuthConfig] = None
+_auth_config: AuthConfig | None = None
 
 
 def configure_auth(
     provider_config=None,
     provider=None,
-    required_scopes: Optional[List[str]] = None,
+    required_scopes: list[str] | None = None,
     callback_path: str = "/auth/callback",
 ) -> None:
     """Configure authentication for a GolfMCP server.
@@ -99,7 +99,7 @@ def configure_auth(
     )
 
 
-def get_auth_config() -> Tuple[Optional[ProviderConfig], List[str]]:
+def get_auth_config() -> tuple[ProviderConfig | None, list[str]]:
     """Get the current authentication configuration.
 
     Returns:
@@ -110,7 +110,7 @@ def get_auth_config() -> Tuple[Optional[ProviderConfig], List[str]]:
     return None, []
 
 
-def create_auth_provider() -> Optional[GolfOAuthProvider]:
+def create_auth_provider() -> GolfOAuthProvider | None:
     """Create an OAuth provider from the configured provider settings.
 
     Returns:

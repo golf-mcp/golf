@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
@@ -16,9 +15,9 @@ console = Console()
 def run_server(
     project_path: Path,
     settings: Settings,
-    dist_dir: Optional[Path] = None,
-    host: Optional[str] = None,
-    port: Optional[int] = None,
+    dist_dir: Path | None = None,
+    host: str | None = None,
+    port: int | None = None,
 ) -> int:
     """Run the built FastMCP server.
 

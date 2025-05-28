@@ -1,8 +1,9 @@
 """Tool for fetching GitHub user information."""
 
-from typing import Optional
-from pydantic import BaseModel
+
 import httpx
+from pydantic import BaseModel
+
 from golf.auth import get_provider_token
 
 
@@ -11,15 +12,15 @@ class GitHubUserResponse(BaseModel):
 
     login: str
     id: int
-    name: Optional[str] = None
-    email: Optional[str] = None
-    avatar_url: Optional[str] = None
-    location: Optional[str] = None
-    bio: Optional[str] = None
+    name: str | None = None
+    email: str | None = None
+    avatar_url: str | None = None
+    location: str | None = None
+    bio: str | None = None
     public_repos: int = 0
     followers: int = 0
     following: int = 0
-    message: Optional[str] = None
+    message: str | None = None
 
 
 async def get_github_user() -> GitHubUserResponse:

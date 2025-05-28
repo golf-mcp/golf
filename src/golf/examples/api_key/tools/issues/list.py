@@ -1,8 +1,9 @@
 """List issues in a GitHub repository."""
 
-from typing import Annotated, List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Annotated, Any
+
 import httpx
+from pydantic import BaseModel, Field
 
 from golf.auth import get_api_key
 
@@ -10,7 +11,7 @@ from golf.auth import get_api_key
 class Output(BaseModel):
     """List of issues from the repository."""
 
-    issues: List[Dict[str, Any]]
+    issues: list[dict[str, Any]]
     total_count: int
 
 
@@ -20,7 +21,7 @@ async def list(
         str, Field(description="Filter by state - 'open', 'closed', or 'all'")
     ] = "open",
     labels: Annotated[
-        Optional[str],
+        str | None,
         Field(description="Comma-separated list of label names to filter by"),
     ] = None,
     per_page: Annotated[

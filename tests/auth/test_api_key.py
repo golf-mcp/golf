@@ -1,9 +1,6 @@
 """Tests for API key authentication."""
 
-import os
-from pathlib import Path
 
-import pytest
 
 from golf.auth.api_key import (
     configure_api_key,
@@ -15,7 +12,7 @@ from golf.auth.api_key import (
 class TestAPIKeyConfiguration:
     """Test API key configuration functionality."""
 
-    def test_configure_api_key_basic(self):
+    def test_configure_api_key_basic(self) -> None:
         """Test basic API key configuration."""
         # Reset any existing configuration
         global _api_key_config
@@ -35,7 +32,7 @@ class TestAPIKeyConfiguration:
         assert config.header_prefix == ""
         assert config.required is True
 
-    def test_configure_api_key_custom(self):
+    def test_configure_api_key_custom(self) -> None:
         """Test API key configuration with custom settings."""
         # Reset configuration
         from golf.auth import api_key
@@ -54,7 +51,7 @@ class TestAPIKeyConfiguration:
         assert config.header_prefix == "Bearer "
         assert config.required is False
 
-    def test_clear_api_key_configuration(self):
+    def test_clear_api_key_configuration(self) -> None:
         """Test clearing API key configuration."""
         # Configure first
         configure_api_key()
@@ -68,7 +65,7 @@ class TestAPIKeyConfiguration:
         assert not is_api_key_configured()
         assert get_api_key_config() is None
 
-    def test_api_key_persistence(self):
+    def test_api_key_persistence(self) -> None:
         """Test that API key configuration persists across calls."""
         # Reset configuration
         from golf.auth import api_key

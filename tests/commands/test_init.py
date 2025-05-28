@@ -11,7 +11,7 @@ from golf.commands.init import initialize_project
 class TestInitCommand:
     """Test the init command functionality."""
 
-    def test_creates_basic_project_structure(self, temp_dir: Path):
+    def test_creates_basic_project_structure(self, temp_dir: Path) -> None:
         """Test that init creates the expected project structure."""
         project_dir = temp_dir / "my_project"
 
@@ -26,7 +26,7 @@ class TestInitCommand:
         assert (project_dir / ".env").exists()
         assert (project_dir / ".gitignore").exists()
 
-    def test_golf_json_has_correct_content(self, temp_dir: Path):
+    def test_golf_json_has_correct_content(self, temp_dir: Path) -> None:
         """Test that golf.json is created with correct content."""
         project_dir = temp_dir / "test_project"
 
@@ -38,7 +38,7 @@ class TestInitCommand:
         assert config["host"] == "127.0.0.1"
         assert config["port"] == 3000
 
-    def test_template_variable_substitution(self, temp_dir: Path):
+    def test_template_variable_substitution(self, temp_dir: Path) -> None:
         """Test that {{project_name}} is replaced correctly."""
         project_dir = temp_dir / "MyApp"
 
@@ -52,7 +52,7 @@ class TestInitCommand:
         env_content = (project_dir / ".env").read_text()
         assert "GOLF_NAME=MyApp" in env_content
 
-    def test_handles_existing_empty_directory(self, temp_dir: Path):
+    def test_handles_existing_empty_directory(self, temp_dir: Path) -> None:
         """Test that init works with an existing empty directory."""
         project_dir = temp_dir / "existing"
         project_dir.mkdir()
@@ -63,7 +63,7 @@ class TestInitCommand:
         assert (project_dir / "golf.json").exists()
 
     @pytest.mark.skip(reason="Requires interactive input handling")
-    def test_prompts_for_non_empty_directory(self, temp_dir: Path):
+    def test_prompts_for_non_empty_directory(self, temp_dir: Path) -> None:
         """Test that init prompts when directory is not empty."""
         # This would require mocking the Confirm.ask prompt
         pass

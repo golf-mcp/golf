@@ -5,7 +5,7 @@ allowing tools to access API keys from request headers and forward them to
 upstream services.
 """
 
-from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -25,7 +25,7 @@ class ApiKeyConfig(BaseModel):
 
 
 # Global configuration storage
-_api_key_config: Optional[ApiKeyConfig] = None
+_api_key_config: ApiKeyConfig | None = None
 
 
 def configure_api_key(
@@ -64,7 +64,7 @@ def configure_api_key(
     )
 
 
-def get_api_key_config() -> Optional[ApiKeyConfig]:
+def get_api_key_config() -> ApiKeyConfig | None:
     """Get the current API key configuration.
 
     Returns:

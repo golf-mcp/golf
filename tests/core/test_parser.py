@@ -14,7 +14,7 @@ from golf.core.parser import (
 class TestComponentDiscovery:
     """Test component discovery functionality."""
 
-    def test_discovers_tool_files(self, sample_project: Path):
+    def test_discovers_tool_files(self, sample_project: Path) -> None:
         """Test that tool files are discovered correctly."""
         # Create a tool file
         tool_file = sample_project / "tools" / "test_tool.py"
@@ -37,7 +37,7 @@ export = run
         assert components[0].name == "test_tool"
         assert components[0].docstring == "Test tool."
 
-    def test_discovers_nested_components(self, sample_project: Path):
+    def test_discovers_nested_components(self, sample_project: Path) -> None:
         """Test discovery of components in nested directories."""
         # Create nested structure
         nested_dir = sample_project / "tools" / "payments" / "stripe"
@@ -62,7 +62,7 @@ export = run
         assert components[0].name == "charge-stripe-payments"
         assert components[0].parent_module == "payments.stripe"
 
-    def test_skips_pycache_and_hidden_files(self, sample_project: Path):
+    def test_skips_pycache_and_hidden_files(self, sample_project: Path) -> None:
         """Test that __pycache__ and hidden directories are skipped."""
         # Create __pycache__ directory
         pycache = sample_project / "tools" / "__pycache__"
@@ -84,7 +84,7 @@ export = run
 
         assert len(components) == 0
 
-    def test_ignores_common_py_files(self, sample_project: Path):
+    def test_ignores_common_py_files(self, sample_project: Path) -> None:
         """Test that common.py files are not returned as components."""
         common_file = sample_project / "tools" / "common.py"
         common_file.write_text(
@@ -104,7 +104,7 @@ def shared_function():
 class TestComponentParsing:
     """Test individual component parsing."""
 
-    def test_parses_tool_with_input_output_classes(self, sample_project: Path):
+    def test_parses_tool_with_input_output_classes(self, sample_project: Path) -> None:
         """Test parsing a tool with Input and Output Pydantic models."""
         tool_file = sample_project / "tools" / "calculator.py"
         tool_file.write_text(
@@ -148,7 +148,7 @@ export = add
         assert "a" in component.input_schema["properties"]
         assert "b" in component.input_schema["properties"]
 
-    def test_parses_resource_with_uri_template(self, sample_project: Path):
+    def test_parses_resource_with_uri_template(self, sample_project: Path) -> None:
         """Test parsing a resource with URI template."""
         resource_file = sample_project / "resources" / "weather.py"
         resource_file.write_text(
@@ -176,7 +176,7 @@ export = get_weather
         assert component.uri_template == "weather://current/{city}"
         assert component.parameters == ["city"]
 
-    def test_parses_prompt(self, sample_project: Path):
+    def test_parses_prompt(self, sample_project: Path) -> None:
         """Test parsing a prompt component."""
         prompt_file = sample_project / "prompts" / "greeting.py"
         prompt_file.write_text(
@@ -204,7 +204,7 @@ export = greet
         assert component.type == ComponentType.PROMPT
         assert component.parameters == ["name"]
 
-    def test_fails_without_module_docstring(self, sample_project: Path):
+    def test_fails_without_module_docstring(self, sample_project: Path) -> None:
         """Test that parsing fails without a module docstring."""
         tool_file = sample_project / "tools" / "no_docstring.py"
         tool_file.write_text(
@@ -220,7 +220,7 @@ export = run
         with pytest.raises(ValueError, match="Missing module docstring"):
             parser.parse_file(tool_file)
 
-    def test_fails_without_return_annotation(self, sample_project: Path):
+    def test_fails_without_return_annotation(self, sample_project: Path) -> None:
         """Test that parsing fails without return type annotation."""
         tool_file = sample_project / "tools" / "no_return.py"
         tool_file.write_text(
@@ -237,7 +237,7 @@ export = run
         with pytest.raises(ValueError, match="Missing return annotation"):
             parser.parse_file(tool_file)
 
-    def test_handles_export_fallback_to_run(self, sample_project: Path):
+    def test_handles_export_fallback_to_run(self, sample_project: Path) -> None:
         """Test fallback to 'run' function when no export is specified."""
         tool_file = sample_project / "tools" / "fallback.py"
         tool_file.write_text(
@@ -259,7 +259,7 @@ def run() -> dict:
 class TestIDGeneration:
     """Test component ID generation."""
 
-    def test_simple_id_generation(self, sample_project: Path):
+    def test_simple_id_generation(self, sample_project: Path) -> None:
         """Test ID generation for files directly in category directory."""
         tool_file = sample_project / "tools" / "simple.py"
         tool_file.write_text(
@@ -275,7 +275,7 @@ export = run
 
         assert components[0].name == "simple"
 
-    def test_nested_id_generation(self, sample_project: Path):
+    def test_nested_id_generation(self, sample_project: Path) -> None:
         """Test ID generation for nested files."""
         # Create nested structure: tools/payments/stripe/refund.py
         nested_dir = sample_project / "tools" / "payments" / "stripe"
@@ -297,7 +297,7 @@ export = run
         # refund + stripe + payments = "refund-stripe-payments"
         assert components[0].name == "refund-stripe-payments"
 
-    def test_id_collision_detection(self, sample_project: Path):
+    def test_id_collision_detection(self, sample_project: Path) -> None:
         """Test that ID collisions are detected."""
         # Create two files that would generate the same ID
         tool1 = sample_project / "tools" / "test.py"
@@ -331,7 +331,7 @@ export = run
 class TestProjectParsing:
     """Test full project parsing."""
 
-    def test_parse_complete_project(self, sample_project: Path):
+    def test_parse_complete_project(self, sample_project: Path) -> None:
         """Test parsing a complete project with multiple components."""
         # Create tool
         tool = sample_project / "tools" / "greet.py"

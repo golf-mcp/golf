@@ -1,28 +1,28 @@
 """Component-level OpenTelemetry instrumentation for Golf-built servers."""
 
+import asyncio
+import functools
 import os
 import sys
-import functools
-from typing import Callable, Optional, TypeVar
+from collections.abc import Callable
 from contextlib import asynccontextmanager
-import asyncio
+from typing import TypeVar
 
-from opentelemetry import trace
+from opentelemetry import baggage, trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.trace import Status, StatusCode, Span
-from opentelemetry import baggage
+from opentelemetry.trace import Status, StatusCode
 
 T = TypeVar("T")
 
 # Global tracer instance
-_tracer: Optional[trace.Tracer] = None
-_provider: Optional[TracerProvider] = None
+_tracer: trace.Tracer | None = None
+_provider: TracerProvider | None = None
 
 
-def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProvider]:
+def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | None:
     """Initialize OpenTelemetry with environment-based configuration.
 
     Returns None if required environment variables are not set.
@@ -37,7 +37,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProv
         endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
         if not endpoint:
             print(
-                f"[WARNING] OpenTelemetry tracing is disabled: OTEL_EXPORTER_OTLP_ENDPOINT is not set for OTLP HTTP exporter"
+                "[WARNING] OpenTelemetry tracing is disabled: OTEL_EXPORTER_OTLP_ENDPOINT is not set for OTLP HTTP exporter"
             )
             return None
 
@@ -74,7 +74,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProv
         else:
             # Default to console exporter
             exporter = ConsoleSpanExporter(out=sys.stderr)
-    except Exception as e:
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -90,7 +90,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProv
             export_timeout_millis=5000,
         )
         provider.add_span_processor(processor)
-    except Exception as e:
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -107,7 +107,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProv
             # Only set if no provider exists or it's the default proxy provider
             trace.set_tracer_provider(provider)
         _provider = provider
-    except Exception as e:
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -123,7 +123,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> Optional[TracerProv
             span.set_attribute(
                 "endpoint", os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "not set")
             )
-    except Exception as e:
+    except Exception:
         import traceback
 
         traceback.print_exc()
@@ -207,7 +207,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
             # Add tool arguments as span attributes (be careful with sensitive data)
             for i, arg in enumerate(args):
-                if isinstance(arg, (str, int, float, bool)) or arg is None:
+                if isinstance(arg, str | int | float | bool) or arg is None:
                     span.set_attribute(f"mcp.tool.arg.{i}", str(arg))
                 elif hasattr(arg, "__dict__"):
                     # For objects, just record the type
@@ -218,9 +218,9 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 if key != "ctx":
                     if value is None:
                         span.set_attribute(f"mcp.tool.input.{key}", "null")
-                    elif isinstance(value, (str, int, float, bool)):
+                    elif isinstance(value, str | int | float | bool):
                         span.set_attribute(f"mcp.tool.input.{key}", str(value))
-                    elif isinstance(value, (list, tuple)):
+                    elif isinstance(value, list | tuple):
                         span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
                         span.set_attribute(f"mcp.tool.input.{key}.type", "array")
                     elif isinstance(value, dict):
@@ -260,7 +260,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
                 # Capture result metadata with better structure
                 if result is not None:
-                    if isinstance(result, (str, int, float, bool)):
+                    if isinstance(result, str | int | float | bool):
                         span.set_attribute("mcp.tool.result.value", str(result))
                         span.set_attribute(
                             "mcp.tool.result.type", type(result).__name__
@@ -356,7 +356,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
             # Add tool arguments as span attributes (be careful with sensitive data)
             for i, arg in enumerate(args):
-                if isinstance(arg, (str, int, float, bool)) or arg is None:
+                if isinstance(arg, str | int | float | bool) or arg is None:
                     span.set_attribute(f"mcp.tool.arg.{i}", str(arg))
                 elif hasattr(arg, "__dict__"):
                     # For objects, just record the type
@@ -367,9 +367,9 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 if key != "ctx":
                     if value is None:
                         span.set_attribute(f"mcp.tool.input.{key}", "null")
-                    elif isinstance(value, (str, int, float, bool)):
+                    elif isinstance(value, str | int | float | bool):
                         span.set_attribute(f"mcp.tool.input.{key}", str(value))
-                    elif isinstance(value, (list, tuple)):
+                    elif isinstance(value, list | tuple):
                         span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
                         span.set_attribute(f"mcp.tool.input.{key}.type", "array")
                     elif isinstance(value, dict):
@@ -409,7 +409,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
                 # Capture result metadata with better structure
                 if result is not None:
-                    if isinstance(result, (str, int, float, bool)):
+                    if isinstance(result, str | int | float | bool):
                         span.set_attribute("mcp.tool.result.value", str(result))
                         span.set_attribute(
                             "mcp.tool.result.type", type(result).__name__
@@ -704,7 +704,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
             # Add prompt arguments
             for key, value in kwargs.items():
                 if key != "ctx":
-                    if isinstance(value, (str, int, float, bool)) or value is None:
+                    if isinstance(value, str | int | float | bool) or value is None:
                         span.set_attribute(f"mcp.prompt.arg.{key}", str(value))
                     else:
                         span.set_attribute(
@@ -808,7 +808,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
             # Add prompt arguments
             for key, value in kwargs.items():
                 if key != "ctx":
-                    if isinstance(value, (str, int, float, bool)) or value is None:
+                    if isinstance(value, str | int | float | bool) or value is None:
                         span.set_attribute(f"mcp.prompt.arg.{key}", str(value))
                     else:
                         span.set_attribute(

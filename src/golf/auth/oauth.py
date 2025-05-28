@@ -5,25 +5,25 @@ interface for GolfMCP servers. It handles the OAuth 2.0 authentication flow,
 token management, and client registration.
 """
 
+import os
 import time
 import uuid
-import jwt
-import httpx
-import os
-from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
+from typing import Any
 
+import httpx
+import jwt
 from mcp.server.auth.provider import (
-    OAuthAuthorizationServerProvider,
     AccessToken,
-    RefreshToken,
     AuthorizationCode,
-    RegistrationError,
     AuthorizationParams,
+    OAuthAuthorizationServerProvider,
+    RefreshToken,
+    RegistrationError,
 )
 from mcp.shared.auth import (
-    OAuthToken,
     OAuthClientInformationFull,
+    OAuthToken,
 )
 from starlette.responses import RedirectResponse
 
@@ -39,7 +39,7 @@ class TokenStorage:
     solution.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the token storage."""
         self.auth_codes = {}  # code_str -> AuthorizationCode
         self.refresh_tokens = {}  # token_str -> RefreshToken
@@ -61,7 +61,7 @@ class TokenStorage:
         """
         self.auth_codes[code] = auth_code_obj
 
-    def get_auth_code(self, code: str) -> Optional[AuthorizationCode]:
+    def get_auth_code(self, code: str) -> AuthorizationCode | None:
         """Get an authorization code by value.
 
         Args:
@@ -89,7 +89,7 @@ class TokenStorage:
         """Store a mapping from an auth_code string to a provider_token string."""
         self.auth_code_to_provider_token[auth_code_str] = provider_token
 
-    def get_provider_token_for_auth_code(self, auth_code_str: str) -> Optional[str]:
+    def get_provider_token_for_auth_code(self, auth_code_str: str) -> str | None:
         """Retrieve a provider_token string using an auth_code string."""
         return self.auth_code_to_provider_token.get(auth_code_str)
 
@@ -102,7 +102,7 @@ class TokenStorage:
         """
         self.clients[client_id] = client
 
-    def get_client(self, client_id: str) -> Optional[OAuthClientInformationFull]:
+    def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
         """Get client information by ID.
 
         Args:
@@ -123,7 +123,7 @@ class TokenStorage:
         """
         self.refresh_tokens[token] = refresh_token
 
-    def get_refresh_token(self, token: str) -> Optional[RefreshToken]:
+    def get_refresh_token(self, token: str) -> RefreshToken | None:
         """Get a refresh token by value.
 
         Args:
@@ -152,7 +152,7 @@ class TokenStorage:
         """
         self.access_tokens[token] = access_token
 
-    def get_access_token(self, token: str) -> Optional[AccessToken]:
+    def get_access_token(self, token: str) -> AccessToken | None:
         """Get an access token by value.
 
         Args:
@@ -181,7 +181,7 @@ class TokenStorage:
         """
         self.provider_tokens[mcp_token] = provider_token
 
-    def get_provider_token(self, mcp_token: str) -> Optional[str]:
+    def get_provider_token(self, mcp_token: str) -> str | None:
         """Get the provider token associated with an MCP token.
 
         This is a non-standard method to allow access to the provider token
@@ -205,7 +205,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
     token management, and client registration.
     """
 
-    def __init__(self, config: ProviderConfig):
+    def __init__(self, config: ProviderConfig) -> None:
         """Initialize the provider.
 
         Args:
@@ -213,7 +213,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
         """
         self.config = config
         self.storage = TokenStorage()
-        self.state_mapping: Dict[str, Dict[str, Any]] = {}  # Initialize state_mapping
+        self.state_mapping: dict[str, dict[str, Any]] = {}  # Initialize state_mapping
 
         # Register default client
         self._register_default_client()
@@ -278,7 +278,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
         self.storage.store_client("default", default_client)
 
     def _generate_jwt(
-        self, subject: str, scopes: List[str], expires_in: int = None
+        self, subject: str, scopes: list[str], expires_in: int = None
     ) -> str:
         """Generate a JWT token.
 
@@ -304,7 +304,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
         jwt_secret = self._get_jwt_secret()
         return jwt.encode(payload, jwt_secret, algorithm="HS256")
 
-    def _verify_jwt(self, token: str) -> Optional[Dict[str, Any]]:
+    def _verify_jwt(self, token: str) -> dict[str, Any] | None:
         """Verify a JWT token."""
         jwt_secret = self._get_jwt_secret()  # Get secret first
         # _diag_logger.info(f"GolfOAuthProvider: _verify_jwt attempting to use secret: {jwt_secret[:5]}...")
@@ -320,22 +320,22 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
             if payload.get("exp", 0) < time.time():
                 exp_timestamp = payload.get("exp")
                 current_timestamp = time.time()
-                exp_datetime_str = (
+                (
                     str(datetime.fromtimestamp(exp_timestamp))
                     if exp_timestamp is not None
                     else "N/A"
                 )
-                current_datetime_str = str(datetime.fromtimestamp(current_timestamp))
+                str(datetime.fromtimestamp(current_timestamp))
                 return None
             return payload
-        except jwt.ExpiredSignatureError as e:
+        except jwt.ExpiredSignatureError:
             return None
-        except jwt.PyJWTError as e:
+        except jwt.PyJWTError:
             return None
-        except Exception as e:  # Catch any other unexpected error during decode
+        except Exception:  # Catch any other unexpected error during decode
             return None
 
-    async def get_client(self, client_id: str) -> Optional[OAuthClientInformationFull]:
+    async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
         """Get client information by ID.
 
         Args:
@@ -349,7 +349,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
     async def register_client(self, client_info: OAuthClientInformationFull) -> None:
         """Register a new client."""
         # Add detailed logging at the beginning
-        client_id_to_register = getattr(
+        getattr(
             client_info, "client_id", "UNKNOWN (client_info has no client_id attribute)"
         )
         try:
@@ -368,7 +368,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
 
             # Store the client
             self.storage.store_client(client_info.client_id, client_info)
-        except Exception as e:
+        except Exception:
             raise  # Re-raise the exception so FastMCP can handle it
 
     async def authorize(
@@ -424,7 +424,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
 
     async def load_authorization_code(
         self, client: OAuthClientInformationFull, code: str
-    ) -> Optional[AuthorizationCode]:
+    ) -> AuthorizationCode | None:
         """Load an authorization code.
 
         Args:
@@ -526,7 +526,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
 
     async def load_refresh_token(
         self, client: OAuthClientInformationFull, refresh_token: str
-    ) -> Optional[RefreshToken]:
+    ) -> RefreshToken | None:
         """Load a refresh token.
 
         Args:
@@ -556,7 +556,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
         self,
         client: OAuthClientInformationFull,
         refresh_token: RefreshToken,
-        scopes: List[str],
+        scopes: list[str],
     ) -> OAuthToken:
         """Exchange a refresh token for a new token pair.
 
@@ -639,7 +639,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
             scope=" ".join(valid_scopes),
         )
 
-    async def load_access_token(self, token: str) -> Optional[AccessToken]:
+    async def load_access_token(self, token: str) -> AccessToken | None:
         """Load and validate an access token."""
 
         payload = self._verify_jwt(token)
@@ -659,7 +659,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
 
         return access_token_obj
 
-    async def revoke_token(self, token: Union[AccessToken, RefreshToken]) -> None:
+    async def revoke_token(self, token: AccessToken | RefreshToken) -> None:
         """Revoke a token.
 
         Args:
@@ -676,7 +676,7 @@ class GolfOAuthProvider(OAuthAuthorizationServerProvider):
         if provider_token:
             self.storage.provider_tokens.pop(token.token, None)
 
-    def get_provider_token(self, mcp_token: str) -> Optional[str]:
+    def get_provider_token(self, mcp_token: str) -> str | None:
         """Get the provider token associated with an MCP token.
 
         This is a non-standard method to allow access to the provider token
@@ -772,7 +772,7 @@ def create_callback_handler(provider: GolfOAuthProvider):
                 idp_state, None
             )  # Use state from IdP
             if not original_mcp_client_details:
-                return RedirectResponse(f"/auth-error?error=invalid_idp_state")
+                return RedirectResponse("/auth-error?error=invalid_idp_state")
 
             original_mcp_client_id = original_mcp_client_details["client_id"]
             original_mcp_redirect_uri = original_mcp_client_details[
@@ -796,10 +796,10 @@ def create_callback_handler(provider: GolfOAuthProvider):
             )  # Renamed for clarity
             if not mcp_client:
                 return RedirectResponse(
-                    f"/auth-error?error=mcp_client_not_found_post_callback"
+                    "/auth-error?error=mcp_client_not_found_post_callback"
                 )
 
-            final_scopes_for_mcp_auth_code: List[str]
+            final_scopes_for_mcp_auth_code: list[str]
             if requested_scopes_for_mcp_server_str:  # Scopes requested by MCP client
                 final_scopes_for_mcp_auth_code = (
                     requested_scopes_for_mcp_server_str.split()
@@ -854,7 +854,7 @@ def create_callback_handler(provider: GolfOAuthProvider):
 
             return RedirectResponse(final_redirect_to_mcp_client)
 
-        except Exception as e:
+        except Exception:
             # Avoid sending raw exception details to the client for security
             return RedirectResponse(
                 "/auth-error?error=callback_processing_failed&detail=internal_server_error"

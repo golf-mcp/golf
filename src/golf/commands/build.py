@@ -4,13 +4,13 @@ This module implements the `golf build` command which generates a standalone
 FastMCP application from a GolfMCP project.
 """
 
-from pathlib import Path
 import argparse
+from pathlib import Path
 
 from rich.console import Console
 
-from golf.core.config import Settings, load_settings
 from golf.core.builder import build_project as core_build_project
+from golf.core.config import Settings, load_settings
 
 console = Console()
 

@@ -1,7 +1,7 @@
 """Helper functions for working with authentication in MCP context."""
 
-from typing import Optional, Dict, Any
 from contextvars import ContextVar
+from typing import Any
 
 # Re-export get_access_token from the MCP SDK
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -9,10 +9,10 @@ from mcp.server.auth.middleware.auth_context import get_access_token
 from .oauth import GolfOAuthProvider
 
 # Context variable to store the active OAuth provider
-_active_golf_oauth_provider: Optional[GolfOAuthProvider] = None
+_active_golf_oauth_provider: GolfOAuthProvider | None = None
 
 # Context variable to store the current request's API key
-_current_api_key: ContextVar[Optional[str]] = ContextVar(
+_current_api_key: ContextVar[str | None] = ContextVar(
     "current_api_key", default=None
 )
 
@@ -26,7 +26,7 @@ def _set_active_golf_oauth_provider(provider: GolfOAuthProvider) -> None:
     _active_golf_oauth_provider = provider
 
 
-def get_provider_token() -> Optional[str]:
+def get_provider_token() -> str | None:
     """
     Get a provider token (e.g., GitHub token) associated with the current
     MCP session's access token.
@@ -49,7 +49,7 @@ def get_provider_token() -> Optional[str]:
     return provider.get_provider_token(mcp_access_token.token)
 
 
-def extract_token_from_header(auth_header: str) -> Optional[str]:
+def extract_token_from_header(auth_header: str) -> str | None:
     """Extract bearer token from Authorization header.
 
     Args:
@@ -68,7 +68,7 @@ def extract_token_from_header(auth_header: str) -> Optional[str]:
     return parts[1]
 
 
-def set_api_key(api_key: Optional[str]) -> None:
+def set_api_key(api_key: str | None) -> None:
     """Set the API key for the current request context.
 
     This is an internal function used by the middleware.
@@ -79,7 +79,7 @@ def set_api_key(api_key: Optional[str]) -> None:
     _current_api_key.set(api_key)
 
 
-def get_api_key() -> Optional[str]:
+def get_api_key() -> str | None:
     """Get the API key from the current request context.
 
     This function should be used in tools to retrieve the API key
@@ -135,10 +135,10 @@ def get_api_key() -> Optional[str]:
 
             if api_key:
                 return api_key
-    except (ImportError, RuntimeError) as e:
+    except (ImportError, RuntimeError):
         # FastMCP not available or not in HTTP context
         pass
-    except Exception as e:
+    except Exception:
         pass
 
     # Final fallback: environment variable (for development/testing)
@@ -151,7 +151,7 @@ def get_api_key() -> Optional[str]:
     return None
 
 
-def get_api_key_from_request(request) -> Optional[str]:
+def get_api_key_from_request(request) -> str | None:
     """Get the API key from a specific request object.
 
     This is useful when you have direct access to the request object.
@@ -170,7 +170,7 @@ def get_api_key_from_request(request) -> Optional[str]:
     return _current_api_key.get()
 
 
-def debug_api_key_context() -> Dict[str, Any]:
+def debug_api_key_context() -> dict[str, Any]:
     """Debug function to inspect API key context.
 
     Returns a dictionary with debugging information about the current
@@ -180,8 +180,8 @@ def debug_api_key_context() -> Dict[str, Any]:
         Dictionary with debug information
     """
     import asyncio
-    import sys
     import os
+    import sys
 
     debug_info = {
         "context_var_value": _current_api_key.get(),
@@ -215,7 +215,7 @@ def debug_api_key_context() -> Dict[str, Any]:
             )
 
             if hasattr(main_module, "request_id_context"):
-                request_id_context = getattr(main_module, "request_id_context")
+                request_id_context = main_module.request_id_context
                 debug_info["request_id_from_context"] = request_id_context.get()
     except:
         pass

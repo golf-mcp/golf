@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from rich.console import Console
 
@@ -29,28 +29,28 @@ class ParsedComponent:
     type: ComponentType
     file_path: Path
     module_path: str
-    docstring: Optional[str] = None
-    input_schema: Optional[Dict[str, Any]] = None
-    output_schema: Optional[Dict[str, Any]] = None
-    uri_template: Optional[str] = None  # For resources
-    parameters: Optional[List[str]] = None  # For resources with URI params
-    parent_module: Optional[str] = None  # For nested components
-    entry_function: Optional[str] = None  # Store the name of the function to use
+    docstring: str | None = None
+    input_schema: dict[str, Any] | None = None
+    output_schema: dict[str, Any] | None = None
+    uri_template: str | None = None  # For resources
+    parameters: list[str] | None = None  # For resources with URI params
+    parent_module: str | None = None  # For nested components
+    entry_function: str | None = None  # Store the name of the function to use
 
 
 class AstParser:
     """AST-based parser for extracting MCP components from Python files."""
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path) -> None:
         """Initialize the parser.
 
         Args:
             project_root: Root directory of the project
         """
         self.project_root = project_root
-        self.components: Dict[str, ParsedComponent] = {}
+        self.components: dict[str, ParsedComponent] = {}
 
-    def parse_directory(self, directory: Path) -> List[ParsedComponent]:
+    def parse_directory(self, directory: Path) -> list[ParsedComponent]:
         """Parse all Python files in a directory recursively."""
         components = []
 
@@ -72,7 +72,7 @@ class AstParser:
 
         return components
 
-    def parse_file(self, file_path: Path) -> List[ParsedComponent]:
+    def parse_file(self, file_path: Path) -> list[ParsedComponent]:
         """Parse a single Python file using AST to extract MCP components."""
         # Handle common.py files
         if file_path.name == "common.py":
@@ -99,7 +99,7 @@ class AstParser:
             return []  # Not in a recognized directory
 
         # Read the file content and parse it with AST
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             file_content = f.read()
 
         try:
@@ -129,7 +129,7 @@ class AstParser:
         # Find all top-level functions
         functions = []
         for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 functions.append(node)
                 # If this function matches our export target, it's our entry function
                 if export_target and node.name == export_target:
@@ -198,7 +198,7 @@ class AstParser:
     ) -> None:
         """Process the entry function to extract parameters and return type."""
         # Extract function docstring
-        func_docstring = ast.get_docstring(func_node)
+        ast.get_docstring(func_node)
 
         # Extract parameter names and annotations
         parameters = []
@@ -287,11 +287,9 @@ class AstParser:
         rel_path = file_path.relative_to(self.project_root)
 
         # Find which category directory this is in
-        category = None
         category_idx = -1
         for i, part in enumerate(rel_path.parts):
             if part in ["tools", "resources", "prompts"]:
-                category = part
                 category_idx = i
                 break
 
@@ -315,7 +313,7 @@ class AstParser:
 
     def _extract_pydantic_schema_from_ast(
         self, class_node: ast.ClassDef
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Extract a JSON schema from an AST class definition.
 
         This is a simplified version that extracts basic field information.
@@ -440,11 +438,11 @@ class AstParser:
         return "string"
 
 
-def parse_project(project_path: Path) -> Dict[ComponentType, List[ParsedComponent]]:
+def parse_project(project_path: Path) -> dict[ComponentType, list[ParsedComponent]]:
     """Parse a GolfMCP project to extract all components."""
     parser = AstParser(project_path)
 
-    components: Dict[ComponentType, List[ParsedComponent]] = {
+    components: dict[ComponentType, list[ParsedComponent]] = {
         ComponentType.TOOL: [],
         ComponentType.RESOURCE: [],
         ComponentType.PROMPT: [],
@@ -476,7 +474,7 @@ def parse_project(project_path: Path) -> Dict[ComponentType, List[ParsedComponen
     return components
 
 
-def parse_common_files(project_path: Path) -> Dict[str, Path]:
+def parse_common_files(project_path: Path) -> dict[str, Path]:
     """Find all common.py files in the project.
 
     Args:

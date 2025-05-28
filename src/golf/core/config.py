@@ -1,7 +1,7 @@
 """Configuration management for GolfMCP."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,14 +16,14 @@ class AuthConfig(BaseModel):
     provider: str = Field(
         ..., description="Authentication provider (e.g., 'jwks', 'google', 'github')"
     )
-    scopes: List[str] = Field(default_factory=list, description="Required OAuth scopes")
-    client_id_env: Optional[str] = Field(
+    scopes: list[str] = Field(default_factory=list, description="Required OAuth scopes")
+    client_id_env: str | None = Field(
         None, description="Environment variable name for client ID"
     )
-    client_secret_env: Optional[str] = Field(
+    client_secret_env: str | None = Field(
         None, description="Environment variable name for client secret"
     )
-    redirect_uri: Optional[str] = Field(
+    redirect_uri: str | None = Field(
         None, description="OAuth redirect URI (defaults to localhost callback)"
     )
 
@@ -44,7 +44,7 @@ class DeployConfig(BaseModel):
     """Deployment configuration."""
 
     default: str = Field("vercel", description="Default deployment target")
-    options: Dict[str, Any] = Field(
+    options: dict[str, Any] = Field(
         default_factory=dict, description="Target-specific options"
     )
 
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
 
     # Project metadata
     name: str = Field("GolfMCP Project", description="FastMCP instance name")
-    description: Optional[str] = Field(None, description="Project description")
+    description: str | None = Field(None, description="Project description")
 
     # Build settings
     output_dir: str = Field("build", description="Build artifact folder")
@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     )
 
     # Auth settings
-    auth: Optional[Union[str, AuthConfig]] = Field(
+    auth: str | AuthConfig | None = Field(
         None, description="Authentication configuration or URI"
     )
 
@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     )
 
 
-def find_config_path(start_path: Optional[Path] = None) -> Optional[Path]:
+def find_config_path(start_path: Path | None = None) -> Path | None:
     """Find the golf config file by searching upwards from the given path.
 
     Args:
@@ -137,8 +137,8 @@ def find_config_path(start_path: Optional[Path] = None) -> Optional[Path]:
 
 
 def find_project_root(
-    start_path: Optional[Path] = None,
-) -> Tuple[Optional[Path], Optional[Path]]:
+    start_path: Path | None = None,
+) -> tuple[Path | None, Path | None]:
     """Find a GolfMCP project root by searching for a config file.
 
     This is the central project discovery function that should be used by all commands.
@@ -155,7 +155,7 @@ def find_project_root(
     return None, None
 
 
-def load_settings(project_path: Union[str, Path]) -> Settings:
+def load_settings(project_path: str | Path) -> Settings:
     """Load settings from a project directory.
 
     Args:
@@ -198,7 +198,7 @@ def _load_json_settings(path: Path, settings: Settings) -> Settings:
     try:
         import json
 
-        with open(path, "r") as f:
+        with open(path) as f:
             config_data = json.load(f)
 
         # Update settings from config data

@@ -15,7 +15,7 @@ TEMPERATURE_UNIT = os.environ.get("WEATHER_TEMP_UNIT", "fahrenheit")
 class WeatherApiClient:
     """Mock weather API client."""
 
-    def __init__(self, api_key: str = WEATHER_API_KEY, api_url: str = WEATHER_API_URL):
+    def __init__(self, api_key: str = WEATHER_API_KEY, api_url: str = WEATHER_API_URL) -> None:
         self.api_key = api_key
         self.api_url = api_url
         self.unit = TEMPERATURE_UNIT

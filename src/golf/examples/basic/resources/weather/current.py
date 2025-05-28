@@ -1,14 +1,15 @@
 """Current weather resource example."""
 
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
+
 from .common import weather_client
 
 # The URI that clients will use to access this resource
 resource_uri = "weather://current/{city}"
 
 
-async def current_weather(city: str) -> Dict[str, Any]:
+async def current_weather(city: str) -> dict[str, Any]:
     """Provide current weather for the specified city.
 
     This example demonstrates:

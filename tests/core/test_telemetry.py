@@ -1,23 +1,23 @@
 """Tests for Golf MCP telemetry functionality."""
 
 from golf.core.telemetry import (
+    _sanitize_error_message,
+    get_anonymous_id,
     is_telemetry_enabled,
     set_telemetry_enabled,
-    get_anonymous_id,
     track_event,
-    _sanitize_error_message,
 )
 
 
 class TestTelemetryConfiguration:
     """Test telemetry configuration and preferences."""
 
-    def test_telemetry_disabled_by_env(self, monkeypatch):
+    def test_telemetry_disabled_by_env(self, monkeypatch) -> None:
         """Test that telemetry respects environment variable."""
         # Note: isolate_telemetry fixture already sets GOLF_TELEMETRY=0
         assert not is_telemetry_enabled()
 
-    def test_set_telemetry_enabled(self, monkeypatch):
+    def test_set_telemetry_enabled(self, monkeypatch) -> None:
         """Test enabling/disabling telemetry programmatically."""
         # Start with telemetry disabled by fixture
         assert not is_telemetry_enabled()
@@ -30,7 +30,7 @@ class TestTelemetryConfiguration:
         set_telemetry_enabled(False, persist=False)
         assert not is_telemetry_enabled()
 
-    def test_anonymous_id_generation(self):
+    def test_anonymous_id_generation(self) -> None:
         """Test that anonymous ID is generated correctly."""
         id1 = get_anonymous_id()
         assert id1 is not None
@@ -41,7 +41,7 @@ class TestTelemetryConfiguration:
         id2 = get_anonymous_id()
         assert id1 == id2
 
-    def test_anonymous_id_format(self):
+    def test_anonymous_id_format(self) -> None:
         """Test that anonymous ID follows expected format."""
         anon_id = get_anonymous_id()
         # Format: golf-[hash]-[random]
@@ -55,7 +55,7 @@ class TestTelemetryConfiguration:
 class TestErrorSanitization:
     """Test error message sanitization."""
 
-    def test_sanitizes_file_paths(self):
+    def test_sanitizes_file_paths(self) -> None:
         """Test that file paths are sanitized."""
         # Unix paths
         msg = "Error in /Users/john/projects/myapp/secret.py"
@@ -69,28 +69,28 @@ class TestErrorSanitization:
         assert "C:\\Users\\john" not in sanitized
         assert "app.py" in sanitized
 
-    def test_sanitizes_api_keys(self):
+    def test_sanitizes_api_keys(self) -> None:
         """Test that API keys are sanitized."""
         msg = "Invalid API key: sk_test_abcdef1234567890abcdef1234567890"
         sanitized = _sanitize_error_message(msg)
         assert "sk_test_abcdef1234567890abcdef1234567890" not in sanitized
         assert "[REDACTED]" in sanitized
 
-    def test_sanitizes_email_addresses(self):
+    def test_sanitizes_email_addresses(self) -> None:
         """Test that email addresses are sanitized."""
         msg = "User john.doe@example.com not found"
         sanitized = _sanitize_error_message(msg)
         assert "john.doe@example.com" not in sanitized
         assert "[EMAIL]" in sanitized
 
-    def test_sanitizes_ip_addresses(self):
+    def test_sanitizes_ip_addresses(self) -> None:
         """Test that IP addresses are sanitized."""
         msg = "Connection failed to 192.168.1.100"
         sanitized = _sanitize_error_message(msg)
         assert "192.168.1.100" not in sanitized
         assert "[IP]" in sanitized
 
-    def test_truncates_long_messages(self):
+    def test_truncates_long_messages(self) -> None:
         """Test that long messages are truncated."""
         # Use a message that won't trigger redaction patterns
         msg = "Error: " + "This is a very long error message. " * 20
@@ -104,7 +104,7 @@ class TestErrorSanitization:
 class TestEventTracking:
     """Test event tracking functionality."""
 
-    def test_track_event_when_disabled(self):
+    def test_track_event_when_disabled(self) -> None:
         """Test that events are not tracked when telemetry is disabled."""
         # Telemetry is disabled by fixture
         assert not is_telemetry_enabled()
@@ -115,7 +115,7 @@ class TestEventTracking:
         # No way to verify it wasn't sent without mocking
         # but at least it shouldn't crash
 
-    def test_track_event_filters_properties(self):
+    def test_track_event_filters_properties(self) -> None:
         """Test that event properties are filtered."""
         # Even though telemetry is disabled, we can test the logic
         # by enabling it temporarily

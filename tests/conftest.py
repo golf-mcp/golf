@@ -1,10 +1,9 @@
 """Pytest configuration and shared fixtures for Golf MCP tests."""
 
-import os
 import shutil
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -74,7 +73,7 @@ export = hello
 
 
 @pytest.fixture(autouse=True)
-def isolate_telemetry(monkeypatch):
+def isolate_telemetry(monkeypatch) -> None:
     """Isolate telemetry for tests to prevent actual tracking."""
     monkeypatch.setenv("GOLF_TELEMETRY", "0")
     # Also prevent any file system telemetry operations

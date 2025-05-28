@@ -1,13 +1,13 @@
 """Current time resource example."""
 
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 # The URI that clients will use to access this resource
 resource_uri = "system://time/{format}"
 
 
-async def current_time(format: str = "full") -> Dict[str, Any]:
+async def current_time(format: str = "full") -> dict[str, Any]:
     """Provide the current time in various formats.
 
     This is a simple resource example that accepts a format parameter.

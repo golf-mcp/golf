@@ -1,9 +1,8 @@
 """Welcome prompt for new users."""
 
-from typing import List, Dict
 
 
-async def welcome() -> List[Dict]:
+async def welcome() -> list[dict]:
     """Provide a welcome prompt for new users.
 
     This is a simple example prompt that demonstrates how to define

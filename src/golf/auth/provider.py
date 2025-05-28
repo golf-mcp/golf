@@ -4,7 +4,8 @@ This module defines the ProviderConfig class used to configure
 OAuth authentication for GolfMCP servers.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -31,29 +32,29 @@ class ProviderConfig(BaseModel):
 
     # These fields will store the actual values read at runtime in dist/server.py
     # They are made optional here as they are resolved in the generated code.
-    client_id: Optional[str] = Field(
+    client_id: str | None = Field(
         None, description="OAuth client ID (resolved at runtime)"
     )
-    client_secret: Optional[str] = Field(
+    client_secret: str | None = Field(
         None, description="OAuth client secret (resolved at runtime)"
     )
 
     # OAuth endpoints (can be baked in)
     authorize_url: str = Field(..., description="Authorization endpoint URL")
     token_url: str = Field(..., description="Token endpoint URL")
-    userinfo_url: Optional[str] = Field(
+    userinfo_url: str | None = Field(
         None, description="User info endpoint URL (for OIDC providers)"
     )
 
-    jwks_uri: Optional[str] = Field(
+    jwks_uri: str | None = Field(
         None, description="JSON Web Key Set URI (for token validation)"
     )
 
-    scopes: List[str] = Field(
+    scopes: list[str] = Field(
         default_factory=list, description="OAuth scopes to request from the provider"
     )
 
-    issuer_url: Optional[str] = Field(
+    issuer_url: str | None = Field(
         None,
         description="OIDC issuer URL for discovery (if using OIDC) - will be overridden by runtime value in server.py",
     )
@@ -67,14 +68,14 @@ class ProviderConfig(BaseModel):
     jwt_secret_env_var: str = Field(
         ..., description="Name of environment variable for JWT Secret"
     )
-    jwt_secret: Optional[str] = Field(
+    jwt_secret: str | None = Field(
         None, description="Secret key for signing JWT tokens (resolved at runtime)"
     )
     token_expiration: int = Field(
         3600, description="JWT token expiration time in seconds", ge=60, le=86400
     )
 
-    settings: Dict[str, Any] = Field(
+    settings: dict[str, Any] = Field(
         default_factory=dict, description="Additional provider-specific settings"
     )
 

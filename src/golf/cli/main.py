@@ -1,20 +1,19 @@
 """CLI entry points for GolfMCP."""
 
+import atexit
 import os
 from pathlib import Path
-from typing import Optional
-import atexit
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 
 from golf import __version__
-from golf.core.config import load_settings, find_project_root
+from golf.core.config import find_project_root, load_settings
 from golf.core.telemetry import (
     is_telemetry_enabled,
-    shutdown,
     set_telemetry_enabled,
+    shutdown,
     track_event,
 )
 
@@ -74,7 +73,7 @@ def callback(
 @app.command()
 def init(
     project_name: str = typer.Argument(..., help="Name of the project to create"),
-    output_dir: Optional[Path] = typer.Option(
+    output_dir: Path | None = typer.Option(
         None, "--output-dir", "-o", help="Directory to create the project in"
     ),
     template: str = typer.Option(
@@ -106,10 +105,10 @@ app.add_typer(build_app, name="build")
 
 @build_app.command("dev")
 def build_dev(
-    output_dir: Optional[str] = typer.Option(
+    output_dir: str | None = typer.Option(
         None, "--output-dir", "-o", help="Directory to output the built project"
     )
-):
+) -> None:
     """Build a development version with environment variables copied."""
     # Find project root directory
     project_root, config_path = find_project_root()
@@ -134,10 +133,7 @@ def build_dev(
     settings = load_settings(project_root)
 
     # Set default output directory if not specified
-    if output_dir is None:
-        output_dir = project_root / "dist"
-    else:
-        output_dir = Path(output_dir)
+    output_dir = project_root / "dist" if output_dir is None else Path(output_dir)
 
     try:
         # Build the project with environment variables copied
@@ -165,10 +161,10 @@ def build_dev(
 
 @build_app.command("prod")
 def build_prod(
-    output_dir: Optional[str] = typer.Option(
+    output_dir: str | None = typer.Option(
         None, "--output-dir", "-o", help="Directory to output the built project"
     )
-):
+) -> None:
     """Build a production version without copying environment variables."""
     # Find project root directory
     project_root, config_path = find_project_root()
@@ -193,10 +189,7 @@ def build_prod(
     settings = load_settings(project_root)
 
     # Set default output directory if not specified
-    if output_dir is None:
-        output_dir = project_root / "dist"
-    else:
-        output_dir = Path(output_dir)
+    output_dir = project_root / "dist" if output_dir is None else Path(output_dir)
 
     try:
         # Build the project without copying environment variables
@@ -224,19 +217,19 @@ def build_prod(
 
 @app.command()
 def run(
-    dist_dir: Optional[str] = typer.Option(
+    dist_dir: str | None = typer.Option(
         None, "--dist-dir", "-d", help="Directory containing the built server"
     ),
-    host: Optional[str] = typer.Option(
+    host: str | None = typer.Option(
         None, "--host", "-h", help="Host to bind to (overrides settings)"
     ),
-    port: Optional[int] = typer.Option(
+    port: int | None = typer.Option(
         None, "--port", "-p", help="Port to bind to (overrides settings)"
     ),
     build_first: bool = typer.Option(
         True, "--build/--no-build", help="Build the project before running"
     ),
-):
+) -> None:
     """Run the built FastMCP server.
 
     This command runs the built server from the dist directory.
@@ -264,10 +257,7 @@ def run(
     settings = load_settings(project_root)
 
     # Set default dist directory if not specified
-    if dist_dir is None:
-        dist_dir = project_root / "dist"
-    else:
-        dist_dir = Path(dist_dir)
+    dist_dir = project_root / "dist" if dist_dir is None else Path(dist_dir)
 
     # Check if dist directory exists
     if not dist_dir.exists():
@@ -358,7 +348,7 @@ def run(
 @app.command()
 def telemetry(
     action: str = typer.Argument(..., help="Action to perform: 'enable' or 'disable'")
-):
+) -> None:
     """Manage telemetry settings."""
     if action.lower() == "enable":
         set_telemetry_enabled(True, persist=True)

@@ -5,12 +5,19 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import black
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from golf.auth import get_auth_config
+from golf.auth.api_key import get_api_key_config
+from golf.core.builder_auth import generate_auth_code, generate_auth_routes
+from golf.core.builder_telemetry import (
+    generate_telemetry_imports,
+    get_otel_dependencies,
+)
 from golf.core.config import Settings
 from golf.core.parser import (
     ComponentType,
@@ -18,13 +25,6 @@ from golf.core.parser import (
     parse_project,
 )
 from golf.core.transformer import transform_component
-from golf.core.builder_auth import generate_auth_code, generate_auth_routes
-from golf.auth import get_auth_config
-from golf.auth.api_key import get_api_key_config
-from golf.core.builder_telemetry import (
-    generate_telemetry_imports,
-    get_otel_dependencies,
-)
 
 console = Console()
 
@@ -32,7 +32,7 @@ console = Console()
 class ManifestBuilder:
     """Builds FastMCP manifest from parsed components."""
 
-    def __init__(self, project_path: Path, settings: Settings):
+    def __init__(self, project_path: Path, settings: Settings) -> None:
         """Initialize the manifest builder.
 
         Args:
@@ -41,8 +41,8 @@ class ManifestBuilder:
         """
         self.project_path = project_path
         self.settings = settings
-        self.components: Dict[ComponentType, List[ParsedComponent]] = {}
-        self.manifest: Dict[str, Any] = {
+        self.components: dict[ComponentType, list[ParsedComponent]] = {}
+        self.manifest: dict[str, Any] = {
             "name": settings.name,
             "description": settings.description or "",
             "tools": [],
@@ -50,7 +50,7 @@ class ManifestBuilder:
             "prompts": [],
         }
 
-    def build(self) -> Dict[str, Any]:
+    def build(self) -> dict[str, Any]:
         """Build the complete manifest.
 
         Returns:
@@ -142,7 +142,7 @@ class ManifestBuilder:
             # Add the prompt to the manifest
             self.manifest["prompts"].append(prompt_schema)
 
-    def save_manifest(self, output_path: Optional[Path] = None) -> Path:
+    def save_manifest(self, output_path: Path | None = None) -> Path:
         """Save the manifest to a JSON file.
 
         Args:
@@ -168,7 +168,7 @@ class ManifestBuilder:
         return output_path
 
 
-def build_manifest(project_path: Path, settings: Settings) -> Dict[str, Any]:
+def build_manifest(project_path: Path, settings: Settings) -> dict[str, Any]:
     """Build a FastMCP manifest from parsed components.
 
     Args:
@@ -184,8 +184,8 @@ def build_manifest(project_path: Path, settings: Settings) -> Dict[str, Any]:
 
 
 def compute_manifest_diff(
-    old_manifest: Dict[str, Any], new_manifest: Dict[str, Any]
-) -> Dict[str, Any]:
+    old_manifest: dict[str, Any], new_manifest: dict[str, Any]
+) -> dict[str, Any]:
     """Compute the difference between two manifests.
 
     Args:
@@ -202,7 +202,7 @@ def compute_manifest_diff(
     }
 
     # Helper function to extract names from a list of components
-    def extract_names(components: List[Dict[str, Any]]) -> Set[str]:
+    def extract_names(components: list[dict[str, Any]]) -> set[str]:
         return {comp["name"] for comp in components}
 
     # Compare tools
@@ -271,7 +271,7 @@ def compute_manifest_diff(
     return diff
 
 
-def has_changes(diff: Dict[str, Any]) -> bool:
+def has_changes(diff: dict[str, Any]) -> bool:
     """Check if a manifest diff contains any changes.
 
     Args:
@@ -298,7 +298,7 @@ class CodeGenerator:
         output_dir: Path,
         build_env: str = "prod",
         copy_env: bool = False,
-    ):
+    ) -> None:
         """Initialize the code generator.
 
         Args:
@@ -559,9 +559,7 @@ class CodeGenerator:
             imports.append("")
 
         # Add imports section for different transport methods
-        if self.settings.transport == "sse":
-            imports.append("import uvicorn")
-        elif self.settings.transport in ["streamable-http", "http"]:
+        if self.settings.transport == "sse" or self.settings.transport in ["streamable-http", "http"]:
             imports.append("import uvicorn")
 
         # Get transport-specific configuration
@@ -931,7 +929,7 @@ def build_project(
                 script_content = f.read()
 
             # Print the first few lines for debugging
-            preview = "\n".join(script_content.split("\n")[:5]) + "\n..."
+            "\n".join(script_content.split("\n")[:5]) + "\n..."
 
             # Use exec to run the script as a module
             code = compile(script_content, str(pre_build_path), "exec")
@@ -1176,7 +1174,7 @@ from golf.auth.api_key import configure_api_key, get_api_key_config
 
         server_file = output_dir / "server.py"
         if server_file.exists():
-            with open(server_file, "r") as f:
+            with open(server_file) as f:
                 server_code_content = f.read()
 
             # Add auth routes before the main block
@@ -1211,8 +1209,8 @@ from golf.auth.api_key import configure_api_key, get_api_key_config
 
 # Renamed function - was find_shared_modules
 def find_common_files(
-    project_path: Path, components: Dict[ComponentType, List[ParsedComponent]]
-) -> Dict[str, Path]:
+    project_path: Path, components: dict[ComponentType, list[ParsedComponent]]
+) -> dict[str, Path]:
     """Find all common.py files used by components."""
     # We'll use the parser's functionality to find common files directly
     from golf.core.parser import parse_common_files
@@ -1225,8 +1223,8 @@ def find_common_files(
 
 # Updated parameter name from shared_modules to common_files
 def build_import_map(
-    project_path: Path, common_files: Dict[str, Path]
-) -> Dict[str, str]:
+    project_path: Path, common_files: dict[str, Path]
+) -> dict[str, str]:
     """Build a mapping of import paths to their new locations in the build output.
 
     This maps from original relative import paths to absolute import paths
@@ -1234,7 +1232,7 @@ def build_import_map(
     """
     import_map = {}
 
-    for dir_path_str, file_path in common_files.items():
+    for dir_path_str, _file_path in common_files.items():
         # Convert string path to Path object
         dir_path = Path(dir_path_str)
 

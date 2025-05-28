@@ -1,8 +1,9 @@
 """Create a new issue in a GitHub repository."""
 
-from typing import Annotated, List, Optional
-from pydantic import BaseModel, Field
+from typing import Annotated
+
 import httpx
+from pydantic import BaseModel, Field
 
 from golf.auth import get_api_key
 
@@ -11,9 +12,9 @@ class Output(BaseModel):
     """Response from creating an issue."""
 
     success: bool
-    issue_number: Optional[int] = None
-    issue_url: Optional[str] = None
-    error: Optional[str] = None
+    issue_number: int | None = None
+    issue_url: str | None = None
+    error: str | None = None
 
 
 async def create(
@@ -23,7 +24,7 @@ async def create(
         str, Field(description="Issue description/body (supports Markdown)")
     ] = "",
     labels: Annotated[
-        Optional[List[str]], Field(description="List of label names to apply")
+        list[str] | None, Field(description="List of label names to apply")
     ] = None,
 ) -> Output:
     """Create a new issue.

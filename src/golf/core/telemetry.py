@@ -1,12 +1,12 @@
 """Telemetry module for anonymous usage tracking with PostHog."""
 
-import os
 import hashlib
-import platform
-from pathlib import Path
-from typing import Optional, Dict, Any
 import json
+import os
+import platform
 import uuid
+from pathlib import Path
+from typing import Any
 
 import posthog
 from rich.console import Console
@@ -23,8 +23,8 @@ POSTHOG_API_KEY = os.environ.get("GOLF_POSTHOG_API_KEY", DEFAULT_POSTHOG_API_KEY
 POSTHOG_HOST = "https://us.i.posthog.com"
 
 # Telemetry state
-_telemetry_enabled: Optional[bool] = None
-_anonymous_id: Optional[str] = None
+_telemetry_enabled: bool | None = None
+_anonymous_id: str | None = None
 _user_identified: bool = False  # Track if we've already identified the user
 
 
@@ -48,7 +48,7 @@ def save_telemetry_preference(enabled: bool) -> None:
         pass
 
 
-def load_telemetry_preference() -> Optional[bool]:
+def load_telemetry_preference() -> bool | None:
     """Load telemetry preference from persistent storage."""
     config_path = get_telemetry_config_path()
 
@@ -56,7 +56,7 @@ def load_telemetry_preference() -> Optional[bool]:
         return None
 
     try:
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             config = json.load(f)
             return config.get("enabled")
     except Exception:
@@ -190,7 +190,7 @@ def initialize_telemetry() -> None:
         pass
 
 
-def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) -> None:
+def track_event(event_name: str, properties: dict[str, Any] | None = None) -> None:
     """Track an anonymous event with minimal data.
 
     Args:
@@ -270,8 +270,8 @@ def track_event(event_name: str, properties: Optional[Dict[str, Any]] = None) ->
 def track_command(
     command: str,
     success: bool = True,
-    error_type: Optional[str] = None,
-    error_message: Optional[str] = None,
+    error_type: str | None = None,
+    error_message: str | None = None,
 ) -> None:
     """Track a CLI command execution with minimal info.
 

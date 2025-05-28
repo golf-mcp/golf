@@ -93,20 +93,20 @@ def generate_auth_code(
     setup_code_lines.extend(
         [
             "# Instantiate ProviderConfig with runtime-resolved secrets and other pre-configured values",
-            f"provider_config_instance = GolfProviderConfigInternal(",  # Use aliased import
+            "provider_config_instance = GolfProviderConfigInternal(",  # Use aliased import
             f"    provider={repr(original_provider_config.provider)},",
             f"    client_id_env_var={repr(original_provider_config.client_id_env_var)},",
             f"    client_secret_env_var={repr(original_provider_config.client_secret_env_var)},",
             f"    jwt_secret_env_var={repr(original_provider_config.jwt_secret_env_var)},",
-            f"    client_id=runtime_client_id,",
-            f"    client_secret=runtime_client_secret,",
-            f"    jwt_secret=runtime_jwt_secret,",
+            "    client_id=runtime_client_id,",
+            "    client_secret=runtime_client_secret,",
+            "    jwt_secret=runtime_jwt_secret,",
             f"    authorize_url={repr(original_provider_config.authorize_url)},",
             f"    token_url={repr(original_provider_config.token_url)},",
             f"    userinfo_url={repr(original_provider_config.userinfo_url)},",
             f"    jwks_uri={repr(original_provider_config.jwks_uri)},",
             f"    scopes={repr(original_provider_config.scopes)},",
-            f"    issuer_url=runtime_issuer_url,",
+            "    issuer_url=runtime_issuer_url,",
             f"    callback_path={repr(original_provider_config.callback_path)},",
             f"    token_expiration={original_provider_config.token_expiration}",
             ")",
@@ -175,11 +175,11 @@ def generate_api_key_auth_components(
 
     setup_code_lines = [
         "# Recreate API key configuration from pre_build.py",
-        f"configure_api_key(",
+        "configure_api_key(",
         f"    header_name={repr(api_key_config.header_name)},",
         f"    header_prefix={repr(api_key_config.header_prefix)},",
         f"    required={repr(api_key_config.required)}",
-        f")",
+        ")",
         "",
         "# Simplified API key middleware that validates presence",
         "class ApiKeyMiddleware(BaseHTTPMiddleware):",

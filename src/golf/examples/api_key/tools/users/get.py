@@ -1,8 +1,9 @@
 """Get GitHub user information."""
 
-from typing import Annotated, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Annotated, Any
+
 import httpx
+from pydantic import BaseModel, Field
 
 from golf.auth import get_api_key
 
@@ -11,12 +12,12 @@ class Output(BaseModel):
     """User information result."""
 
     found: bool
-    user: Optional[Dict[str, Any]] = None
+    user: dict[str, Any] | None = None
 
 
 async def get(
     username: Annotated[
-        Optional[str],
+        str | None,
         Field(description="GitHub username (if not provided, gets authenticated user)"),
     ] = None,
 ) -> Output:

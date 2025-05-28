@@ -6,7 +6,7 @@ into explicit FastMCP component registrations.
 
 import ast
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from golf.core.parser import ParsedComponent
 
@@ -18,9 +18,9 @@ class ImportTransformer(ast.NodeTransformer):
         self,
         original_path: Path,
         target_path: Path,
-        import_map: Dict[str, str],
+        import_map: dict[str, str],
         project_root: Path,
-    ):
+    ) -> None:
         """Initialize the import transformer.
 
         Args:
@@ -69,7 +69,7 @@ def transform_component(
     component: ParsedComponent,
     output_file: Path,
     project_path: Path,
-    import_map: Dict[str, str],
+    import_map: dict[str, str],
     source_file: Path = None,
 ) -> str:
     """Transform a GolfMCP component into a standalone FastMCP component.
@@ -92,7 +92,7 @@ def transform_component(
     else:
         raise ValueError("Either component or source_file must be provided")
 
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         source_code = f.read()
 
     # Parse the source code into an AST
@@ -117,7 +117,7 @@ def transform_component(
 
     # Find imports
     for node in tree.body:
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
+        if isinstance(node, ast.Import | ast.ImportFrom):
             imports.append(node)
 
     # Generate the transformed code
@@ -140,7 +140,7 @@ def transform_component(
     remaining_nodes = []
     for node in tree.body:
         # Skip imports
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
+        if isinstance(node, ast.Import | ast.ImportFrom):
             continue
 
         # Skip the original docstring
