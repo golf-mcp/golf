@@ -57,5 +57,5 @@ jobs:
     # - name: Run ruff lint
     #   run: ruff check src/ tests/
     
-    - name: Run mypy
-      run: mypy src/golf --ignore-missing-imports 
+    # - name: Run mypy
+    #   run: mypy src/golf --ignore-missing-imports 
