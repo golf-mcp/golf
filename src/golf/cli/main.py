@@ -56,13 +56,24 @@ def callback(
         "--no-telemetry",
         help="Disable telemetry collection (persists for future commands).",
     ),
+    test: bool = typer.Option(
+        False,
+        "--test",
+        hidden=True,
+        help="Run in test mode (disables telemetry for this execution only).",
+    ),
 ) -> None:
     """GolfMCP: A Pythonic framework for building MCP servers with zero boilerplate."""
     # Set verbosity in environment for other components to access
     if verbose:
         os.environ["GOLF_VERBOSE"] = "1"
 
-    # Set telemetry preference if flag is used
+    # Set test mode if flag is used (temporary, just for this execution)
+    if test:
+        set_telemetry_enabled(False, persist=False)
+        os.environ["GOLF_TEST_MODE"] = "1"
+
+    # Set telemetry preference if flag is used (permanent)
     if no_telemetry:
         set_telemetry_enabled(False, persist=True)
         console.print(
