@@ -281,6 +281,8 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
                 "command_type",
                 "error_type",
                 "error_message",
+                "shutdown_type",
+                "exit_code",
             }
             for key in safe_keys:
                 if key in properties:
@@ -327,25 +329,11 @@ def track_command(
 
 
 def _sanitize_error_message(message: str) -> str:
-    """Sanitize error message to remove sensitive information.
-
-    Args:
-        message: Raw error message
-
-    Returns:
-        Sanitized error message
-    """
+    """Sanitize error messages to remove sensitive information."""
     import re
 
-    # Remove absolute file paths but keep the filename
-    # Unix-style paths
-    message = re.sub(
-        r'/(?:Users|home|var|tmp|opt|usr|etc)/[^\s"\']+/([^/\s"\']+)', r"\1", message
-    )
-    # Windows-style paths
-    message = re.sub(r'[A-Za-z]:\\[^\s"\']+\\([^\\s"\']+)', r"\1", message)
-    # Generic path pattern (catches remaining paths)
-    message = re.sub(r'(?:^|[\s"])(/[^\s"\']+/)+([^/\s"\']+)', r"\2", message)
+    # Remove file paths (both Unix and Windows style)
+    message = re.sub(r"[/\\][^\s]*[/\\][^\s]*", "[PATH]", message)
 
     # Remove potential API keys or tokens (common patterns)
     # Generic API keys (20+ alphanumeric with underscores/hyphens)
