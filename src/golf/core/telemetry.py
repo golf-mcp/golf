@@ -412,8 +412,14 @@ def _sanitize_error_message(message: str) -> str:
     """Sanitize error messages to remove sensitive information."""
     import re
 
-    # Remove file paths (both Unix and Windows style)
-    message = re.sub(r"[/\\][^\s]*[/\\][^\s]*", "[PATH]", message)
+    # Remove file paths but preserve filenames
+    # Match paths with directories and capture the filename
+    # Unix style: /path/to/file.py -> file.py
+    message = re.sub(r"(/[^/\s]+)+/([^/\s]+)", r"\2", message)
+    # Windows style: C:\path\to\file.py -> file.py
+    message = re.sub(r"([A-Za-z]:\\[^\\]+\\)+([^\\]+)", r"\2", message)
+    # Remaining absolute paths without filename
+    message = re.sub(r"[/\\][^\s]*[/\\]", "[PATH]/", message)
 
     # Remove potential API keys or tokens (common patterns)
     # Generic API keys (20+ alphanumeric with underscores/hyphens)
