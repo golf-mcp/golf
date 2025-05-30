@@ -328,6 +328,86 @@ def track_command(
     track_event(f"cli_{command}", properties)
 
 
+def track_detailed_error(
+    event_name: str,
+    error: Exception,
+    context: str | None = None,
+    operation: str | None = None,
+    additional_props: dict[str, Any] | None = None,
+) -> None:
+    """Track a detailed error with enhanced debugging information.
+
+    Args:
+        event_name: Name of the error event (e.g., "cli_run_failed", "cli_build_failed")
+        error: The exception that occurred
+        context: Additional context about where the error occurred
+        operation: The specific operation that failed
+        additional_props: Additional properties to include
+    """
+    import traceback
+    import time
+
+    properties = {
+        "success": False,
+        "error_type": type(error).__name__,
+        "error_message": _sanitize_error_message(str(error)),
+        "timestamp": int(time.time()),
+    }
+
+    # Add operation context
+    if operation:
+        properties["operation"] = operation
+    if context:
+        properties["context"] = context
+
+    # Add sanitized stack trace for debugging
+    try:
+        tb_lines = traceback.format_exception(type(error), error, error.__traceback__)
+        # Get the last few frames (most relevant) and sanitize them
+        relevant_frames = tb_lines[-3:] if len(tb_lines) > 3 else tb_lines
+        sanitized_trace = []
+        
+        for frame in relevant_frames:
+            # Sanitize file paths in stack trace
+            sanitized_frame = _sanitize_error_message(frame.strip())
+            # Further sanitize common traceback patterns
+            sanitized_frame = sanitized_frame.replace('File "[PATH]', 'File "[PATH]')
+            sanitized_trace.append(sanitized_frame)
+        
+        properties["stack_trace"] = " | ".join(sanitized_trace)
+        
+        # Add the specific line that caused the error if available
+        if hasattr(error, '__traceback__') and error.__traceback__:
+            tb = error.__traceback__
+            while tb.tb_next:
+                tb = tb.tb_next
+            properties["error_line"] = tb.tb_lineno
+            
+    except Exception:
+        # Don't fail if we can't capture stack trace
+        pass
+
+    # Add system context for debugging
+    try:
+        properties["python_executable"] = _sanitize_error_message(platform.python_implementation())
+        properties["platform_detail"] = platform.platform()[:50]  # Limit length
+    except Exception:
+        pass
+
+    # Merge additional properties
+    if additional_props:
+        # Only include safe additional properties
+        safe_additional_keys = {
+            "exit_code", "shutdown_type", "environment", "template",
+            "build_env", "transport", "component_count", "file_path",
+            "component_type", "validation_error", "config_error"
+        }
+        for key, value in additional_props.items():
+            if key in safe_additional_keys:
+                properties[key] = value
+
+    track_event(event_name, properties)
+
 def _sanitize_error_message(message: str) -> str:
     """Sanitize error messages to remove sensitive information."""
     import re
