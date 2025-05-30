@@ -325,16 +325,39 @@ def run(
             port=port,
         )
 
-        # Track based on return code
+        # Track based on return code with better categorization
         if return_code == 0:
             track_event("cli_run_success", {"success": True})
+        elif return_code in [130, 143, 137, 2]:
+            # Intentional shutdowns (not errors):
+            # 130: Ctrl+C (SIGINT)
+            # 143: SIGTERM (graceful shutdown, e.g., Kubernetes, Docker)
+            # 137: SIGKILL (forced shutdown)
+            # 2: General interrupt/graceful shutdown
+            shutdown_type = {
+                130: "UserInterrupt",
+                143: "GracefulShutdown", 
+                137: "ForcedShutdown",
+                2: "Interrupt"
+            }.get(return_code, "GracefulShutdown")
+            
+            track_event(
+                "cli_run_shutdown",
+                {
+                    "success": True,  # Not an error
+                    "shutdown_type": shutdown_type,
+                    "exit_code": return_code,
+                },
+            )
         else:
+            # Actual errors (unexpected exit codes)
             track_event(
                 "cli_run_failed",
                 {
                     "success": False,
-                    "error_type": "NonZeroExit",
+                    "error_type": "UnexpectedExit",
                     "error_message": f"Server exited with code {return_code}",
+                    "exit_code": return_code,
                 },
             )
 
