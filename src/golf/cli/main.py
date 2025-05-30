@@ -16,7 +16,6 @@ from golf.core.telemetry import (
     shutdown,
     track_event,
     track_detailed_error,
-    _detect_execution_environment,
 )
 
 # Create console for rich output
@@ -351,8 +350,6 @@ def run(
                     "exit_code": return_code,
                     "operation": "server_process_execution",
                     "context": "Server process terminated with unexpected exit code",
-                    # Add execution environment context
-                    "execution_env": _detect_execution_environment(),
                 },
             )
 
