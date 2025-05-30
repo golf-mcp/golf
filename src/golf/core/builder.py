@@ -950,6 +950,23 @@ def build_project(
             import traceback
 
             console.print(f"[red]{traceback.format_exc()}[/red]")
+            
+            # Track detailed error for pre_build.py execution failures
+            try:
+                from golf.core.telemetry import track_detailed_error
+                track_detailed_error(
+                    "build_pre_build_failed",
+                    e,
+                    context="Executing pre_build.py configuration script",
+                    operation="pre_build_execution",
+                    additional_props={
+                        "file_path": str(pre_build_path.relative_to(project_path)),
+                        "build_env": build_env,
+                    }
+                )
+            except Exception:
+                # Don't let telemetry errors break the build
+                pass
 
     # Clear the output directory if it exists
     if output_dir.exists():
