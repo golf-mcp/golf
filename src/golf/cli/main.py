@@ -15,6 +15,8 @@ from golf.core.telemetry import (
     set_telemetry_enabled,
     shutdown,
     track_event,
+    track_detailed_error,
+    _detect_execution_environment,
 )
 
 # Create console for rich output
@@ -156,16 +158,12 @@ def build_dev(
         # Track successful build with environment
         track_event("cli_build_success", {"success": True, "environment": "dev"})
     except Exception as e:
-        error_type = type(e).__name__
-        error_message = str(e)
-        track_event(
+        track_detailed_error(
             "cli_build_failed",
-            {
-                "success": False,
-                "environment": "dev",
-                "error_type": error_type,
-                "error_message": error_message,
-            },
+            e,
+            context="Development build with environment variables",
+            operation="build_dev",
+            additional_props={"environment": "dev", "copy_env": True}
         )
         raise
 
@@ -212,16 +210,12 @@ def build_prod(
         # Track successful build with environment
         track_event("cli_build_success", {"success": True, "environment": "prod"})
     except Exception as e:
-        error_type = type(e).__name__
-        error_message = str(e)
-        track_event(
+        track_detailed_error(
             "cli_build_failed",
-            {
-                "success": False,
-                "environment": "prod",
-                "error_type": error_type,
-                "error_message": error_message,
-            },
+            e,
+            context="Production build without environment variables",
+            operation="build_prod",
+            additional_props={"environment": "prod", "copy_env": False}
         )
         raise
 
@@ -282,18 +276,15 @@ def run(
 
                 build_project(project_root, settings, dist_dir)
             except Exception as e:
-                error_type = type(e).__name__
-                error_message = str(e)
                 console.print(
-                    f"[bold red]Error building project:[/bold red] {error_message}"
+                    f"[bold red]Error building project:[/bold red] {str(e)}"
                 )
-                track_event(
+                track_detailed_error(
                     "cli_run_failed",
-                    {
-                        "success": False,
-                        "error_type": f"BuildError.{error_type}",
-                        "error_message": error_message,
-                    },
+                    e,
+                    context="Auto-build before running server",
+                    operation="auto_build_before_run",
+                    additional_props={"auto_build": True}
                 )
                 raise
         else:
@@ -325,16 +316,43 @@ def run(
             port=port,
         )
 
-        # Track based on return code
+        # Track based on return code with better categorization
         if return_code == 0:
             track_event("cli_run_success", {"success": True})
+        elif return_code in [130, 143, 137, 2]:
+            # Intentional shutdowns (not errors):
+            # 130: Ctrl+C (SIGINT)
+            # 143: SIGTERM (graceful shutdown, e.g., Kubernetes, Docker)
+            # 137: SIGKILL (forced shutdown)
+            # 2: General interrupt/graceful shutdown
+            shutdown_type = {
+                130: "UserInterrupt",
+                143: "GracefulShutdown", 
+                137: "ForcedShutdown",
+                2: "Interrupt"
+            }.get(return_code, "GracefulShutdown")
+            
+            track_event(
+                "cli_run_shutdown",
+                {
+                    "success": True,  # Not an error
+                    "shutdown_type": shutdown_type,
+                    "exit_code": return_code,
+                },
+            )
         else:
+            # Actual errors (unexpected exit codes)
             track_event(
                 "cli_run_failed",
                 {
                     "success": False,
-                    "error_type": "NonZeroExit",
-                    "error_message": f"Server exited with code {return_code}",
+                    "error_type": "UnexpectedExit",
+                    "error_message": f"Server process exited unexpectedly with code {return_code}",
+                    "exit_code": return_code,
+                    "operation": "server_process_execution",
+                    "context": "Server process terminated with unexpected exit code",
+                    # Add execution environment context
+                    "execution_env": _detect_execution_environment(),
                 },
             )
 
@@ -342,15 +360,12 @@ def run(
         if return_code != 0:
             raise typer.Exit(code=return_code)
     except Exception as e:
-        error_type = type(e).__name__
-        error_message = str(e)
-        track_event(
+        track_detailed_error(
             "cli_run_failed",
-            {
-                "success": False,
-                "error_type": error_type,
-                "error_message": error_message,
-            },
+            e,
+            context="Server execution or startup failure",
+            operation="run_server_execution",
+            additional_props={"has_dist_dir": dist_dir.exists() if dist_dir else False}
         )
         raise
 

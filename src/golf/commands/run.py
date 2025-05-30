@@ -64,10 +64,24 @@ def run_server(
             env=env,
         )
 
+        # Provide more context about the exit
+        if process.returncode == 0:
+            console.print("[green]Server stopped successfully[/green]")
+        elif process.returncode == 130:
+            console.print("[yellow]Server stopped by user interrupt (Ctrl+C)[/yellow]")
+        elif process.returncode == 143:
+            console.print("[yellow]Server stopped by SIGTERM (graceful shutdown)[/yellow]")
+        elif process.returncode == 137:
+            console.print("[yellow]Server stopped by SIGKILL (forced shutdown)[/yellow]")
+        elif process.returncode in [1, 2]:
+            console.print(f"[red]Server exited with error code {process.returncode}[/red]")
+        else:
+            console.print(f"[orange]Server exited with code {process.returncode}[/orange]")
+
         return process.returncode
     except KeyboardInterrupt:
-        console.print("\n[yellow]Server stopped by user[/yellow]")
-        return 0
+        console.print("\n[yellow]Server stopped by user (Ctrl+C)[/yellow]")
+        return 130  # Standard exit code for SIGINT
     except Exception as e:
         console.print(f"\n[bold red]Error running server:[/bold red] {e}")
         return 1
