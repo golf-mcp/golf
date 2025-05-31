@@ -36,6 +36,7 @@ class ParsedComponent:
     parameters: list[str] | None = None  # For resources with URI params
     parent_module: str | None = None  # For nested components
     entry_function: str | None = None  # Store the name of the function to use
+    annotations: dict[str, Any] | None = None  # Tool annotations for MCP hints
 
 
 class AstParser:
@@ -223,10 +224,11 @@ class AstParser:
         component.parameters = parameters
 
     def _process_tool(self, component: ParsedComponent, tree: ast.Module) -> None:
-        """Process a tool component to extract input/output schemas."""
+        """Process a tool component to extract input/output schemas and annotations."""
         # Look for Input and Output classes in the AST
         input_class = None
         output_class = None
+        annotations = None
 
         for node in tree.body:
             if isinstance(node, ast.ClassDef):
@@ -234,6 +236,13 @@ class AstParser:
                     input_class = node
                 elif node.name == "Output":
                     output_class = node
+            # Look for annotations assignment
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "annotations":
+                        if isinstance(node.value, ast.Dict):
+                            annotations = self._extract_dict_from_ast(node.value)
+                        break
 
         # Process Input class if found
         if input_class:
@@ -254,6 +263,10 @@ class AstParser:
                         output_class
                     )
                     break
+
+        # Store annotations if found
+        if annotations:
+            component.annotations = annotations
 
     def _process_resource(self, component: ParsedComponent, tree: ast.Module) -> None:
         """Process a resource component to extract URI template."""
@@ -436,6 +449,42 @@ class AstParser:
 
         # Default to string for unknown types
         return "string"
+
+    def _extract_dict_from_ast(self, dict_node: ast.Dict) -> dict[str, Any]:
+        """Extract a dictionary from an AST Dict node.
+        
+        This handles simple literal dictionaries with string keys and 
+        boolean/string/number values.
+        """
+        result = {}
+        
+        for key, value in zip(dict_node.keys, dict_node.values):
+            # Extract the key
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                key_str = key.value
+            elif isinstance(key, ast.Str):  # For older Python versions
+                key_str = key.s
+            else:
+                # Skip non-string keys
+                continue
+            
+            # Extract the value
+            if isinstance(value, ast.Constant):
+                # Handles strings, numbers, booleans, None
+                result[key_str] = value.value
+            elif isinstance(value, ast.Str):  # For older Python versions
+                result[key_str] = value.s
+            elif isinstance(value, ast.Num):  # For older Python versions
+                result[key_str] = value.n
+            elif isinstance(value, ast.NameConstant):  # For older Python versions (True/False/None)
+                result[key_str] = value.value
+            elif isinstance(value, ast.Name):
+                # Handle True/False/None as names
+                if value.id in ("True", "False", "None"):
+                    result[key_str] = {"True": True, "False": False, "None": None}[value.id]
+            # We could add more complex value handling here if needed
+            
+        return result
 
 
 def parse_project(project_path: Path) -> dict[ComponentType, list[ParsedComponent]]:
