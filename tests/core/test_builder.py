@@ -393,7 +393,7 @@ export = empty_annotations_tool
         
         # Should still have the default title annotation
         assert "annotations" in tool
-        assert tool["annotations"]["title"] == "Empty Annotations"
+        assert tool["annotations"]["title"] == "Empty_Annotations"
         # Should not have any other annotations
         assert len(tool["annotations"]) == 1
 
