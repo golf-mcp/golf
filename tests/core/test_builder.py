@@ -338,27 +338,40 @@ export = simple_tool
         
         # Should contain tool registration but without annotations parameter
         assert "mcp.add_tool(" in server_code
-        # The specific tool registration should not have annotations parameter
+        assert "simple_tool" in server_code
+        
+        # Check that the registration doesn't have annotations parameter
+        # Since the registration is on multiple lines, we need to check the full registration block
         lines = server_code.split('\n')
-        tool_registration_lines = [line for line in lines if 'simple_tool' in line and 'mcp.add_tool' in line]
         
-        # Should find the registration line
-        assert len(tool_registration_lines) > 0
-        
-        # Check that there's no annotations parameter for this tool
-        registration_context = []
+        # Find the start of the tool registration for simple_tool
+        registration_start = -1
         for i, line in enumerate(lines):
-            if 'simple_tool' in line and 'mcp.add_tool' in line:
-                # Get a few lines of context
-                start = max(0, i - 2)
-                end = min(len(lines), i + 5)
-                registration_context = lines[start:end]
+            if 'mcp.add_tool(' in line:
+                # Look ahead for the tool name to make sure it's the right registration
+                for j in range(i, min(i + 10, len(lines))):
+                    if 'simple_tool' in lines[j]:
+                        registration_start = i
+                        break
+                if registration_start != -1:
+                    break
+        
+        assert registration_start != -1, "Could not find mcp.add_tool registration for simple_tool"
+        
+        # Get the registration block (until the closing parenthesis)
+        registration_end = registration_start
+        paren_count = 0
+        for i in range(registration_start, len(lines)):
+            line = lines[i]
+            paren_count += line.count('(') - line.count(')')
+            if paren_count == 0 and ')' in line:
+                registration_end = i
                 break
         
-        registration_text = '\n'.join(registration_context)
+        registration_block = '\n'.join(lines[registration_start:registration_end + 1])
+        
         # This tool should not have annotations since it doesn't define any
-        # The registration should end with description parameter, not annotations
-        assert 'annotations=' not in registration_text or 'simple_tool' not in registration_text
+        assert 'annotations=' not in registration_block
 
 
 class TestAnnotationEdgeCases:
