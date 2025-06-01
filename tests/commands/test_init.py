@@ -80,7 +80,9 @@ class TestInitCommand:
         assert config["health_check_path"] == "/health"
         assert config["health_check_response"] == "OK"
 
-    def test_api_key_template_compatibility_with_health_check(self, temp_dir: Path) -> None:
+    def test_api_key_template_compatibility_with_health_check(
+        self, temp_dir: Path
+    ) -> None:
         """Test that API key template is compatible with health check configuration."""
         project_dir = temp_dir / "api_key_project"
 

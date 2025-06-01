@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
 
 from golf.commands.build import build_project
 from golf.commands.init import initialize_project

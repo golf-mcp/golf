@@ -322,7 +322,10 @@ export = simple_tool
 
         # Should contain health check route definition
         assert "@mcp.custom_route(\"/health\", methods=[\"GET\"])" in server_code
-        assert "async def health_check(request: Request) -> PlainTextResponse:" in server_code
+        assert (
+            "async def health_check(request: Request) -> PlainTextResponse:"
+            in server_code
+        )
         assert 'return PlainTextResponse("OK")' in server_code
 
     def test_health_check_with_custom_config(
@@ -466,7 +469,10 @@ export = simple_tool
         server_code = server_file.read_text()
 
         # Most importantly, no health check route should be generated
-        assert "@mcp.custom_route" not in server_code or "health_check" not in server_code
+        assert (
+            "@mcp.custom_route" not in server_code
+            or "health_check" not in server_code
+        )
         assert "async def health_check" not in server_code
 
     def test_health_check_docstring_generation(
