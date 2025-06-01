@@ -280,7 +280,7 @@ class TestHealthCheckGeneration:
             "name": "HealthProject",
             "health_check_enabled": True,
             "health_check_path": "/health",
-            "health_check_response": "OK"
+            "health_check_response": "OK",
         }
         config_file.write_text(json.dumps(config))
 
@@ -321,7 +321,7 @@ export = simple_tool
         assert "from starlette.responses import PlainTextResponse" in server_code
 
         # Should contain health check route definition
-        assert "@mcp.custom_route(\"/health\", methods=[\"GET\"])" in server_code
+        assert '@mcp.custom_route("/health", methods=["GET"])' in server_code
         assert (
             "async def health_check(request: Request) -> PlainTextResponse:"
             in server_code
@@ -338,7 +338,7 @@ export = simple_tool
             "name": "CustomHealthProject",
             "health_check_enabled": True,
             "health_check_path": "/status",
-            "health_check_response": "Service is running"
+            "health_check_response": "Service is running",
         }
         config_file.write_text(json.dumps(config))
 
@@ -371,7 +371,7 @@ export = simple_tool
         server_code = server_file.read_text()
 
         # Should use custom path and response
-        assert "@mcp.custom_route(\"/status\", methods=[\"GET\"])" in server_code
+        assert '@mcp.custom_route("/status", methods=["GET"])' in server_code
         assert 'return PlainTextResponse("Service is running")' in server_code
 
     def test_no_health_check_when_disabled(
@@ -380,10 +380,7 @@ export = simple_tool
         """Test that health check route is not generated when disabled."""
         # Ensure health check is disabled (default)
         config_file = sample_project / "golf.json"
-        config = {
-            "name": "NoHealthProject",
-            "health_check_enabled": False
-        }
+        config = {"name": "NoHealthProject", "health_check_enabled": False}
         config_file.write_text(json.dumps(config))
 
         # Create a simple tool
@@ -426,18 +423,15 @@ export = simple_tool
         # Create a minimal project without any auth or other features
         project_dir = temp_dir / "minimal_project"
         project_dir.mkdir()
-        
+
         # Create minimal golf.json with only health check disabled
         config_file = project_dir / "golf.json"
-        config = {
-            "name": "MinimalProject",
-            "health_check_enabled": False
-        }
+        config = {"name": "MinimalProject", "health_check_enabled": False}
         config_file.write_text(json.dumps(config))
-        
+
         # Create minimal tool structure
         (project_dir / "tools").mkdir()
-        (project_dir / "resources").mkdir() 
+        (project_dir / "resources").mkdir()
         (project_dir / "prompts").mkdir()
 
         # Create a simple tool
@@ -470,8 +464,7 @@ export = simple_tool
 
         # Most importantly, no health check route should be generated
         assert (
-            "@mcp.custom_route" not in server_code
-            or "health_check" not in server_code
+            "@mcp.custom_route" not in server_code or "health_check" not in server_code
         )
         assert "async def health_check" not in server_code
 
@@ -480,10 +473,7 @@ export = simple_tool
     ) -> None:
         """Test that health check function has proper docstring."""
         config_file = sample_project / "golf.json"
-        config = {
-            "name": "DocstringProject",
-            "health_check_enabled": True
-        }
+        config = {"name": "DocstringProject", "health_check_enabled": True}
         config_file.write_text(json.dumps(config))
 
         # Create a simple tool
@@ -515,20 +505,25 @@ export = simple_tool
         server_code = server_file.read_text()
 
         # Should include descriptive docstring
-        assert '"""Health check endpoint for Kubernetes and load balancers."""' in server_code
+        assert (
+            '"""Health check endpoint for Kubernetes and load balancers."""'
+            in server_code
+        )
 
 
 class TestHealthCheckEdgeCases:
     """Test edge cases and error conditions for health check generation."""
 
-    def test_health_check_with_empty_response(self, sample_project: Path, temp_dir: Path) -> None:
+    def test_health_check_with_empty_response(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
         """Test health check with empty response string."""
         config_file = sample_project / "golf.json"
         config = {
             "name": "EmptyResponseProject",
             "health_check_enabled": True,
             "health_check_path": "/health",
-            "health_check_response": ""
+            "health_check_response": "",
         }
         config_file.write_text(json.dumps(config))
 
@@ -563,14 +558,16 @@ export = simple_tool
         # Should handle empty string gracefully
         assert 'return PlainTextResponse("")' in server_code
 
-    def test_health_check_path_sanitization(self, sample_project: Path, temp_dir: Path) -> None:
+    def test_health_check_path_sanitization(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
         """Test that health check paths are properly handled in generated code."""
         config_file = sample_project / "golf.json"
         config = {
             "name": "PathSanitizationProject",
             "health_check_enabled": True,
             "health_check_path": "/api/v1/health-check",
-            "health_check_response": "All systems operational"
+            "health_check_response": "All systems operational",
         }
         config_file.write_text(json.dumps(config))
 
@@ -603,7 +600,9 @@ export = simple_tool
         server_code = server_file.read_text()
 
         # Should properly handle complex paths
-        assert "@mcp.custom_route(\"/api/v1/health-check\", methods=[\"GET\"])" in server_code
+        assert (
+            '@mcp.custom_route("/api/v1/health-check", methods=["GET"])' in server_code
+        )
         assert 'return PlainTextResponse("All systems operational")' in server_code
 
     def test_health_check_imports_only_when_needed(self, temp_dir: Path) -> None:
@@ -611,15 +610,12 @@ export = simple_tool
         # Create a minimal project without any auth or other features
         project_dir = temp_dir / "minimal_project"
         project_dir.mkdir()
-        
+
         # Create minimal golf.json with health check disabled
         config_file = project_dir / "golf.json"
-        config = {
-            "name": "MinimalProject", 
-            "health_check_enabled": False
-        }
+        config = {"name": "MinimalProject", "health_check_enabled": False}
         config_file.write_text(json.dumps(config))
-        
+
         # Create minimal tool structure
         (project_dir / "tools").mkdir()
         (project_dir / "resources").mkdir()
@@ -655,7 +651,7 @@ export = simple_tool
 
         # Should not have health check route when disabled
         assert "async def health_check" not in server_code
-        
+
         # Now test with health check enabled
         config["health_check_enabled"] = True
         config["health_check_path"] = "/health"
@@ -664,6 +660,7 @@ export = simple_tool
 
         # Clean and regenerate
         import shutil
+
         shutil.rmtree(output_dir)
 
         settings = load_settings(project_dir)

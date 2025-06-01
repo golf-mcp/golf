@@ -572,10 +572,12 @@ class CodeGenerator:
 
         # Add health check imports if enabled
         if self.settings.health_check_enabled:
-            imports.extend([
-                "from starlette.requests import Request",
-                "from starlette.responses import PlainTextResponse"
-            ])
+            imports.extend(
+                [
+                    "from starlette.requests import Request",
+                    "from starlette.responses import PlainTextResponse",
+                ]
+            )
 
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
@@ -904,7 +906,9 @@ class CodeGenerator:
         if self.settings.health_check_enabled:
             health_check_code = [
                 "# Add health check route",
-                "@mcp.custom_route('" + self.settings.health_check_path + "', methods=[\"GET\"])",
+                "@mcp.custom_route('"
+                + self.settings.health_check_path
+                + '\', methods=["GET"])',
                 "async def health_check(request: Request) -> PlainTextResponse:",
                 '    """Health check endpoint for Kubernetes and load balancers."""',
                 f'    return PlainTextResponse("{self.settings.health_check_response}")',

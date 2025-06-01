@@ -91,17 +91,19 @@ class TestInitCommand:
         # Check that we can add health check configuration
         config_file = project_dir / "golf.json"
         config = json.loads(config_file.read_text())
-        
+
         # Add health check configuration
-        config.update({
-            "health_check_enabled": True,
-            "health_check_path": "/status",
-            "health_check_response": "API Ready"
-        })
-        
+        config.update(
+            {
+                "health_check_enabled": True,
+                "health_check_path": "/status",
+                "health_check_response": "API Ready",
+            }
+        )
+
         # Should be able to write back without issues
         config_file.write_text(json.dumps(config, indent=2))
-        
+
         # Verify it can be read back
         updated_config = json.loads(config_file.read_text())
         assert updated_config["health_check_enabled"] is True

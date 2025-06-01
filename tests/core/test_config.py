@@ -111,7 +111,7 @@ class TestSettingsLoading:
             "name": "HealthProject",
             "health_check_enabled": True,
             "health_check_path": "/status",
-            "health_check_response": "Service is healthy"
+            "health_check_response": "Service is healthy",
         }
 
         config_file = temp_dir / "golf.json"
@@ -124,10 +124,7 @@ class TestSettingsLoading:
 
     def test_health_check_partial_configuration(self, temp_dir: Path) -> None:
         """Test that partial health check configuration uses defaults for missing values."""
-        config = {
-            "name": "PartialHealthProject",
-            "health_check_enabled": True
-        }
+        config = {"name": "PartialHealthProject", "health_check_enabled": True}
 
         config_file = temp_dir / "golf.json"
         config_file.write_text(json.dumps(config))
