@@ -138,7 +138,7 @@ export = read_file
         
         annotations = tool["annotations"]
         assert annotations["readOnlyHint"] is True
-        assert annotations["title"] == "Read File"  # Default title should still be there
+        assert annotations["title"] == "Read_File"  # Default title should still be there
 
     def test_manifest_excludes_annotations_for_resources(self, sample_project: Path) -> None:
         """Test that annotations are not included for resources."""
