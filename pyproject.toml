@@ -107,6 +107,7 @@ telemetry = ["opentelemetry-api", "opentelemetry-sdk", "opentelemetry-instrument
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 pytest-asyncio = "^0.23.0"
+pytest-httpx = "^0.35.0"
 ruff = "^0.1.0"
 mypy = "^1.6.0"
 pytest-cov = "^4.1.0"
