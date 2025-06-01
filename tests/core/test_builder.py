@@ -884,3 +884,165 @@ export = ordered_tool
             "openWorldHint",
         }
         assert set(tool_component.annotations.keys()) == expected_keys
+
+
+class TestPlatformIntegration:
+    """Test platform integration with build process."""
+
+    def test_platform_registration_called_in_prod_build(
+        self, sample_project: Path, temp_dir: Path, monkeypatch
+    ) -> None:
+        """Test that platform registration is called during prod builds."""
+        from unittest.mock import AsyncMock, patch
+
+        # Set up environment variables
+        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "test_tool.py"
+        tool_file.write_text(
+            '''"""Test tool."""
+
+from pydantic import BaseModel
+
+
+class Output(BaseModel):
+    result: str
+
+
+def test_function() -> Output:
+    return Output(result="test")
+
+
+export = test_function
+'''
+        )
+
+        # Mock the platform registration function as an AsyncMock that returns True
+        with patch("golf.core.platform.register_project_with_platform", new_callable=AsyncMock) as mock_register:
+            mock_register.return_value = True
+
+            from golf.core.builder import build_project
+
+            settings = load_settings(sample_project)
+            output_dir = temp_dir / "build"
+
+            # Build with prod environment
+            build_project(
+                sample_project, settings, output_dir, build_env="prod", copy_env=False
+            )
+
+            # Platform registration should have been called
+            mock_register.assert_called_once()
+            
+            # Check the call arguments
+            call_args = mock_register.call_args
+            assert call_args is not None
+            
+            # Check keyword arguments since they're passed as keyword args
+            kwargs = call_args.kwargs
+            assert "project_path" in kwargs
+            assert "settings" in kwargs
+            assert "components" in kwargs
+            assert kwargs["project_path"] == sample_project
+            assert kwargs["settings"] == settings
+
+    def test_platform_registration_skipped_in_dev_build(
+        self, sample_project: Path, temp_dir: Path, monkeypatch
+    ) -> None:
+        """Test that platform registration is skipped during dev builds."""
+        from unittest.mock import patch
+
+        # Set up environment variables
+        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_SERVER_ID", "test-server-dev")
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "test_tool.py"
+        tool_file.write_text(
+            '''"""Test tool."""
+
+from pydantic import BaseModel
+
+
+class Output(BaseModel):
+    result: str
+
+
+def test_function() -> Output:
+    return Output(result="test")
+
+
+export = test_function
+'''
+        )
+
+        # Mock the platform registration function
+        with patch("golf.core.platform.register_project_with_platform") as mock_register:
+            mock_register.return_value = True
+
+            from golf.core.builder import build_project
+
+            settings = load_settings(sample_project)
+            output_dir = temp_dir / "build"
+
+            # Build with dev environment
+            build_project(
+                sample_project, settings, output_dir, build_env="dev", copy_env=True
+            )
+
+            # Platform registration should NOT have been called
+            mock_register.assert_not_called()
+
+    def test_platform_registration_failure_does_not_break_build(
+        self, sample_project: Path, temp_dir: Path, monkeypatch, capsys
+    ) -> None:
+        """Test that platform registration failure doesn't break the build."""
+        from unittest.mock import AsyncMock, patch
+
+        # Set up environment variables
+        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "test_tool.py"
+        tool_file.write_text(
+            '''"""Test tool."""
+
+from pydantic import BaseModel
+
+
+class Output(BaseModel):
+    result: str
+
+
+def test_function() -> Output:
+    return Output(result="test")
+
+
+export = test_function
+'''
+        )
+
+        # Mock the platform registration function to raise an exception
+        with patch("golf.core.platform.register_project_with_platform", new_callable=AsyncMock) as mock_register:
+            mock_register.side_effect = Exception("Platform unavailable")
+
+            from golf.core.builder import build_project
+
+            settings = load_settings(sample_project)
+            output_dir = temp_dir / "build"
+
+            # Build should still succeed even if platform registration fails
+            build_project(
+                sample_project, settings, output_dir, build_env="prod", copy_env=False
+            )
+
+            # Verify build artifacts were created
+            assert (output_dir / "server.py").exists()
+            assert (output_dir / "pyproject.toml").exists()
+
+            # Check that warning was printed
+            captured = capsys.readouterr()
+            assert "Platform registration failed" in captured.out
