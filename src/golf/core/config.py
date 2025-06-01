@@ -102,6 +102,17 @@ class Settings(BaseSettings):
         "console", description="Default OpenTelemetry exporter type"
     )
 
+    # Health check configuration
+    health_check_enabled: bool = Field(
+        False, description="Enable health check endpoint"
+    )
+    health_check_path: str = Field(
+        "/health", description="Health check endpoint path"
+    )
+    health_check_response: str = Field(
+        "OK", description="Health check response text"
+    )
+
 
 def find_config_path(start_path: Path | None = None) -> Path | None:
     """Find the golf config file by searching upwards from the given path.
