@@ -920,7 +920,9 @@ export = test_function
         )
 
         # Mock the platform registration function as an AsyncMock that returns True
-        with patch("golf.core.platform.register_project_with_platform", new_callable=AsyncMock) as mock_register:
+        with patch(
+            "golf.core.platform.register_project_with_platform", new_callable=AsyncMock
+        ) as mock_register:
             mock_register.return_value = True
 
             from golf.core.builder import build_project
@@ -935,11 +937,11 @@ export = test_function
 
             # Platform registration should have been called
             mock_register.assert_called_once()
-            
+
             # Check the call arguments
             call_args = mock_register.call_args
             assert call_args is not None
-            
+
             # Check keyword arguments since they're passed as keyword args
             kwargs = call_args.kwargs
             assert "project_path" in kwargs
@@ -979,7 +981,9 @@ export = test_function
         )
 
         # Mock the platform registration function
-        with patch("golf.core.platform.register_project_with_platform") as mock_register:
+        with patch(
+            "golf.core.platform.register_project_with_platform"
+        ) as mock_register:
             mock_register.return_value = True
 
             from golf.core.builder import build_project
@@ -1026,7 +1030,9 @@ export = test_function
         )
 
         # Mock the platform registration function to raise an exception
-        with patch("golf.core.platform.register_project_with_platform", new_callable=AsyncMock) as mock_register:
+        with patch(
+            "golf.core.platform.register_project_with_platform", new_callable=AsyncMock
+        ) as mock_register:
             mock_register.side_effect = Exception("Platform unavailable")
 
             from golf.core.builder import build_project

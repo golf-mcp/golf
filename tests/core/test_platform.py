@@ -123,7 +123,9 @@ export = test_function
 
         # Check that warning message was printed (handle multiline output)
         captured = capsys.readouterr()
-        assert "GOLF_SERVER_ID environment variable required" in captured.out.replace("\n", " ").replace("  ", " ")
+        assert "GOLF_SERVER_ID environment variable required" in captured.out.replace(
+            "\n", " "
+        ).replace("  ", " ")
 
     @pytest.mark.asyncio
     async def test_handles_http_timeout(
@@ -268,7 +270,10 @@ class TestComponentListBuilder:
             docstring="Test tool description",
             entry_function="test_function",
             input_schema={"type": "object", "properties": {"name": {"type": "string"}}},
-            output_schema={"type": "object", "properties": {"result": {"type": "string"}}},
+            output_schema={
+                "type": "object",
+                "properties": {"result": {"type": "string"}},
+            },
             annotations={"title": "Test Tool"},
             parameters=["name"],
         )
@@ -444,4 +449,4 @@ class TestComponentCounts:
         assert counts["tools"] == 1
         assert counts["resources"] == 0  # Should default to 0
         assert counts["prompts"] == 0  # Should default to 0
-        assert counts["total"] == 1 
+        assert counts["total"] == 1

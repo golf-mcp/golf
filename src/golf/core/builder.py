@@ -1129,7 +1129,9 @@ def build_project(
                 "[yellow]Warning: Platform registration module not available[/yellow]"
             )
         except Exception as e:
-            console.print(f"[yellow]Warning: Platform registration failed: {e}[/yellow]")
+            console.print(
+                f"[yellow]Warning: Platform registration failed: {e}[/yellow]"
+            )
 
     # Create a simple README
     readme_content = f"""# {settings.name}

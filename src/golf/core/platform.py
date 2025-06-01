@@ -21,12 +21,12 @@ async def register_project_with_platform(
     components: Dict[ComponentType, list[ParsedComponent]],
 ) -> bool:
     """Register project with Golf platform during prod build.
-    
+
     Args:
         project_path: Path to the project root
         settings: Project settings
         components: Parsed components dictionary
-        
+
     Returns:
         True if registration succeeded or was skipped, False if failed
     """
@@ -79,9 +79,7 @@ async def register_project_with_platform(
         return True
 
     except httpx.TimeoutException:
-        console.print(
-            "[yellow]Warning: Platform registration timed out[/yellow]"
-        )
+        console.print("[yellow]Warning: Platform registration timed out[/yellow]")
         return False
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 401:
@@ -103,13 +101,13 @@ async def register_project_with_platform(
 
 
 def _build_component_list(
-    components: Dict[ComponentType, list[ParsedComponent]]
+    components: Dict[ComponentType, list[ParsedComponent]],
 ) -> list[Dict[str, Any]]:
     """Convert parsed components to platform format.
-    
+
     Args:
         components: Dictionary of parsed components by type
-        
+
     Returns:
         List of component metadata dictionaries
     """
@@ -151,13 +149,13 @@ def _build_component_list(
 
 
 def _get_component_counts(
-    components: Dict[ComponentType, list[ParsedComponent]]
+    components: Dict[ComponentType, list[ParsedComponent]],
 ) -> Dict[str, int]:
     """Get component counts by type.
-    
+
     Args:
         components: Dictionary of parsed components by type
-        
+
     Returns:
         Dictionary with counts for each component type
     """
@@ -166,4 +164,4 @@ def _get_component_counts(
         "resources": len(components.get(ComponentType.RESOURCE, [])),
         "prompts": len(components.get(ComponentType.PROMPT, [])),
         "total": sum(len(comp_list) for comp_list in components.values()),
-    } 
+    }
