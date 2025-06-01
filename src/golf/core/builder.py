@@ -570,6 +570,13 @@ class CodeGenerator:
         ]:
             imports.append("import uvicorn")
 
+        # Add health check imports if enabled
+        if self.settings.health_check_enabled:
+            imports.extend([
+                "from starlette.requests import Request",
+                "from starlette.responses import PlainTextResponse"
+            ])
+
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
         endpoint_path = transport_config["endpoint_path"]
@@ -892,6 +899,18 @@ class CodeGenerator:
                 ["    # Run with stdio transport", '    mcp.run(transport="stdio")']
             )
 
+        # Add health check route if enabled
+        health_check_code = []
+        if self.settings.health_check_enabled:
+            health_check_code = [
+                "# Add health check route",
+                "@mcp.custom_route('" + self.settings.health_check_path + "', methods=[\"GET\"])",
+                "async def health_check(request: Request) -> PlainTextResponse:",
+                '    """Health check endpoint for Kubernetes and load balancers."""',
+                f'    return PlainTextResponse("{self.settings.health_check_response}")',
+                "",
+            ]
+
         # Combine all sections
         # Order: imports, env_section, auth_setup, server_code (mcp init),
         # post_init (API key middleware), component_registrations, main_code (run block)
@@ -901,6 +920,7 @@ class CodeGenerator:
             + auth_setup_code
             + server_code_lines
             + component_registrations
+            + health_check_code
             + main_code
         )
 
