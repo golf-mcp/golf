@@ -1,6 +1,7 @@
 """Tests for the Golf MCP builder module."""
 
 from pathlib import Path
+import json
 
 from golf.core.builder import build_manifest
 from golf.core.config import load_settings
@@ -264,6 +265,411 @@ export = process
         assert (
             process_tool["annotations"]["title"] == "Process"
         )  # Should have default title
+
+
+class TestHealthCheckGeneration:
+    """Test health check route generation."""
+
+    def test_generates_health_check_when_enabled(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that health check route is generated when enabled."""
+        # Update project config to enable health check
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "HealthProject",
+            "health_check_enabled": True,
+            "health_check_path": "/health",
+            "health_check_response": "OK"
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool to ensure we have components
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        from golf.core.builder import CodeGenerator
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+
+        generator = CodeGenerator(sample_project, settings, output_dir)
+        generator.generate()
+
+        # Check that server.py was generated
+        server_file = output_dir / "server.py"
+        assert server_file.exists()
+
+        # Read the generated server code
+        server_code = server_file.read_text()
+
+        # Should contain health check imports
+        assert "from starlette.requests import Request" in server_code
+        assert "from starlette.responses import PlainTextResponse" in server_code
+
+        # Should contain health check route definition
+        assert "@mcp.custom_route(\"/health\", methods=[\"GET\"])" in server_code
+        assert "async def health_check(request: Request) -> PlainTextResponse:" in server_code
+        assert 'return PlainTextResponse("OK")' in server_code
+
+    def test_health_check_with_custom_config(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test health check generation with custom path and response."""
+        # Update project config with custom health check settings
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "CustomHealthProject",
+            "health_check_enabled": True,
+            "health_check_path": "/status",
+            "health_check_response": "Service is running"
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        from golf.core.builder import CodeGenerator
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+
+        generator = CodeGenerator(sample_project, settings, output_dir)
+        generator.generate()
+
+        server_file = output_dir / "server.py"
+        server_code = server_file.read_text()
+
+        # Should use custom path and response
+        assert "@mcp.custom_route(\"/status\", methods=[\"GET\"])" in server_code
+        assert 'return PlainTextResponse("Service is running")' in server_code
+
+    def test_no_health_check_when_disabled(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that health check route is not generated when disabled."""
+        # Ensure health check is disabled (default)
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "NoHealthProject",
+            "health_check_enabled": False
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        from golf.core.builder import CodeGenerator
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+
+        generator = CodeGenerator(sample_project, settings, output_dir)
+        generator.generate()
+
+        server_file = output_dir / "server.py"
+        server_code = server_file.read_text()
+
+        # Should not contain health check code
+        assert "@mcp.custom_route" not in server_code
+        assert "health_check" not in server_code
+        assert "PlainTextResponse" not in server_code
+
+    def test_health_check_without_starlette_imports_when_disabled(
+        self, temp_dir: Path
+    ) -> None:
+        """Test that health check route is not generated when disabled."""
+        # Create a minimal project without any auth or other features
+        project_dir = temp_dir / "minimal_project"
+        project_dir.mkdir()
+        
+        # Create minimal golf.json with only health check disabled
+        config_file = project_dir / "golf.json"
+        config = {
+            "name": "MinimalProject",
+            "health_check_enabled": False
+        }
+        config_file.write_text(json.dumps(config))
+        
+        # Create minimal tool structure
+        (project_dir / "tools").mkdir()
+        (project_dir / "resources").mkdir() 
+        (project_dir / "prompts").mkdir()
+
+        # Create a simple tool
+        tool_file = project_dir / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        from golf.core.builder import CodeGenerator
+
+        settings = load_settings(project_dir)
+        output_dir = temp_dir / "build"
+
+        generator = CodeGenerator(project_dir, settings, output_dir)
+        generator.generate()
+
+        server_file = output_dir / "server.py"
+        server_code = server_file.read_text()
+
+        # Most importantly, no health check route should be generated
+        assert "@mcp.custom_route" not in server_code or "health_check" not in server_code
+        assert "async def health_check" not in server_code
+
+    def test_health_check_docstring_generation(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that health check function has proper docstring."""
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "DocstringProject",
+            "health_check_enabled": True
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        from golf.core.builder import CodeGenerator
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+
+        generator = CodeGenerator(sample_project, settings, output_dir)
+        generator.generate()
+
+        server_file = output_dir / "server.py"
+        server_code = server_file.read_text()
+
+        # Should include descriptive docstring
+        assert '"""Health check endpoint for Kubernetes and load balancers."""' in server_code
+
+
+class TestHealthCheckEdgeCases:
+    """Test edge cases and error conditions for health check generation."""
+
+    def test_health_check_with_empty_response(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test health check with empty response string."""
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "EmptyResponseProject",
+            "health_check_enabled": True,
+            "health_check_path": "/health",
+            "health_check_response": ""
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        from golf.core.builder import CodeGenerator
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+
+        generator = CodeGenerator(sample_project, settings, output_dir)
+        generator.generate()
+
+        server_file = output_dir / "server.py"
+        server_code = server_file.read_text()
+
+        # Should handle empty string gracefully
+        assert 'return PlainTextResponse("")' in server_code
+
+    def test_health_check_path_sanitization(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that health check paths are properly handled in generated code."""
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "PathSanitizationProject",
+            "health_check_enabled": True,
+            "health_check_path": "/api/v1/health-check",
+            "health_check_response": "All systems operational"
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        from golf.core.builder import CodeGenerator
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+
+        generator = CodeGenerator(sample_project, settings, output_dir)
+        generator.generate()
+
+        server_file = output_dir / "server.py"
+        server_code = server_file.read_text()
+
+        # Should properly handle complex paths
+        assert "@mcp.custom_route(\"/api/v1/health-check\", methods=[\"GET\"])" in server_code
+        assert 'return PlainTextResponse("All systems operational")' in server_code
+
+    def test_health_check_imports_only_when_needed(self, temp_dir: Path) -> None:
+        """Test that health check route is only generated when explicitly enabled."""
+        # Create a minimal project without any auth or other features
+        project_dir = temp_dir / "minimal_project"
+        project_dir.mkdir()
+        
+        # Create minimal golf.json with health check disabled
+        config_file = project_dir / "golf.json"
+        config = {
+            "name": "MinimalProject", 
+            "health_check_enabled": False
+        }
+        config_file.write_text(json.dumps(config))
+        
+        # Create minimal tool structure
+        (project_dir / "tools").mkdir()
+        (project_dir / "resources").mkdir()
+        (project_dir / "prompts").mkdir()
+
+        # Create a simple tool
+        tool_file = project_dir / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        from golf.core.builder import CodeGenerator
+
+        settings = load_settings(project_dir)
+        output_dir = temp_dir / "build"
+
+        generator = CodeGenerator(project_dir, settings, output_dir)
+        generator.generate()
+
+        server_file = output_dir / "server.py"
+        server_code = server_file.read_text()
+
+        # Should not have health check route when disabled
+        assert "async def health_check" not in server_code
+        
+        # Now test with health check enabled
+        config["health_check_enabled"] = True
+        config["health_check_path"] = "/health"
+        config["health_check_response"] = "OK"
+        config_file.write_text(json.dumps(config))
+
+        # Clean and regenerate
+        import shutil
+        shutil.rmtree(output_dir)
+
+        settings = load_settings(project_dir)
+        generator = CodeGenerator(project_dir, settings, output_dir)
+        generator.generate()
+
+        server_file = output_dir / "server.py"
+        server_code = server_file.read_text()
+
+        # Should now have the health check route
+        assert "async def health_check" in server_code
+        assert '@mcp.custom_route("/health", methods=["GET"])' in server_code
 
 
 class TestCodeGeneration:
