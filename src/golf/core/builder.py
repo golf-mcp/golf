@@ -97,6 +97,11 @@ class ManifestBuilder:
             if required_fields:
                 tool_schema["inputSchema"]["required"] = required_fields
 
+            # Add tool annotations if present
+            if component.annotations:
+                # Merge with existing annotations (keeping title)
+                tool_schema["annotations"].update(component.annotations)
+
             # Add the tool to the manifest
             self.manifest["tools"].append(tool_schema)
 
@@ -662,7 +667,11 @@ class CodeGenerator:
                     registration += f"\n_wrapped_func = instrument_{component_type.value}({full_module_path}.{entry_func}, '{component.name}')"
 
                     if component_type == ComponentType.TOOL:
-                        registration += f'\nmcp.add_tool(_wrapped_func, name="{component.name}", description="{component.docstring or ""}")'
+                        registration += f'\nmcp.add_tool(_wrapped_func, name="{component.name}", description="{component.docstring or ""}"'
+                        # Add annotations if present
+                        if hasattr(component, "annotations") and component.annotations:
+                            registration += f", annotations={component.annotations}"
+                        registration += ")"
                     elif component_type == ComponentType.RESOURCE:
                         registration += f'\nmcp.add_resource_fn(_wrapped_func, uri="{component.uri_template}", name="{component.name}", description="{component.docstring or ""}")'
                     else:  # PROMPT
@@ -689,6 +698,11 @@ class CodeGenerator:
                             # Escape any quotes in the docstring
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
+
+                        # Add annotations if present
+                        if hasattr(component, "annotations") and component.annotations:
+                            registration += f", annotations={component.annotations}"
+
                         registration += ")"
 
                     elif component_type == ComponentType.RESOURCE:
@@ -711,6 +725,7 @@ class CodeGenerator:
                             # Escape any quotes in the docstring
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
+
                         registration += ")"
 
                     else:  # PROMPT
@@ -735,6 +750,7 @@ class CodeGenerator:
                             # Escape any quotes in the docstring
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
+
                         registration += ")"
 
                 component_registrations.append(registration)
@@ -950,10 +966,11 @@ def build_project(
             import traceback
 
             console.print(f"[red]{traceback.format_exc()}[/red]")
-            
+
             # Track detailed error for pre_build.py execution failures
             try:
                 from golf.core.telemetry import track_detailed_error
+
                 track_detailed_error(
                     "build_pre_build_failed",
                     e,
@@ -962,7 +979,7 @@ def build_project(
                     additional_props={
                         "file_path": str(pre_build_path.relative_to(project_path)),
                         "build_env": build_env,
-                    }
+                    },
                 )
             except Exception:
                 # Don't let telemetry errors break the build

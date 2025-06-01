@@ -70,13 +70,21 @@ def run_server(
         elif process.returncode == 130:
             console.print("[yellow]Server stopped by user interrupt (Ctrl+C)[/yellow]")
         elif process.returncode == 143:
-            console.print("[yellow]Server stopped by SIGTERM (graceful shutdown)[/yellow]")
+            console.print(
+                "[yellow]Server stopped by SIGTERM (graceful shutdown)[/yellow]"
+            )
         elif process.returncode == 137:
-            console.print("[yellow]Server stopped by SIGKILL (forced shutdown)[/yellow]")
+            console.print(
+                "[yellow]Server stopped by SIGKILL (forced shutdown)[/yellow]"
+            )
         elif process.returncode in [1, 2]:
-            console.print(f"[red]Server exited with error code {process.returncode}[/red]")
+            console.print(
+                f"[red]Server exited with error code {process.returncode}[/red]"
+            )
         else:
-            console.print(f"[orange]Server exited with code {process.returncode}[/orange]")
+            console.print(
+                f"[orange]Server exited with code {process.returncode}[/orange]"
+            )
 
         return process.returncode
     except KeyboardInterrupt:
