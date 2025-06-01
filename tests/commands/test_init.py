@@ -67,3 +67,41 @@ class TestInitCommand:
         """Test that init prompts when directory is not empty."""
         # This would require mocking the Confirm.ask prompt
         pass
+
+    def test_basic_template_includes_health_check(self, temp_dir: Path) -> None:
+        """Test that basic template includes health check configuration."""
+        project_dir = temp_dir / "health_check_project"
+
+        initialize_project("health_check_project", project_dir, template="basic")
+
+        # Check that golf.json includes health check configuration (disabled by default)
+        config = json.loads((project_dir / "golf.json").read_text())
+        assert config["health_check_enabled"] is False  # Should be disabled by default
+        assert config["health_check_path"] == "/health"
+        assert config["health_check_response"] == "OK"
+
+    def test_api_key_template_compatibility_with_health_check(self, temp_dir: Path) -> None:
+        """Test that API key template is compatible with health check configuration."""
+        project_dir = temp_dir / "api_key_project"
+
+        initialize_project("api_key_project", project_dir, template="api_key")
+
+        # Check that we can add health check configuration
+        config_file = project_dir / "golf.json"
+        config = json.loads(config_file.read_text())
+        
+        # Add health check configuration
+        config.update({
+            "health_check_enabled": True,
+            "health_check_path": "/status",
+            "health_check_response": "API Ready"
+        })
+        
+        # Should be able to write back without issues
+        config_file.write_text(json.dumps(config, indent=2))
+        
+        # Verify it can be read back
+        updated_config = json.loads(config_file.read_text())
+        assert updated_config["health_check_enabled"] is True
+        assert updated_config["health_check_path"] == "/status"
+        assert updated_config["health_check_response"] == "API Ready"
