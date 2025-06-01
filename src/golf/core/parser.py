@@ -18,6 +18,7 @@ class ComponentType(str, Enum):
     TOOL = "tool"
     RESOURCE = "resource"
     PROMPT = "prompt"
+    ROUTE = "route"
     UNKNOWN = "unknown"
 
 
