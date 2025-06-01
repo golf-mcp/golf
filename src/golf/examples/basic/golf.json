@@ -4,6 +4,9 @@
   "host": "127.0.0.1",
   "port": 3000,
   "transport": "sse",
+  "health_check_enabled": false,
+  "health_check_path": "/health",
+  "health_check_response": "OK",
   "opentelemetry_enabled": true,
   "opentelemetry_default_exporter": "otlp_http"
 } 
