@@ -148,6 +148,245 @@ export = add
         assert "a" in component.input_schema["properties"]
         assert "b" in component.input_schema["properties"]
 
+    def test_parses_tool_with_annotations(self, sample_project: Path) -> None:
+        """Test parsing a tool with annotations."""
+        tool_file = sample_project / "tools" / "delete_file.py"
+        tool_file.write_text(
+            '''"""Delete file tool."""
+
+from typing import Annotated
+from pydantic import BaseModel, Field
+
+# Tool annotations
+annotations = {
+    "readOnlyHint": False,
+    "destructiveHint": True,
+    "idempotentHint": False,
+    "openWorldHint": False
+}
+
+
+class Output(BaseModel):
+    """Response from delete file tool."""
+    success: bool
+    message: str
+
+
+async def delete_file(
+    path: Annotated[str, Field(description="Path to file to delete")]
+) -> Output:
+    """Delete a file."""
+    return Output(success=True, message="Deleted")
+
+
+export = delete_file
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        component = components[0]
+
+        assert component.type == ComponentType.TOOL
+        assert component.annotations is not None
+        assert component.annotations["readOnlyHint"] is False
+        assert component.annotations["destructiveHint"] is True
+        assert component.annotations["idempotentHint"] is False
+        assert component.annotations["openWorldHint"] is False
+
+    def test_parses_tool_with_readonly_annotations(self, sample_project: Path) -> None:
+        """Test parsing a tool with read-only annotations."""
+        tool_file = sample_project / "tools" / "read_file.py"
+        tool_file.write_text(
+            '''"""Read file tool."""
+
+from typing import Annotated
+from pydantic import BaseModel, Field
+
+# Tool annotations - read-only operation
+annotations = {
+    "readOnlyHint": True
+}
+
+
+class Output(BaseModel):
+    """Response from read file tool."""
+    content: str
+
+
+async def read_file(
+    path: Annotated[str, Field(description="Path to file to read")]
+) -> Output:
+    """Read a file."""
+    return Output(content="file content")
+
+
+export = read_file
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        component = components[0]
+
+        assert component.type == ComponentType.TOOL
+        assert component.annotations is not None
+        assert component.annotations["readOnlyHint"] is True
+        # Should only have readOnlyHint since other hints are ignored when readOnlyHint is True
+        assert len(component.annotations) == 1
+
+    def test_parses_tool_without_annotations(self, sample_project: Path) -> None:
+        """Test parsing a tool without annotations."""
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from typing import Annotated
+from pydantic import BaseModel, Field
+
+
+class Output(BaseModel):
+    """Simple output."""
+    result: str
+
+
+async def simple_tool(
+    input_text: Annotated[str, Field(description="Input text")]
+) -> Output:
+    """Simple tool without annotations."""
+    return Output(result="processed")
+
+
+export = simple_tool
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        component = components[0]
+
+        assert component.type == ComponentType.TOOL
+        assert component.annotations is None
+
+    def test_handles_complex_annotations(self, sample_project: Path) -> None:
+        """Test parsing tool with various annotation value types."""
+        tool_file = sample_project / "tools" / "complex_annotations.py"
+        tool_file.write_text(
+            '''"""Tool with complex annotations."""
+
+from pydantic import BaseModel
+
+# Tool annotations with different value types
+annotations = {
+    "readOnlyHint": False,
+    "destructiveHint": True,
+    "idempotentHint": False,
+    "openWorldHint": True,
+    "customHint": "custom_value",
+    "numericHint": 42
+}
+
+
+class Output(BaseModel):
+    result: str
+
+
+def complex_tool() -> Output:
+    """Tool with complex annotations."""
+    return Output(result="done")
+
+
+export = complex_tool
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        component = components[0]
+
+        assert component.type == ComponentType.TOOL
+        assert component.annotations is not None
+        assert component.annotations["readOnlyHint"] is False
+        assert component.annotations["destructiveHint"] is True
+        assert component.annotations["customHint"] == "custom_value"
+        assert component.annotations["numericHint"] == 42
+
+    def test_ignores_non_dict_annotations(self, sample_project: Path) -> None:
+        """Test that non-dictionary annotations are ignored."""
+        tool_file = sample_project / "tools" / "invalid_annotations.py"
+        tool_file.write_text(
+            '''"""Tool with invalid annotations."""
+
+from pydantic import BaseModel
+
+# This should be ignored since it's not a dictionary
+annotations = "not a dict"
+
+
+class Output(BaseModel):
+    result: str
+
+
+def invalid_tool() -> Output:
+    """Tool with invalid annotations."""
+    return Output(result="done")
+
+
+export = invalid_tool
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        component = components[0]
+
+        assert component.type == ComponentType.TOOL
+        assert component.annotations is None
+
+    def test_annotations_only_for_tools(self, sample_project: Path) -> None:
+        """Test that annotations are only parsed for tools, not resources or prompts."""
+        # Test resource with annotations (should be ignored)
+        resource_file = sample_project / "resources" / "annotated_resource.py"
+        resource_file.write_text(
+            '''"""Resource with annotations."""
+
+resource_uri = "test://data"
+
+# This should be ignored for resources
+annotations = {
+    "readOnlyHint": True
+}
+
+
+def get_data() -> dict:
+    """Get data."""
+    return {"data": "value"}
+
+
+export = get_data
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(resource_file)
+
+        assert len(components) == 1
+        component = components[0]
+
+        assert component.type == ComponentType.RESOURCE
+        # Resources shouldn't have annotations parsed
+        assert component.annotations is None
+
     def test_parses_resource_with_uri_template(self, sample_project: Path) -> None:
         """Test parsing a resource with URI template."""
         resource_file = sample_project / "resources" / "weather.py"
@@ -376,3 +615,133 @@ export = chat
         assert components[ComponentType.TOOL][0].name == "greet"
         assert components[ComponentType.RESOURCE][0].name == "data"
         assert components[ComponentType.PROMPT][0].name == "chat"
+
+
+class TestASTDictionaryExtraction:
+    """Test AST dictionary extraction helper method."""
+
+    def test_extract_dict_with_boolean_values(self, sample_project: Path) -> None:
+        """Test extracting dictionary with boolean values from AST."""
+        tool_file = sample_project / "tools" / "bool_test.py"
+        tool_file.write_text(
+            '''"""Tool with boolean annotations."""
+
+annotations = {
+    "readOnlyHint": True,
+    "destructiveHint": False
+}
+
+def run() -> str:
+    return "test"
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        component = components[0]
+        assert component.annotations["readOnlyHint"] is True
+        assert component.annotations["destructiveHint"] is False
+
+    def test_extract_dict_with_mixed_types(self, sample_project: Path) -> None:
+        """Test extracting dictionary with mixed value types."""
+        tool_file = sample_project / "tools" / "mixed_test.py"
+        tool_file.write_text(
+            '''"""Tool with mixed type annotations."""
+
+annotations = {
+    "readOnlyHint": True,
+    "customString": "test_value",
+    "customNumber": 42,
+    "customFloat": 3.14,
+    "customNull": None
+}
+
+def run() -> str:
+    return "test"
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        component = components[0]
+        assert component.annotations["readOnlyHint"] is True
+        assert component.annotations["customString"] == "test_value"
+        assert component.annotations["customNumber"] == 42
+        assert component.annotations["customFloat"] == 3.14
+        assert component.annotations["customNull"] is None
+
+    def test_extract_dict_ignores_non_string_keys(self, sample_project: Path) -> None:
+        """Test that non-string keys are ignored during extraction."""
+        # This test is a bit artificial since we can't easily create non-string
+        # keys in Python dict literals, but we can test the robustness
+        tool_file = sample_project / "tools" / "string_keys_test.py"
+        tool_file.write_text(
+            '''"""Tool with string key annotations."""
+
+annotations = {
+    "readOnlyHint": True,
+    "validKey": "validValue"
+}
+
+def run() -> str:
+    return "test"
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        component = components[0]
+        # Should have both valid string keys
+        assert len(component.annotations) == 2
+        assert component.annotations["readOnlyHint"] is True
+        assert component.annotations["validKey"] == "validValue"
+
+    def test_extract_dict_handles_complex_expressions(self, sample_project: Path) -> None:
+        """Test that complex expressions in dict values are handled gracefully."""
+        tool_file = sample_project / "tools" / "complex_test.py"
+        tool_file.write_text(
+            '''"""Tool with complex annotations."""
+
+# Define a variable that could be used in complex expressions
+some_var = "complex"
+
+# This should only extract the simple literal values
+annotations = {
+    "readOnlyHint": True,
+    "simpleString": "simple",
+    "variableReference": some_var,  # This should be ignored (not a literal)
+    "anotherSimple": False
+}
+
+def run() -> str:
+    return "test"
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+        
+        assert len(components) == 1
+        component = components[0]
+        
+        # Should have extracted the simple literal values
+        assert component.annotations["readOnlyHint"] is True
+        assert component.annotations["simpleString"] == "simple"
+        assert component.annotations["anotherSimple"] is False
+        
+        # Variable reference should be ignored (not present in annotations)
+        assert "variableReference" not in component.annotations
