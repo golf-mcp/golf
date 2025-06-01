@@ -97,3 +97,42 @@ class TestSettingsLoading:
         settings = load_settings(temp_dir)
         assert settings.port == 9000
         assert settings.host == "localhost"
+
+    def test_health_check_defaults(self, temp_dir: Path) -> None:
+        """Test health check default configuration values."""
+        settings = load_settings(temp_dir)
+        assert settings.health_check_enabled is False
+        assert settings.health_check_path == "/health"
+        assert settings.health_check_response == "OK"
+
+    def test_health_check_configuration_from_json(self, temp_dir: Path) -> None:
+        """Test loading health check configuration from golf.json."""
+        config = {
+            "name": "HealthProject",
+            "health_check_enabled": True,
+            "health_check_path": "/status",
+            "health_check_response": "Service is healthy"
+        }
+
+        config_file = temp_dir / "golf.json"
+        config_file.write_text(json.dumps(config))
+
+        settings = load_settings(temp_dir)
+        assert settings.health_check_enabled is True
+        assert settings.health_check_path == "/status"
+        assert settings.health_check_response == "Service is healthy"
+
+    def test_health_check_partial_configuration(self, temp_dir: Path) -> None:
+        """Test that partial health check configuration uses defaults for missing values."""
+        config = {
+            "name": "PartialHealthProject",
+            "health_check_enabled": True
+        }
+
+        config_file = temp_dir / "golf.json"
+        config_file.write_text(json.dumps(config))
+
+        settings = load_settings(temp_dir)
+        assert settings.health_check_enabled is True
+        assert settings.health_check_path == "/health"  # default
+        assert settings.health_check_response == "OK"  # default
