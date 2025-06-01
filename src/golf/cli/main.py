@@ -162,7 +162,7 @@ def build_dev(
             e,
             context="Development build with environment variables",
             operation="build_dev",
-            additional_props={"environment": "dev", "copy_env": True}
+            additional_props={"environment": "dev", "copy_env": True},
         )
         raise
 
@@ -214,7 +214,7 @@ def build_prod(
             e,
             context="Production build without environment variables",
             operation="build_prod",
-            additional_props={"environment": "prod", "copy_env": False}
+            additional_props={"environment": "prod", "copy_env": False},
         )
         raise
 
@@ -275,15 +275,13 @@ def run(
 
                 build_project(project_root, settings, dist_dir)
             except Exception as e:
-                console.print(
-                    f"[bold red]Error building project:[/bold red] {str(e)}"
-                )
+                console.print(f"[bold red]Error building project:[/bold red] {str(e)}")
                 track_detailed_error(
                     "cli_run_failed",
                     e,
                     context="Auto-build before running server",
                     operation="auto_build_before_run",
-                    additional_props={"auto_build": True}
+                    additional_props={"auto_build": True},
                 )
                 raise
         else:
@@ -326,11 +324,11 @@ def run(
             # 2: General interrupt/graceful shutdown
             shutdown_type = {
                 130: "UserInterrupt",
-                143: "GracefulShutdown", 
+                143: "GracefulShutdown",
                 137: "ForcedShutdown",
-                2: "Interrupt"
+                2: "Interrupt",
             }.get(return_code, "GracefulShutdown")
-            
+
             track_event(
                 "cli_run_shutdown",
                 {
@@ -362,7 +360,7 @@ def run(
             e,
             context="Server execution or startup failure",
             operation="run_server_execution",
-            additional_props={"has_dist_dir": dist_dir.exists() if dist_dir else False}
+            additional_props={"has_dist_dir": dist_dir.exists() if dist_dir else False},
         )
         raise
 

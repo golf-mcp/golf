@@ -366,30 +366,32 @@ def track_detailed_error(
         # Get the last few frames (most relevant) and sanitize them
         relevant_frames = tb_lines[-3:] if len(tb_lines) > 3 else tb_lines
         sanitized_trace = []
-        
+
         for frame in relevant_frames:
             # Sanitize file paths in stack trace
             sanitized_frame = _sanitize_error_message(frame.strip())
             # Further sanitize common traceback patterns
             sanitized_frame = sanitized_frame.replace('File "[PATH]', 'File "[PATH]')
             sanitized_trace.append(sanitized_frame)
-        
+
         properties["stack_trace"] = " | ".join(sanitized_trace)
-        
+
         # Add the specific line that caused the error if available
-        if hasattr(error, '__traceback__') and error.__traceback__:
+        if hasattr(error, "__traceback__") and error.__traceback__:
             tb = error.__traceback__
             while tb.tb_next:
                 tb = tb.tb_next
             properties["error_line"] = tb.tb_lineno
-            
+
     except Exception:
         # Don't fail if we can't capture stack trace
         pass
 
     # Add system context for debugging
     try:
-        properties["python_executable"] = _sanitize_error_message(platform.python_implementation())
+        properties["python_executable"] = _sanitize_error_message(
+            platform.python_implementation()
+        )
         properties["platform_detail"] = platform.platform()[:50]  # Limit length
     except Exception:
         pass
@@ -398,15 +400,24 @@ def track_detailed_error(
     if additional_props:
         # Only include safe additional properties
         safe_additional_keys = {
-            "exit_code", "shutdown_type", "environment", "template",
-            "build_env", "transport", "component_count", "file_path",
-            "component_type", "validation_error", "config_error"
+            "exit_code",
+            "shutdown_type",
+            "environment",
+            "template",
+            "build_env",
+            "transport",
+            "component_count",
+            "file_path",
+            "component_type",
+            "validation_error",
+            "config_error",
         }
         for key, value in additional_props.items():
             if key in safe_additional_keys:
                 properties[key] = value
 
     track_event(event_name, properties)
+
 
 def _sanitize_error_message(message: str) -> str:
     """Sanitize error messages to remove sensitive information."""

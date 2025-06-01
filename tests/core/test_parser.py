@@ -236,7 +236,8 @@ export = read_file
         assert component.type == ComponentType.TOOL
         assert component.annotations is not None
         assert component.annotations["readOnlyHint"] is True
-        # Should only have readOnlyHint since other hints are ignored when readOnlyHint is True
+        # Should only have readOnlyHint since other hints are ignored when
+        # readOnlyHint is True
         assert len(component.annotations) == 1
 
     def test_parses_tool_without_annotations(self, sample_project: Path) -> None:
@@ -708,7 +709,9 @@ export = run
         assert component.annotations["readOnlyHint"] is True
         assert component.annotations["validKey"] == "validValue"
 
-    def test_extract_dict_handles_complex_expressions(self, sample_project: Path) -> None:
+    def test_extract_dict_handles_complex_expressions(
+        self, sample_project: Path
+    ) -> None:
         """Test that complex expressions in dict values are handled gracefully."""
         tool_file = sample_project / "tools" / "complex_test.py"
         tool_file.write_text(
@@ -734,14 +737,14 @@ export = run
 
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
         component = components[0]
-        
+
         # Should have extracted the simple literal values
         assert component.annotations["readOnlyHint"] is True
         assert component.annotations["simpleString"] == "simple"
         assert component.annotations["anotherSimple"] is False
-        
+
         # Variable reference should be ignored (not present in annotations)
         assert "variableReference" not in component.annotations

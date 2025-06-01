@@ -452,13 +452,13 @@ class AstParser:
 
     def _extract_dict_from_ast(self, dict_node: ast.Dict) -> dict[str, Any]:
         """Extract a dictionary from an AST Dict node.
-        
-        This handles simple literal dictionaries with string keys and 
+
+        This handles simple literal dictionaries with string keys and
         boolean/string/number values.
         """
         result = {}
-        
-        for key, value in zip(dict_node.keys, dict_node.values):
+
+        for key, value in zip(dict_node.keys, dict_node.values, strict=False):
             # Extract the key
             if isinstance(key, ast.Constant) and isinstance(key.value, str):
                 key_str = key.value
@@ -467,7 +467,7 @@ class AstParser:
             else:
                 # Skip non-string keys
                 continue
-            
+
             # Extract the value
             if isinstance(value, ast.Constant):
                 # Handles strings, numbers, booleans, None
@@ -476,14 +476,18 @@ class AstParser:
                 result[key_str] = value.s
             elif isinstance(value, ast.Num):  # For older Python versions
                 result[key_str] = value.n
-            elif isinstance(value, ast.NameConstant):  # For older Python versions (True/False/None)
+            elif isinstance(
+                value, ast.NameConstant
+            ):  # For older Python versions (True/False/None)
                 result[key_str] = value.value
             elif isinstance(value, ast.Name):
                 # Handle True/False/None as names
                 if value.id in ("True", "False", "None"):
-                    result[key_str] = {"True": True, "False": False, "None": None}[value.id]
+                    result[key_str] = {"True": True, "False": False, "None": None}[
+                        value.id
+                    ]
             # We could add more complex value handling here if needed
-            
+
         return result
 
 
