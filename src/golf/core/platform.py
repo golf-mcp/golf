@@ -3,7 +3,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 from rich.console import Console
@@ -18,7 +18,7 @@ console = Console()
 async def register_project_with_platform(
     project_path: Path,
     settings: Settings,
-    components: Dict[ComponentType, list[ParsedComponent]],
+    components: dict[ComponentType, list[ParsedComponent]],
 ) -> bool:
     """Register project with Golf platform during prod build.
 
@@ -101,8 +101,8 @@ async def register_project_with_platform(
 
 
 def _build_component_list(
-    components: Dict[ComponentType, list[ParsedComponent]],
-) -> list[Dict[str, Any]]:
+    components: dict[ComponentType, list[ParsedComponent]],
+) -> list[dict[str, Any]]:
     """Convert parsed components to platform format.
 
     Args:
@@ -149,8 +149,8 @@ def _build_component_list(
 
 
 def _get_component_counts(
-    components: Dict[ComponentType, list[ParsedComponent]],
-) -> Dict[str, int]:
+    components: dict[ComponentType, list[ParsedComponent]],
+) -> dict[str, int]:
     """Get component counts by type.
 
     Args:
