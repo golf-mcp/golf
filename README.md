@@ -140,6 +140,11 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
                                       // - "streamable-http": HTTP with streaming support
                                       // - "stdio": Standard I/O (for CLI integration)
   
+  // Health Check Configuration (optional)
+  "health_check_enabled": false,      // Enable health check endpoint for Kubernetes/load balancers
+  "health_check_path": "/health",     // HTTP path for health check endpoint
+  "health_check_response": "OK",      // Response text returned by health check
+  
   // OpenTelemetry Configuration (optional)
   "opentelemetry_enabled": false,     // Enable distributed tracing
   "opentelemetry_default_exporter": "console"  // Default exporter if OTEL_TRACES_EXPORTER not set
@@ -155,10 +160,40 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
   - `"streamable-http"` provides HTTP streaming for traditional API clients
   - `"stdio"` enables integration with command-line tools and scripts
 - **`host` & `port`**: Control where your server listens. Use `"127.0.0.1"` for local development or `"0.0.0.0"` to accept external connections.
+- **`health_check_enabled`**: When true, enables a health check endpoint for Kubernetes readiness/liveness probes and load balancers
+- **`health_check_path`**: Customizable path for the health check endpoint (defaults to "/health")
+- **`health_check_response`**: Customizable response text for successful health checks (defaults to "OK")
 - **`opentelemetry_enabled`**: When true, enables distributed tracing for debugging and monitoring your MCP server
 - **`opentelemetry_default_exporter`**: Sets the default trace exporter. Can be overridden by the `OTEL_TRACES_EXPORTER` environment variable
 
 ## Features
+
+### 🏥 Health Check Support
+
+Golf includes built-in health check endpoint support for production deployments. When enabled, it automatically adds a custom HTTP route that can be used by:
+- Kubernetes readiness and liveness probes
+- Load balancers and reverse proxies
+- Monitoring systems
+- Container orchestration platforms
+
+#### Configuration
+
+Enable health checks in your `golf.json`:
+```json
+{
+  "health_check_enabled": true,
+  "health_check_path": "/health",
+  "health_check_response": "Service is healthy"
+}
+```
+
+The generated server will include a route like:
+```python
+@mcp.custom_route('/health', methods=["GET"])
+async def health_check(request: Request) -> PlainTextResponse:
+    """Health check endpoint for Kubernetes and load balancers."""
+    return PlainTextResponse("Service is healthy")
+```
 
 ### 🔍 OpenTelemetry Support
 
