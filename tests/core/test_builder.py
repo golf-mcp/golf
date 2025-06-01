@@ -93,7 +93,7 @@ export = delete_file
         
         # Should merge default title with custom annotations
         annotations = tool["annotations"]
-        assert annotations["title"] == "Delete File"  # Default title
+        assert annotations["title"] == "Delete_File"  # Default title (underscores preserved)
         assert annotations["readOnlyHint"] is False
         assert annotations["destructiveHint"] is True
         assert annotations["idempotentHint"] is False
