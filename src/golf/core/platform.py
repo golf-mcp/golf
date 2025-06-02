@@ -31,7 +31,7 @@ async def register_project_with_platform(
         True if registration succeeded or was skipped, False if failed
     """
     # Check if platform integration is enabled
-    api_key = os.getenv("GOLF_PLATFORM_API_KEY")
+    api_key = os.getenv("GOLF_API_KEY")
     if not api_key:
         return True  # Skip silently if no API key
 
@@ -48,7 +48,7 @@ async def register_project_with_platform(
         "project_name": settings.name,
         "description": settings.description,
         "server_id": server_id,
-        "components": _build_component_list(components),
+        "components": _build_component_list(components, project_path),
         "build_timestamp": datetime.utcnow().isoformat(),
         "golf_version": __version__,
         "component_counts": _get_component_counts(components),
@@ -65,10 +65,10 @@ async def register_project_with_platform(
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                "https://api.golf.dev/api/v1/projects",
+                "http://localhost:8000/api/resources",
                 json=metadata,
                 headers={
-                    "Authorization": f"Bearer {api_key}",
+                    "X-Golf-Key": api_key,
                     "Content-Type": "application/json",
                     "User-Agent": f"Golf-MCP/{__version__}",
                 },
@@ -102,11 +102,13 @@ async def register_project_with_platform(
 
 def _build_component_list(
     components: dict[ComponentType, list[ParsedComponent]],
+    project_path: Path,
 ) -> list[dict[str, Any]]:
     """Convert parsed components to platform format.
 
     Args:
         components: Dictionary of parsed components by type
+        project_path: Path to the project root
 
     Returns:
         List of component metadata dictionaries
@@ -115,33 +117,44 @@ def _build_component_list(
 
     for comp_type, comp_list in components.items():
         for comp in comp_list:
+            # Start with basic component data
             component_data = {
                 "name": comp.name,
                 "type": comp_type.value,
                 "description": comp.docstring,
-                "file_path": str(comp.file_path) if comp.file_path else None,
                 "entry_function": comp.entry_function,
                 "parent_module": comp.parent_module,
             }
 
-            # Add schema information if available
+            # Add file path relative to project root if available
+            if comp.file_path:
+                try:
+                    file_path = Path(comp.file_path)
+                    # Use the provided project_path for relative calculation
+                    rel_path = file_path.relative_to(project_path)
+                    component_data["file_path"] = str(rel_path)
+                except ValueError:
+                    # If relative_to fails, try to find a common path or use filename
+                    component_data["file_path"] = Path(comp.file_path).name
+
+            # Add schema information only if available and not None
             if hasattr(comp, "input_schema") and comp.input_schema:
                 component_data["input_schema"] = comp.input_schema
             if hasattr(comp, "output_schema") and comp.output_schema:
                 component_data["output_schema"] = comp.output_schema
 
-            # Add component-specific fields
+            # Add component-specific fields only if they have values
             if comp_type == ComponentType.RESOURCE:
                 if hasattr(comp, "uri_template") and comp.uri_template:
                     component_data["uri_template"] = comp.uri_template
-                if hasattr(comp, "parameters") and comp.parameters:
-                    component_data["parameters"] = comp.parameters
 
             elif comp_type == ComponentType.TOOL:
                 if hasattr(comp, "annotations") and comp.annotations:
                     component_data["annotations"] = comp.annotations
-                if hasattr(comp, "parameters") and comp.parameters:
-                    component_data["parameters"] = comp.parameters
+
+            # Add parameters only if they exist and are not empty
+            if hasattr(comp, "parameters") and comp.parameters:
+                component_data["parameters"] = comp.parameters
 
             result.append(component_data)
 

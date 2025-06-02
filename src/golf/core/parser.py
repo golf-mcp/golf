@@ -199,30 +199,357 @@ class AstParser:
         file_path: Path,
     ) -> None:
         """Process the entry function to extract parameters and return type."""
-        # Extract function docstring
-        ast.get_docstring(func_node)
-
-        # Extract parameter names and annotations
-        parameters = []
-        for arg in func_node.args.args:
-            # Skip self, cls parameters
-            if arg.arg in ("self", "cls"):
-                continue
-
-            # Skip ctx parameter - GolfMCP will inject this
-            if arg.arg == "ctx":
-                continue
-
-            parameters.append(arg.arg)
-
         # Check for return annotation - STRICT requirement
         if func_node.returns is None:
             raise ValueError(
                 f"Missing return annotation for {func_node.name} function in {file_path}"
             )
 
+        # Extract parameter names for basic info
+        parameters = []
+        for arg in func_node.args.args:
+            # Skip self, cls, ctx parameters
+            if arg.arg not in ("self", "cls", "ctx"):
+                parameters.append(arg.arg)
+
         # Store parameters
         component.parameters = parameters
+
+        # Extract schemas using runtime inspection (safer and more accurate)
+        try:
+            self._extract_schemas_at_runtime(component, file_path)
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: Could not extract schemas from {file_path}: {e}[/yellow]"
+            )
+            # Continue without schemas - better than failing the build
+
+    def _extract_schemas_at_runtime(
+        self, component: ParsedComponent, file_path: Path
+    ) -> None:
+        """Extract input/output schemas by importing and inspecting the actual function."""
+        import importlib.util
+        import sys
+
+        # Convert file path to module name
+        rel_path = file_path.relative_to(self.project_root)
+        module_name = str(rel_path.with_suffix("")).replace("/", ".")
+
+        # Temporarily add project root to sys.path
+        project_root_str = str(self.project_root)
+        if project_root_str not in sys.path:
+            sys.path.insert(0, project_root_str)
+            cleanup_path = True
+        else:
+            cleanup_path = False
+
+        try:
+            # Import the module
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            if spec is None or spec.loader is None:
+                return
+
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            # Get the entry function
+            if not hasattr(module, component.entry_function):
+                return
+
+            func = getattr(module, component.entry_function)
+
+            # Extract input schema from function signature
+            component.input_schema = self._extract_input_schema(func)
+
+            # Extract output schema from return type annotation
+            component.output_schema = self._extract_output_schema(func)
+
+        finally:
+            # Clean up sys.path
+            if cleanup_path and project_root_str in sys.path:
+                sys.path.remove(project_root_str)
+
+    def _extract_input_schema(self, func) -> dict[str, Any] | None:
+        """Extract input schema from function signature using runtime inspection."""
+        import inspect
+        from typing import get_type_hints
+
+        try:
+            sig = inspect.signature(func)
+            type_hints = get_type_hints(func, include_extras=True)
+
+            properties = {}
+            required = []
+
+            for param_name, param in sig.parameters.items():
+                # Skip special parameters
+                if param_name in ("self", "cls", "ctx"):
+                    continue
+
+                # Get type hint
+                if param_name not in type_hints:
+                    continue
+
+                type_hint = type_hints[param_name]
+
+                # Extract schema for this parameter
+                param_schema = self._extract_param_schema_from_hint(
+                    type_hint, param_name
+                )
+                if param_schema:
+                    # Clean the schema to remove problematic objects
+                    cleaned_schema = self._clean_schema(param_schema)
+                    if cleaned_schema:
+                        properties[param_name] = cleaned_schema
+
+                        # Check if required (no default value)
+                        if param.default is param.empty:
+                            required.append(param_name)
+
+            if properties:
+                return {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                }
+
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: Could not extract input schema: {e}[/yellow]"
+            )
+
+        return None
+
+    def _extract_output_schema(self, func) -> dict[str, Any] | None:
+        """Extract output schema from return type annotation."""
+        from typing import get_type_hints
+
+        try:
+            type_hints = get_type_hints(func, include_extras=True)
+            return_type = type_hints.get("return")
+
+            if return_type is None:
+                return None
+
+            # If it's a Pydantic BaseModel, extract schema manually
+            if hasattr(return_type, "model_fields"):
+                return self._extract_pydantic_model_schema(return_type)
+
+            # For other types, create a simple schema
+            return self._type_to_schema(return_type)
+
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: Could not extract output schema: {e}[/yellow]"
+            )
+
+        return None
+
+    def _extract_pydantic_model_schema(self, model_class) -> dict[str, Any]:
+        """Extract schema from Pydantic model by inspecting fields directly."""
+        try:
+            schema = {"type": "object", "properties": {}, "required": []}
+
+            if hasattr(model_class, "model_fields"):
+                for field_name, field_info in model_class.model_fields.items():
+                    # Extract field type
+                    field_type = (
+                        field_info.annotation
+                        if hasattr(field_info, "annotation")
+                        else None
+                    )
+                    if field_type:
+                        field_schema = self._type_to_schema(field_type)
+
+                        # Add description if available
+                        if (
+                            hasattr(field_info, "description")
+                            and field_info.description
+                        ):
+                            field_schema["description"] = field_info.description
+
+                        # Add title
+                        field_schema["title"] = field_name.replace("_", " ").title()
+
+                        # Add default if available
+                        if (
+                            hasattr(field_info, "default")
+                            and field_info.default is not None
+                        ):
+                            try:
+                                # Only add if it's JSON serializable
+                                import json
+
+                                json.dumps(field_info.default)
+                                field_schema["default"] = field_info.default
+                            except:
+                                pass
+
+                        schema["properties"][field_name] = field_schema
+
+                        # Check if required
+                        if (
+                            hasattr(field_info, "is_required")
+                            and field_info.is_required()
+                        ):
+                            schema["required"].append(field_name)
+                        elif (
+                            not hasattr(field_info, "default")
+                            or field_info.default is None
+                        ):
+                            # Assume required if no default
+                            schema["required"].append(field_name)
+
+            return schema
+
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: Could not extract Pydantic model schema: {e}[/yellow]"
+            )
+            return {"type": "object"}
+
+    def _clean_schema(self, schema) -> dict[str, Any]:
+        """Clean up a schema to remove non-JSON-serializable objects."""
+        import json
+
+        def clean_object(obj):
+            if obj is None:
+                return None
+            elif isinstance(obj, (str, int, float, bool)):
+                return obj
+            elif isinstance(obj, dict):
+                cleaned = {}
+                for k, v in obj.items():
+                    # Skip problematic keys
+                    if k in ["definitions", "$defs", "allOf", "anyOf", "oneOf"]:
+                        continue
+                    cleaned_v = clean_object(v)
+                    if cleaned_v is not None:
+                        cleaned[k] = cleaned_v
+                return cleaned if cleaned else None
+            elif isinstance(obj, list):
+                cleaned = []
+                for item in obj:
+                    cleaned_item = clean_object(item)
+                    if cleaned_item is not None:
+                        cleaned.append(cleaned_item)
+                return cleaned if cleaned else None
+            else:
+                # For any other type, test JSON serializability
+                try:
+                    json.dumps(obj)
+                    return obj
+                except (TypeError, ValueError):
+                    # If it's not JSON serializable, try to get a string representation
+                    if hasattr(obj, "__name__"):
+                        return obj.__name__
+                    elif hasattr(obj, "__str__"):
+                        try:
+                            str_val = str(obj)
+                            if str_val and str_val != repr(obj):
+                                return str_val
+                        except:
+                            pass
+                    return None
+
+        cleaned = clean_object(schema)
+        return cleaned if cleaned else {"type": "object"}
+
+    def _extract_param_schema_from_hint(
+        self, type_hint, param_name: str
+    ) -> dict[str, Any] | None:
+        """Extract parameter schema from type hint (including Annotated types)."""
+        from typing import get_args, get_origin
+
+        # Handle Annotated types
+        if get_origin(type_hint) is not None:
+            origin = get_origin(type_hint)
+            args = get_args(type_hint)
+
+            # Check for Annotated[Type, Field(...)]
+            if (
+                hasattr(origin, "__name__")
+                and origin.__name__ == "Annotated"
+                and len(args) >= 2
+            ):
+                base_type = args[0]
+                metadata = args[1:]
+
+                # Start with base type schema
+                schema = self._type_to_schema(base_type)
+
+                # Extract Field metadata
+                for meta in metadata:
+                    if hasattr(meta, "description") and meta.description:
+                        schema["description"] = meta.description
+                    if hasattr(meta, "title") and meta.title:
+                        schema["title"] = meta.title
+                    if hasattr(meta, "default") and meta.default is not None:
+                        schema["default"] = meta.default
+                    # Add other Field constraints as needed
+
+                return schema
+
+        # For non-Annotated types, just convert the type
+        return self._type_to_schema(type_hint)
+
+    def _type_to_schema(self, type_hint) -> dict[str, Any]:
+        """Convert a Python type to JSON schema."""
+        from typing import get_args, get_origin
+        import types
+
+        # Handle None/NoneType
+        if type_hint is type(None):
+            return {"type": "null"}
+
+        # Handle basic types
+        if type_hint is str:
+            return {"type": "string"}
+        elif type_hint is int:
+            return {"type": "integer"}
+        elif type_hint is float:
+            return {"type": "number"}
+        elif type_hint is bool:
+            return {"type": "boolean"}
+        elif type_hint is list:
+            return {"type": "array"}
+        elif type_hint is dict:
+            return {"type": "object"}
+
+        # Handle generic types
+        origin = get_origin(type_hint)
+        if origin is not None:
+            args = get_args(type_hint)
+
+            if origin is list:
+                if args:
+                    item_schema = self._type_to_schema(args[0])
+                    return {"type": "array", "items": item_schema}
+                return {"type": "array"}
+
+            elif origin is dict:
+                return {"type": "object"}
+
+            elif (
+                origin is types.UnionType
+                or (hasattr(types, "UnionType") and origin is types.UnionType)
+                or str(origin).startswith("typing.Union")
+            ):
+                # Handle Union types (including Optional)
+                non_none_types = [arg for arg in args if arg is not type(None)]
+                if len(non_none_types) == 1:
+                    # This is Optional[Type]
+                    return self._type_to_schema(non_none_types[0])
+                # For complex unions, default to object
+                return {"type": "object"}
+
+        # For unknown types, try to use Pydantic schema if available
+        if hasattr(type_hint, "model_json_schema"):
+            schema = type_hint.model_json_schema()
+            return self._clean_schema(schema)
+
+        # Default fallback
+        return {"type": "object"}
 
     def _process_tool(self, component: ParsedComponent, tree: ast.Module) -> None:
         """Process a tool component to extract input/output schemas and annotations."""
@@ -349,11 +676,28 @@ class AstParser:
                 else:
                     annotation = ast.unparse(node.annotation)
 
-                # Create property definition
-                prop = {
-                    "type": self._type_hint_to_json_type(annotation),
-                    "title": field_name.replace("_", " ").title(),
-                }
+                # Create property definition using improved type extraction
+                if isinstance(node.annotation, ast.Subscript):
+                    # Use the improved complex type extraction
+                    type_schema = self._extract_complex_type_schema(node.annotation)
+                    if isinstance(type_schema, dict) and "type" in type_schema:
+                        prop = type_schema.copy()
+                        prop["title"] = field_name.replace("_", " ").title()
+                    else:
+                        prop = {
+                            "type": self._type_hint_to_json_type(annotation),
+                            "title": field_name.replace("_", " ").title(),
+                        }
+                elif isinstance(node.annotation, ast.Name):
+                    prop = {
+                        "type": self._type_hint_to_json_type(node.annotation.id),
+                        "title": field_name.replace("_", " ").title(),
+                    }
+                else:
+                    prop = {
+                        "type": self._type_hint_to_json_type(annotation),
+                        "title": field_name.replace("_", " ").title(),
+                    }
 
                 # Extract default value if present
                 if node.value is not None:
@@ -431,9 +775,13 @@ class AstParser:
     def _type_hint_to_json_type(self, type_hint: str) -> str:
         """Convert a Python type hint to a JSON schema type.
 
-        This is a simplified version. A more sophisticated approach would
-        handle complex types correctly.
+        This handles complex types and edge cases better than the original version.
         """
+        # Handle None type
+        if type_hint.lower() in ["none", "nonetype"]:
+            return "null"
+
+        # Handle basic types first
         type_map = {
             "str": "string",
             "int": "integer",
@@ -441,15 +789,53 @@ class AstParser:
             "bool": "boolean",
             "list": "array",
             "dict": "object",
+            "any": "object",  # Any maps to object
         }
 
-        # Handle simple types
-        for py_type, json_type in type_map.items():
-            if py_type in type_hint.lower():
-                return json_type
+        # Exact matches for simple types
+        lower_hint = type_hint.lower()
+        if lower_hint in type_map:
+            return type_map[lower_hint]
 
-        # Default to string for unknown types
-        return "string"
+        # Handle common complex patterns
+        if "list[" in type_hint or "List[" in type_hint:
+            return "array"
+        elif "dict[" in type_hint or "Dict[" in type_hint:
+            return "object"
+        elif "union[" in type_hint or "Union[" in type_hint:
+            # For Union types, try to extract the first non-None type
+            if "none" in lower_hint or "nonetype" in lower_hint:
+                # This is Optional[SomeType] - extract the SomeType
+                for basic_type in type_map:
+                    if basic_type in lower_hint:
+                        return type_map[basic_type]
+            return "object"  # Fallback for complex unions
+        elif "optional[" in type_hint or "Optional[" in type_hint:
+            # Extract the wrapped type from Optional[Type]
+            for basic_type in type_map:
+                if basic_type in lower_hint:
+                    return type_map[basic_type]
+            return "object"
+
+        # Handle some common pydantic/typing types
+        if any(keyword in lower_hint for keyword in ["basemodel", "model"]):
+            return "object"
+
+        # Check for numeric patterns
+        if any(num_type in lower_hint for num_type in ["int", "integer", "number"]):
+            return "integer"
+        elif any(num_type in lower_hint for num_type in ["float", "double", "decimal"]):
+            return "number"
+        elif any(str_type in lower_hint for str_type in ["str", "string", "text"]):
+            return "string"
+        elif any(bool_type in lower_hint for bool_type in ["bool", "boolean"]):
+            return "boolean"
+
+        # Default to object for unknown complex types, string for simple unknowns
+        if "[" in type_hint or "." in type_hint:
+            return "object"
+        else:
+            return "string"
 
     def _extract_dict_from_ast(self, dict_node: ast.Dict) -> dict[str, Any]:
         """Extract a dictionary from an AST Dict node.
@@ -490,6 +876,119 @@ class AstParser:
             # We could add more complex value handling here if needed
 
         return result
+
+    def _extract_complex_type_schema(self, subscript: ast.Subscript) -> dict[str, Any]:
+        """Extract schema from complex types like list[str], dict[str, Any], etc."""
+        if isinstance(subscript.value, ast.Name):
+            base_type = subscript.value.id
+
+            if base_type == "list":
+                # Handle list[ItemType]
+                if isinstance(subscript.slice, ast.Name):
+                    item_type = self._type_hint_to_json_type(subscript.slice.id)
+                    return {"type": "array", "items": {"type": item_type}}
+                elif isinstance(subscript.slice, ast.Subscript):
+                    # Nested subscript like list[dict[str, Any]]
+                    item_schema = self._extract_complex_type_schema(subscript.slice)
+                    return {"type": "array", "items": item_schema}
+                else:
+                    # Complex item type, try to parse it
+                    item_type_str = ast.unparse(subscript.slice)
+                    if "dict" in item_type_str.lower():
+                        return {"type": "array", "items": {"type": "object"}}
+                    else:
+                        item_type = self._type_hint_to_json_type(item_type_str)
+                        return {"type": "array", "items": {"type": item_type}}
+
+            elif base_type == "dict":
+                return {"type": "object"}
+
+            elif base_type in ["Optional", "Union"]:
+                # Handle Optional[Type] or Union[Type, None]
+                return self._handle_optional_type(subscript)
+
+        # Fallback
+        type_str = ast.unparse(subscript)
+        return {"type": self._type_hint_to_json_type(type_str)}
+
+    def _handle_union_type(self, union_node: ast.BinOp) -> dict[str, Any]:
+        """Handle union types like str | None."""
+        # For now, just extract the first non-None type
+        left_type = self._extract_type_from_node(union_node.left)
+        right_type = self._extract_type_from_node(union_node.right)
+
+        # If one side is None, return the other type
+        if isinstance(right_type, str) and right_type == "null":
+            return left_type if isinstance(left_type, dict) else {"type": left_type}
+        elif isinstance(left_type, str) and left_type == "null":
+            return right_type if isinstance(right_type, dict) else {"type": right_type}
+
+        # Otherwise, return the first type
+        return left_type if isinstance(left_type, dict) else {"type": left_type}
+
+    def _handle_optional_type(self, subscript: ast.Subscript) -> dict[str, Any]:
+        """Handle Optional[Type] annotations."""
+        if isinstance(subscript.slice, ast.Name):
+            base_type = self._type_hint_to_json_type(subscript.slice.id)
+            return {"type": base_type}
+        elif isinstance(subscript.slice, ast.Subscript):
+            return self._extract_complex_type_schema(subscript.slice)
+        else:
+            type_str = ast.unparse(subscript.slice)
+            return {"type": self._type_hint_to_json_type(type_str)}
+
+    def _is_parameter_required(
+        self, position: int, defaults: list, total_args: int
+    ) -> bool:
+        """Check if a function parameter is required (has no default value)."""
+        if position >= total_args or position < 0:
+            return True  # Default to required if position is out of range
+
+        # If there are no defaults, all parameters are required
+        if not defaults:
+            return True
+
+        # Defaults apply to the last N parameters where N = len(defaults)
+        # So if we have 4 args and 2 defaults, defaults apply to args[2] and args[3]
+        args_with_defaults = len(defaults)
+        first_default_position = total_args - args_with_defaults
+
+        # If this parameter's position is before the first default position, it's required
+        return position < first_default_position
+
+    def _extract_return_type_schema(
+        self, return_annotation: ast.AST, tree: ast.Module
+    ) -> dict[str, Any] | None:
+        """Extract schema from function return type annotation."""
+        if isinstance(return_annotation, ast.Name):
+            # Simple type like str, int, or a class name
+            if return_annotation.id in ["str", "int", "float", "bool", "list", "dict"]:
+                return {"type": self._type_hint_to_json_type(return_annotation.id)}
+            else:
+                # Assume it's a Pydantic model class - look for it in the module
+                return self._find_class_schema(return_annotation.id, tree)
+
+        elif isinstance(return_annotation, ast.Subscript):
+            # Complex type like list[dict], Optional[MyClass], etc.
+            return self._extract_complex_type_schema(return_annotation)
+
+        else:
+            # Other complex types
+            type_str = ast.unparse(return_annotation)
+            return {"type": self._type_hint_to_json_type(type_str)}
+
+    def _find_class_schema(
+        self, class_name: str, tree: ast.Module
+    ) -> dict[str, Any] | None:
+        """Find a class definition in the module and extract its schema."""
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                # Check if it inherits from BaseModel
+                for base in node.bases:
+                    if isinstance(base, ast.Name) and base.id == "BaseModel":
+                        return self._extract_pydantic_schema_from_ast(node)
+
+        return None
 
 
 def parse_project(project_path: Path) -> dict[ComponentType, list[ParsedComponent]]:

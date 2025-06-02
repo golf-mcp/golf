@@ -24,7 +24,7 @@ class TestPlatformRegistration:
     ) -> None:
         """Test successful platform registration with API key and server ID."""
         # Set environment variables
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         # Create a sample tool
@@ -71,11 +71,11 @@ export = test_function
             # Verify the HTTP request was made correctly
             mock_context.post.assert_called_once()
             call_args = mock_context.post.call_args
-            assert call_args.args[0] == "https://api.golf.dev/api/v1/projects"
+            assert call_args.args[0] == "http://localhost:8000/api/resources"
 
             # Verify request headers
             headers = call_args.kwargs["headers"]
-            assert headers["Authorization"] == "Bearer test-api-key"
+            assert headers["X-Golf-Key"] == "test-api-key"
             assert headers["Content-Type"] == "application/json"
             assert "Golf-MCP/" in headers["User-Agent"]
 
@@ -93,7 +93,7 @@ export = test_function
     ) -> None:
         """Test that registration is skipped when no API key is provided."""
         # Ensure no API key is set
-        monkeypatch.delenv("GOLF_PLATFORM_API_KEY", raising=False)
+        monkeypatch.delenv("GOLF_API_KEY", raising=False)
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -111,7 +111,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test that registration is skipped when no server ID is provided."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         # Ensure no server ID is set
         monkeypatch.delenv("GOLF_SERVER_ID", raising=False)
 
@@ -136,7 +136,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of HTTP timeout errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -161,7 +161,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of authentication errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "invalid-key")
+        monkeypatch.setenv("GOLF_API_KEY", "invalid-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -192,7 +192,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of forbidden access errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "valid-key")
+        monkeypatch.setenv("GOLF_API_KEY", "valid-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -223,7 +223,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of server errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -254,7 +254,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of network errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -298,7 +298,7 @@ class TestComponentListBuilder:
         )
 
         components = {ComponentType.TOOL: [tool_component]}
-        component_list = _build_component_list(components)
+        component_list = _build_component_list(components, sample_project)
 
         assert len(component_list) == 1
         assert component_list[0]["name"] == "test-tool"
@@ -309,6 +309,8 @@ class TestComponentListBuilder:
         assert component_list[0]["output_schema"] is not None
         assert component_list[0]["annotations"] == {"title": "Test Tool"}
         assert component_list[0]["parameters"] == ["name"]
+        # Check that file path is relative
+        assert component_list[0]["file_path"] == "tools/test.py"
 
     def test_builds_component_list_with_resources(self, sample_project: Path) -> None:
         """Test building component list with resources."""
@@ -325,7 +327,7 @@ class TestComponentListBuilder:
         )
 
         components = {ComponentType.RESOURCE: [resource_component]}
-        component_list = _build_component_list(components)
+        component_list = _build_component_list(components, sample_project)
 
         assert len(component_list) == 1
         assert component_list[0]["name"] == "test-resource"
@@ -334,6 +336,7 @@ class TestComponentListBuilder:
         assert component_list[0]["entry_function"] == "get_resource"
         assert component_list[0]["uri_template"] == "/api/users/{user_id}"
         assert component_list[0]["parameters"] == ["user_id"]
+        assert component_list[0]["file_path"] == "resources/test.py"
 
     def test_builds_component_list_with_prompts(self, sample_project: Path) -> None:
         """Test building component list with prompts."""
@@ -349,7 +352,7 @@ class TestComponentListBuilder:
         )
 
         components = {ComponentType.PROMPT: [prompt_component]}
-        component_list = _build_component_list(components)
+        component_list = _build_component_list(components, sample_project)
 
         assert len(component_list) == 1
         assert component_list[0]["name"] == "test-prompt"
@@ -359,6 +362,7 @@ class TestComponentListBuilder:
         # Only check for parameters if they exist
         if "parameters" in component_list[0]:
             assert component_list[0]["parameters"] == ["context"]
+        assert component_list[0]["file_path"] == "prompts/test.py"
 
     def test_handles_mixed_component_types(self, sample_project: Path) -> None:
         """Test building component list with mixed component types."""
@@ -393,13 +397,19 @@ class TestComponentListBuilder:
             ComponentType.PROMPT: [prompt_component],
         }
 
-        component_list = _build_component_list(components)
+        component_list = _build_component_list(components, sample_project)
 
         assert len(component_list) == 3
         component_types = [comp["type"] for comp in component_list]
         assert "tool" in component_types
         assert "resource" in component_types
         assert "prompt" in component_types
+
+        # Check that all file paths are relative
+        for comp in component_list:
+            assert not comp["file_path"].startswith(
+                "/"
+            )  # Should be relative, not absolute
 
 
 class TestComponentCounts:
