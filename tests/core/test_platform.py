@@ -407,7 +407,9 @@ class TestComponentListBuilder:
 
         # Check that all file paths are relative
         for comp in component_list:
-            assert not comp["file_path"].startswith("/")  # Should be relative, not absolute
+            assert not comp["file_path"].startswith(
+                "/"
+            )  # Should be relative, not absolute
 
 
 class TestComponentCounts:
