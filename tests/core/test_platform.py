@@ -327,7 +327,7 @@ class TestComponentListBuilder:
         )
 
         components = {ComponentType.RESOURCE: [resource_component]}
-        component_list = _build_component_list(components)
+        component_list = _build_component_list(components, sample_project)
 
         assert len(component_list) == 1
         assert component_list[0]["name"] == "test-resource"
@@ -336,6 +336,7 @@ class TestComponentListBuilder:
         assert component_list[0]["entry_function"] == "get_resource"
         assert component_list[0]["uri_template"] == "/api/users/{user_id}"
         assert component_list[0]["parameters"] == ["user_id"]
+        assert component_list[0]["file_path"] == "resources/test.py"
 
     def test_builds_component_list_with_prompts(self, sample_project: Path) -> None:
         """Test building component list with prompts."""
@@ -351,7 +352,7 @@ class TestComponentListBuilder:
         )
 
         components = {ComponentType.PROMPT: [prompt_component]}
-        component_list = _build_component_list(components)
+        component_list = _build_component_list(components, sample_project)
 
         assert len(component_list) == 1
         assert component_list[0]["name"] == "test-prompt"
@@ -361,6 +362,7 @@ class TestComponentListBuilder:
         # Only check for parameters if they exist
         if "parameters" in component_list[0]:
             assert component_list[0]["parameters"] == ["context"]
+        assert component_list[0]["file_path"] == "prompts/test.py"
 
     def test_handles_mixed_component_types(self, sample_project: Path) -> None:
         """Test building component list with mixed component types."""
@@ -395,13 +397,17 @@ class TestComponentListBuilder:
             ComponentType.PROMPT: [prompt_component],
         }
 
-        component_list = _build_component_list(components)
+        component_list = _build_component_list(components, sample_project)
 
         assert len(component_list) == 3
         component_types = [comp["type"] for comp in component_list]
         assert "tool" in component_types
         assert "resource" in component_types
         assert "prompt" in component_types
+
+        # Check that all file paths are relative
+        for comp in component_list:
+            assert not comp["file_path"].startswith("/")  # Should be relative, not absolute
 
 
 class TestComponentCounts:
