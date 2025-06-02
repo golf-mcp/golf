@@ -24,7 +24,7 @@ class TestPlatformRegistration:
     ) -> None:
         """Test successful platform registration with API key and server ID."""
         # Set environment variables
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         # Create a sample tool
@@ -71,7 +71,7 @@ export = test_function
             # Verify the HTTP request was made correctly
             mock_context.post.assert_called_once()
             call_args = mock_context.post.call_args
-            assert call_args.args[0] == "https://api.golf.dev/api/v1/projects"
+            assert call_args.args[0] == "http://localhost:8000/api/resources"
 
             # Verify request headers
             headers = call_args.kwargs["headers"]
@@ -93,7 +93,7 @@ export = test_function
     ) -> None:
         """Test that registration is skipped when no API key is provided."""
         # Ensure no API key is set
-        monkeypatch.delenv("GOLF_PLATFORM_API_KEY", raising=False)
+        monkeypatch.delenv("GOLF_API_KEY", raising=False)
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -111,7 +111,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test that registration is skipped when no server ID is provided."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         # Ensure no server ID is set
         monkeypatch.delenv("GOLF_SERVER_ID", raising=False)
 
@@ -136,7 +136,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of HTTP timeout errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -161,7 +161,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of authentication errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "invalid-key")
+        monkeypatch.setenv("GOLF_API_KEY", "invalid-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -192,7 +192,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of forbidden access errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "valid-key")
+        monkeypatch.setenv("GOLF_API_KEY", "valid-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -223,7 +223,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of server errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
@@ -254,7 +254,7 @@ export = test_function
         self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of network errors."""
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         settings = load_settings(sample_project)
