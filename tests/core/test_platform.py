@@ -75,7 +75,7 @@ export = test_function
 
             # Verify request headers
             headers = call_args.kwargs["headers"]
-            assert headers["Authorization"] == "Bearer test-api-key"
+            assert headers["X-Golf-Key"] == "test-api-key"
             assert headers["Content-Type"] == "application/json"
             assert "Golf-MCP/" in headers["User-Agent"]
 
