@@ -751,15 +751,17 @@ class AstParser:
         if position >= total_args or position < 0:
             return True  # Default to required if position is out of range
         
-        # Calculate the position of this argument
-        # Defaults are for the last N arguments where N = len(defaults)
-        args_with_defaults = len(defaults)
-        args_without_defaults = total_args - args_with_defaults
+        # If there are no defaults, all parameters are required
+        if not defaults:
+            return True
         
-        # We need to figure out the position of this arg
-        # This is a simplified approach - in practice we'd need the arg's position
-        # For now, assume parameters without explicit Optional or default are required
-        return True  # Will be refined based on actual default detection
+        # Defaults apply to the last N parameters where N = len(defaults)
+        # So if we have 4 args and 2 defaults, defaults apply to args[2] and args[3] 
+        args_with_defaults = len(defaults)
+        first_default_position = total_args - args_with_defaults
+        
+        # If this parameter's position is before the first default position, it's required
+        return position < first_default_position
 
     def _extract_return_type_schema(self, return_annotation: ast.AST, tree: ast.Module) -> dict[str, Any] | None:
         """Extract schema from function return type annotation."""
