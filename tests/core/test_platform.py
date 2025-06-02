@@ -298,7 +298,7 @@ class TestComponentListBuilder:
         )
 
         components = {ComponentType.TOOL: [tool_component]}
-        component_list = _build_component_list(components)
+        component_list = _build_component_list(components, sample_project)
 
         assert len(component_list) == 1
         assert component_list[0]["name"] == "test-tool"
@@ -309,6 +309,8 @@ class TestComponentListBuilder:
         assert component_list[0]["output_schema"] is not None
         assert component_list[0]["annotations"] == {"title": "Test Tool"}
         assert component_list[0]["parameters"] == ["name"]
+        # Check that file path is relative
+        assert component_list[0]["file_path"] == "tools/test.py"
 
     def test_builds_component_list_with_resources(self, sample_project: Path) -> None:
         """Test building component list with resources."""
