@@ -229,10 +229,7 @@ class AstParser:
     ) -> None:
         """Extract input/output schemas by importing and inspecting the actual function."""
         import importlib.util
-        import inspect
-        from typing import get_type_hints, get_args, get_origin
         import sys
-        from pathlib import Path
 
         # Convert file path to module name
         rel_path = file_path.relative_to(self.project_root)
@@ -275,7 +272,7 @@ class AstParser:
     def _extract_input_schema(self, func) -> dict[str, Any] | None:
         """Extract input schema from function signature using runtime inspection."""
         import inspect
-        from typing import get_type_hints, get_args, get_origin
+        from typing import get_type_hints
 
         try:
             sig = inspect.signature(func)
@@ -325,7 +322,6 @@ class AstParser:
 
     def _extract_output_schema(self, func) -> dict[str, Any] | None:
         """Extract output schema from return type annotation."""
-        import inspect
         from typing import get_type_hints
 
         try:
