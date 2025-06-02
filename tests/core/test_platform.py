@@ -1,7 +1,5 @@
 """Tests for Golf MCP platform registration."""
 
-import json
-import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -74,7 +72,7 @@ export = test_function
             mock_context.post.assert_called_once()
             call_args = mock_context.post.call_args
             assert call_args.args[0] == "https://api.golf.dev/api/v1/projects"
-            
+
             # Verify request headers
             headers = call_args.kwargs["headers"]
             assert headers["Authorization"] == "Bearer test-api-key"
@@ -129,7 +127,9 @@ export = test_function
 
         # Check that warning message was printed (handle multiline output)
         captured = capsys.readouterr()
-        assert "GOLF_SERVER_ID environment variable required" in captured.out.replace("\n", " ").replace("  ", " ")
+        assert "GOLF_SERVER_ID environment variable required" in captured.out.replace(
+            "\n", " "
+        ).replace("  ", " ")
 
     @pytest.mark.asyncio
     async def test_handles_http_timeout(
@@ -289,7 +289,10 @@ class TestComponentListBuilder:
             docstring="Test tool description",
             entry_function="test_function",
             input_schema={"type": "object", "properties": {"name": {"type": "string"}}},
-            output_schema={"type": "object", "properties": {"result": {"type": "string"}}},
+            output_schema={
+                "type": "object",
+                "properties": {"result": {"type": "string"}},
+            },
             annotations={"title": "Test Tool"},
             parameters=["name"],
         )
