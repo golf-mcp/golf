@@ -31,7 +31,7 @@ async def register_project_with_platform(
         True if registration succeeded or was skipped, False if failed
     """
     # Check if platform integration is enabled
-    api_key = os.getenv("GOLF_PLATFORM_API_KEY")
+    api_key = os.getenv("GOLF_API_KEY")
     if not api_key:
         return True  # Skip silently if no API key
 
@@ -65,10 +65,10 @@ async def register_project_with_platform(
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                "https://api.golf.dev/api/v1/projects",
+                "http://localhost:8000/api/resources",
                 json=metadata,
                 headers={
-                    "Authorization": f"Bearer {api_key}",
+                    "X-Golf-Key": api_key,
                     "Content-Type": "application/json",
                     "User-Agent": f"Golf-MCP/{__version__}",
                 },
