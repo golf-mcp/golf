@@ -1,8 +1,9 @@
 """Tests for Golf MCP platform registration."""
 
 import json
+import os
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -21,7 +22,7 @@ class TestPlatformRegistration:
 
     @pytest.mark.asyncio
     async def test_successful_registration(
-        self, sample_project: Path, httpx_mock, monkeypatch
+        self, sample_project: Path, monkeypatch
     ) -> None:
         """Test successful platform registration with API key and server ID."""
         # Set environment variables
@@ -49,39 +50,44 @@ export = test_function
         )
 
         # Mock successful HTTP response
-        httpx_mock.add_response(
-            method="POST",
-            url="https://api.golf.dev/api/v1/projects",
-            json={"status": "success", "project_id": "123"},
-            status_code=200,
-        )
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status.return_value = None
 
-        # Load settings and parse components
-        settings = load_settings(sample_project)
-        components = parse_project(sample_project)
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_context = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_context
+            mock_context.post.return_value = mock_response
 
-        # Test registration
-        result = await register_project_with_platform(
-            sample_project, settings, components
-        )
+            # Load settings and parse components
+            settings = load_settings(sample_project)
+            components = parse_project(sample_project)
 
-        assert result is True
+            # Test registration
+            result = await register_project_with_platform(
+                sample_project, settings, components
+            )
 
-        # Verify the HTTP request was made correctly
-        request = httpx_mock.get_request()
-        assert request.method == "POST"
-        assert request.url == "https://api.golf.dev/api/v1/projects"
-        assert request.headers["Authorization"] == "Bearer test-api-key"
-        assert request.headers["Content-Type"] == "application/json"
-        assert "Golf-MCP/" in request.headers["User-Agent"]
+            assert result is True
 
-        # Verify request payload
-        payload = json.loads(request.content)
-        assert payload["project_name"] == "TestProject"
-        assert payload["server_id"] == "test-server-prod"
-        assert payload["golf_version"] is not None
-        assert "components" in payload
-        assert "component_counts" in payload
+            # Verify the HTTP request was made correctly
+            mock_context.post.assert_called_once()
+            call_args = mock_context.post.call_args
+            assert call_args.args[0] == "https://api.golf.dev/api/v1/projects"
+            
+            # Verify request headers
+            headers = call_args.kwargs["headers"]
+            assert headers["Authorization"] == "Bearer test-api-key"
+            assert headers["Content-Type"] == "application/json"
+            assert "Golf-MCP/" in headers["User-Agent"]
+
+            # Verify request payload
+            payload = call_args.kwargs["json"]
+            assert payload["project_name"] == "TestProject"
+            assert payload["server_id"] == "test-server-prod"
+            assert payload["golf_version"] is not None
+            assert "components" in payload
+            assert "component_counts" in payload
 
     @pytest.mark.asyncio
     async def test_skips_registration_without_api_key(
@@ -123,9 +129,7 @@ export = test_function
 
         # Check that warning message was printed (handle multiline output)
         captured = capsys.readouterr()
-        assert "GOLF_SERVER_ID environment variable required" in captured.out.replace(
-            "\n", " "
-        ).replace("  ", " ")
+        assert "GOLF_SERVER_ID environment variable required" in captured.out.replace("\n", " ").replace("  ", " ")
 
     @pytest.mark.asyncio
     async def test_handles_http_timeout(
@@ -154,25 +158,30 @@ export = test_function
 
     @pytest.mark.asyncio
     async def test_handles_auth_errors(
-        self, sample_project: Path, httpx_mock, monkeypatch, capsys
+        self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of authentication errors."""
         monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "invalid-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
-        # Mock 401 Unauthorized response
-        httpx_mock.add_response(
-            method="POST",
-            url="https://api.golf.dev/api/v1/projects",
-            status_code=401,
-        )
-
         settings = load_settings(sample_project)
         components = parse_project(sample_project)
 
-        result = await register_project_with_platform(
-            sample_project, settings, components
+        # Mock 401 Unauthorized response
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "401 Unauthorized", request=MagicMock(), response=mock_response
         )
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_context = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_context
+            mock_context.post.return_value = mock_response
+
+            result = await register_project_with_platform(
+                sample_project, settings, components
+            )
 
         assert result is False
         captured = capsys.readouterr()
@@ -180,25 +189,30 @@ export = test_function
 
     @pytest.mark.asyncio
     async def test_handles_forbidden_errors(
-        self, sample_project: Path, httpx_mock, monkeypatch, capsys
+        self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of forbidden access errors."""
         monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "valid-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
-        # Mock 403 Forbidden response
-        httpx_mock.add_response(
-            method="POST",
-            url="https://api.golf.dev/api/v1/projects",
-            status_code=403,
-        )
-
         settings = load_settings(sample_project)
         components = parse_project(sample_project)
 
-        result = await register_project_with_platform(
-            sample_project, settings, components
+        # Mock 403 Forbidden response
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "403 Forbidden", request=MagicMock(), response=mock_response
         )
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_context = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_context
+            mock_context.post.return_value = mock_response
+
+            result = await register_project_with_platform(
+                sample_project, settings, components
+            )
 
         assert result is False
         captured = capsys.readouterr()
@@ -206,25 +220,30 @@ export = test_function
 
     @pytest.mark.asyncio
     async def test_handles_server_errors(
-        self, sample_project: Path, httpx_mock, monkeypatch, capsys
+        self, sample_project: Path, monkeypatch, capsys
     ) -> None:
         """Test handling of server errors."""
         monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
-        # Mock 500 Internal Server Error response
-        httpx_mock.add_response(
-            method="POST",
-            url="https://api.golf.dev/api/v1/projects",
-            status_code=500,
-        )
-
         settings = load_settings(sample_project)
         components = parse_project(sample_project)
 
-        result = await register_project_with_platform(
-            sample_project, settings, components
+        # Mock 500 Internal Server Error response
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "500 Internal Server Error", request=MagicMock(), response=mock_response
         )
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_context = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_context
+            mock_context.post.return_value = mock_response
+
+            result = await register_project_with_platform(
+                sample_project, settings, components
+            )
 
         assert result is False
         captured = capsys.readouterr()
@@ -270,10 +289,7 @@ class TestComponentListBuilder:
             docstring="Test tool description",
             entry_function="test_function",
             input_schema={"type": "object", "properties": {"name": {"type": "string"}}},
-            output_schema={
-                "type": "object",
-                "properties": {"result": {"type": "string"}},
-            },
+            output_schema={"type": "object", "properties": {"result": {"type": "string"}}},
             annotations={"title": "Test Tool"},
             parameters=["name"],
         )
