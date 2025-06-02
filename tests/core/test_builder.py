@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import json
+from unittest.mock import AsyncMock, patch
 
 from golf.core.builder import build_manifest
 from golf.core.config import load_settings
@@ -893,27 +894,19 @@ class TestPlatformIntegration:
         self, sample_project: Path, temp_dir: Path, monkeypatch
     ) -> None:
         """Test that platform registration is called during prod builds."""
-        from unittest.mock import AsyncMock, patch
-
-        # Set up environment variables
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        # Set up environment for platform registration
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
-        # Create a simple tool
-        tool_file = sample_project / "tools" / "test_tool.py"
+        # Create a simple tool to ensure components exist
+        tools_dir = sample_project / "tools"
+        tools_dir.mkdir(exist_ok=True)
+        tool_file = tools_dir / "test_tool.py"
         tool_file.write_text(
             '''"""Test tool."""
 
-from pydantic import BaseModel
-
-
-class Output(BaseModel):
-    result: str
-
-
-def test_function() -> Output:
-    return Output(result="test")
-
+def test_function():
+    return "test"
 
 export = test_function
 '''
@@ -957,7 +950,7 @@ export = test_function
         from unittest.mock import patch
 
         # Set up environment variables
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-dev")
 
         # Create a simple tool
@@ -1006,7 +999,7 @@ export = test_function
         from unittest.mock import AsyncMock, patch
 
         # Set up environment variables
-        monkeypatch.setenv("GOLF_PLATFORM_API_KEY", "test-api-key")
+        monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
 
         # Create a simple tool
