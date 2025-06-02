@@ -1110,6 +1110,29 @@ def build_project(
     )
     generator.generate()
 
+    # Platform registration (only for prod builds)
+    if build_env == "prod":
+        import asyncio
+
+        try:
+            from golf.core.platform import register_project_with_platform
+
+            asyncio.run(
+                register_project_with_platform(
+                    project_path=project_path,
+                    settings=settings,
+                    components=generator.components,
+                )
+            )
+        except ImportError:
+            console.print(
+                "[yellow]Warning: Platform registration module not available[/yellow]"
+            )
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: Platform registration failed: {e}[/yellow]"
+            )
+
     # Create a simple README
     readme_content = f"""# {settings.name}
 
