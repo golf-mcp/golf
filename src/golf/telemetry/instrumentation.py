@@ -29,6 +29,15 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
     """
     global _provider
 
+    # Check for Golf platform integration first
+    golf_api_key = os.environ.get("GOLF_API_KEY")
+    if golf_api_key and not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+        # Auto-configure for Golf platform
+        os.environ["OTEL_TRACES_EXPORTER"] = "otlp_http"
+        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:8000/api/v1/otel"
+        os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"X-Golf-Key={golf_api_key}"
+        print("[INFO] Auto-configured OpenTelemetry for Golf platform ingestion")
+
     # Check for required environment variables based on exporter type
     exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "console").lower()
 
@@ -37,7 +46,8 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
         if not endpoint:
             print(
-                "[WARNING] OpenTelemetry tracing is disabled: OTEL_EXPORTER_OTLP_ENDPOINT is not set for OTLP HTTP exporter"
+                "[WARNING] OpenTelemetry tracing is disabled: "
+                "OTEL_EXPORTER_OTLP_ENDPOINT is not set for OTLP HTTP exporter"
             )
             return None
 
@@ -47,6 +57,14 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         "service.version": os.environ.get("SERVICE_VERSION", "1.0.0"),
         "service.instance.id": os.environ.get("SERVICE_INSTANCE_ID", "default"),
     }
+
+    # Add Golf-specific attributes if available
+    if golf_api_key:
+        golf_server_id = os.environ.get("GOLF_SERVER_ID")
+        if golf_server_id:
+            resource_attributes["golf.server.id"] = golf_server_id
+        resource_attributes["golf.platform.enabled"] = "true"
+
     resource = Resource.create(resource_attributes)
 
     # Create provider
@@ -71,6 +89,10 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
             exporter = OTLPSpanExporter(
                 endpoint=endpoint, headers=header_dict if header_dict else None
             )
+
+            # Log successful configuration for Golf platform
+            if golf_api_key:
+                print(f"[INFO] OpenTelemetry configured for Golf platform: {endpoint}")
         else:
             # Default to console exporter
             exporter = ConsoleSpanExporter(out=sys.stderr)
@@ -113,21 +135,6 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         traceback.print_exc()
         raise
 
-    # Create a test span to verify everything is working
-    try:
-        test_tracer = provider.get_tracer("golf.telemetry.test", "1.0.0")
-        with test_tracer.start_as_current_span("startup.test") as span:
-            span.set_attribute("test", True)
-            span.set_attribute("service.name", service_name)
-            span.set_attribute("exporter.type", exporter_type)
-            span.set_attribute(
-                "endpoint", os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "not set")
-            )
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-
     return provider
 
 
@@ -154,15 +161,8 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
     tracer = get_tracer()
 
-    # Add debug logging
-    print(
-        f"[TELEMETRY DEBUG] Instrumenting tool: {tool_name} (function: {func.__name__})"
-    )
-
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
-        print(f"[TELEMETRY DEBUG] Executing async tool: {tool_name}")
-
         # Create a more descriptive span name
         span_name = f"mcp.tool.{tool_name}.execute"
 
@@ -247,10 +247,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Add event for tool execution start
             span.add_event("tool.execution.started", {"tool.name": tool_name})
 
-            print(
-                f"[TELEMETRY DEBUG] Tool span created: {span_name} (span_id: {span.get_span_context().span_id:016x})"
-            )
-
             try:
                 result = await func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
@@ -288,9 +284,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                     # For any result, record its type
                     span.set_attribute("mcp.tool.result.class", type(result).__name__)
 
-                print(
-                    f"[TELEMETRY DEBUG] Tool execution completed successfully: {tool_name}"
-                )
                 return result
             except Exception as e:
                 span.record_exception(e)
@@ -305,13 +298,10 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                         "error.message": str(e),
                     },
                 )
-                print(f"[TELEMETRY DEBUG] Tool execution failed: {tool_name} - {e}")
                 raise
 
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
-        print(f"[TELEMETRY DEBUG] Executing sync tool: {tool_name}")
-
         # Create a more descriptive span name
         span_name = f"mcp.tool.{tool_name}.execute"
 
@@ -396,10 +386,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Add event for tool execution start
             span.add_event("tool.execution.started", {"tool.name": tool_name})
 
-            print(
-                f"[TELEMETRY DEBUG] Tool span created: {span_name} (span_id: {span.get_span_context().span_id:016x})"
-            )
-
             try:
                 result = func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
@@ -437,9 +423,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                     # For any result, record its type
                     span.set_attribute("mcp.tool.result.class", type(result).__name__)
 
-                print(
-                    f"[TELEMETRY DEBUG] Tool execution completed successfully: {tool_name}"
-                )
                 return result
             except Exception as e:
                 span.record_exception(e)
@@ -454,7 +437,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                         "error.message": str(e),
                     },
                 )
-                print(f"[TELEMETRY DEBUG] Tool execution failed: {tool_name} - {e}")
                 raise
 
     # Return appropriate wrapper based on function type
@@ -1004,16 +986,13 @@ async def telemetry_lifespan(mcp_instance):
             app = getattr(mcp_instance, "app", getattr(mcp_instance, "_app", None))
             if app and hasattr(app, "add_middleware"):
                 app.add_middleware(SessionTracingMiddleware)
-                print("[TELEMETRY DEBUG] Added SessionTracingMiddleware to FastMCP app")
 
         # Also try to instrument FastMCP's internal handlers
         if hasattr(mcp_instance, "_tool_manager") and hasattr(
             mcp_instance._tool_manager, "tools"
         ):
-            print(
-                f"[TELEMETRY DEBUG] Found {len(mcp_instance._tool_manager.tools)} tools in FastMCP"
-            )
             # The tools should already be instrumented when they were registered
+            pass
 
         # Try to patch FastMCP's request handling to ensure context propagation
         if hasattr(mcp_instance, "handle_request"):
@@ -1026,10 +1005,9 @@ async def telemetry_lifespan(mcp_instance):
                     return await original_handle_request(*args, **kwargs)
 
             mcp_instance.handle_request = traced_handle_request
-            print("[TELEMETRY DEBUG] Patched FastMCP handle_request method")
 
-    except Exception as e:
-        print(f"[TELEMETRY DEBUG] Error setting up telemetry middleware: {e}")
+    except Exception:
+        # Silently continue if middleware setup fails
         import traceback
 
         traceback.print_exc()

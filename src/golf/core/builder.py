@@ -561,7 +561,6 @@ class CodeGenerator:
         # Add OpenTelemetry imports if enabled
         if self.settings.opentelemetry_enabled:
             imports.extend(generate_telemetry_imports())
-            imports.append("")
 
         # Add imports section for different transport methods
         if self.settings.transport == "sse" or self.settings.transport in [
@@ -664,7 +663,10 @@ class CodeGenerator:
                 # Add code to register this component
                 if self.settings.opentelemetry_enabled:
                     # Use telemetry instrumentation
-                    registration = f"# Register the {component_type.value} '{component.name}' with telemetry"
+                    registration = (
+                        f"# Register the {component_type.value} "
+                        f"'{component.name}' with telemetry"
+                    )
                     entry_func = (
                         component.entry_function
                         if hasattr(component, "entry_function")
@@ -673,18 +675,31 @@ class CodeGenerator:
                     )
 
                     # Debug: Add logging to verify wrapping
-                    registration += f"\n_wrapped_func = instrument_{component_type.value}({full_module_path}.{entry_func}, '{component.name}')"
+                    registration += (
+                        f"\\n_wrapped_func = instrument_{component_type.value}("
+                        f"{full_module_path}.{entry_func}, '{component.name}')"
+                    )
 
                     if component_type == ComponentType.TOOL:
-                        registration += f'\nmcp.add_tool(_wrapped_func, name="{component.name}", description="{component.docstring or ""}"'
+                        registration += (
+                            f'\\nmcp.add_tool(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}"'
+                        )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
                             registration += f", annotations={component.annotations}"
                         registration += ")"
                     elif component_type == ComponentType.RESOURCE:
-                        registration += f'\nmcp.add_resource_fn(_wrapped_func, uri="{component.uri_template}", name="{component.name}", description="{component.docstring or ""}")'
+                        registration += (
+                            f"\\nmcp.add_resource_fn(_wrapped_func, "
+                            f'uri="{component.uri_template}", name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
+                        )
                     else:  # PROMPT
-                        registration += f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", description="{component.docstring or ""}")'
+                        registration += (
+                            f'\\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
+                        )
                 else:
                     # Standard registration without telemetry
                     if component_type == ComponentType.TOOL:
@@ -803,6 +818,18 @@ class CodeGenerator:
         server_code_lines.append(mcp_instance_line)
         server_code_lines.append("")
 
+        # Add early telemetry initialization if enabled (before component registration)
+        early_telemetry_init = []
+        if self.settings.opentelemetry_enabled:
+            early_telemetry_init.extend(
+                [
+                    "# Initialize telemetry early to ensure instrumentation works",
+                    "from golf.telemetry.instrumentation import init_telemetry",
+                    f'init_telemetry("{self.settings.name}")',
+                    "",
+                ]
+            )
+
         # Main entry point with transport-specific app initialization
         main_code = [
             'if __name__ == "__main__":',
@@ -917,12 +944,13 @@ class CodeGenerator:
 
         # Combine all sections
         # Order: imports, env_section, auth_setup, server_code (mcp init),
-        # post_init (API key middleware), component_registrations, main_code (run block)
+        # early_telemetry_init, component_registrations, health_check_code, main_code (run block)
         code = "\n".join(
             imports
             + env_section
             + auth_setup_code
             + server_code_lines
+            + early_telemetry_init
             + component_registrations
             + health_check_code
             + main_code
