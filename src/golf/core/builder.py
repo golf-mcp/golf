@@ -561,7 +561,6 @@ class CodeGenerator:
         # Add OpenTelemetry imports if enabled
         if self.settings.opentelemetry_enabled:
             imports.extend(generate_telemetry_imports())
-            imports.append("")
 
         # Add imports section for different transport methods
         if self.settings.transport == "sse" or self.settings.transport in [
@@ -803,6 +802,16 @@ class CodeGenerator:
         server_code_lines.append(mcp_instance_line)
         server_code_lines.append("")
 
+        # Add early telemetry initialization if enabled (before component registration)
+        early_telemetry_init = []
+        if self.settings.opentelemetry_enabled:
+            early_telemetry_init.extend([
+                "# Initialize telemetry early to ensure instrumentation works",
+                "from golf.telemetry.instrumentation import init_telemetry",
+                "init_telemetry(\"" + self.settings.name + "\")",
+                ""
+            ])
+
         # Main entry point with transport-specific app initialization
         main_code = [
             'if __name__ == "__main__":',
@@ -917,12 +926,13 @@ class CodeGenerator:
 
         # Combine all sections
         # Order: imports, env_section, auth_setup, server_code (mcp init),
-        # post_init (API key middleware), component_registrations, main_code (run block)
+        # early_telemetry_init, component_registrations, health_check_code, main_code (run block)
         code = "\n".join(
             imports
             + env_section
             + auth_setup_code
             + server_code_lines
+            + early_telemetry_init
             + component_registrations
             + health_check_code
             + main_code
