@@ -121,7 +121,11 @@ def build_dev(
         None, "--output-dir", "-o", help="Directory to output the built project"
     ),
 ) -> None:
-    """Build a development version with environment variables copied."""
+    """Build a development version with app environment variables copied.
+
+    Golf credentials (GOLF_*) are always loaded from .env for build operations.
+    All environment variables are copied to the built project for development.
+    """
     # Find project root directory
     project_root, config_path = find_project_root()
 
@@ -173,7 +177,14 @@ def build_prod(
         None, "--output-dir", "-o", help="Directory to output the built project"
     ),
 ) -> None:
-    """Build a production version without copying environment variables."""
+    """Build a production version for deployment.
+
+    Golf credentials (GOLF_*) are always loaded from .env for build operations
+    (platform registration, resource updates). App environment variables are
+    NOT copied for security - provide them in your deployment environment.
+
+    Your production deployment must include GOLF_* vars for runtime telemetry.
+    """
     # Find project root directory
     project_root, config_path = find_project_root()
 
