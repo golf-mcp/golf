@@ -674,15 +674,14 @@ class CodeGenerator:
                         else "export"
                     )
 
-                    # Debug: Add logging to verify wrapping
                     registration += (
-                        f"\\n_wrapped_func = instrument_{component_type.value}("
+                        f"\n_wrapped_func = instrument_{component_type.value}("
                         f"{full_module_path}.{entry_func}, '{component.name}')"
                     )
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\\nmcp.add_tool(_wrapped_func, name="{component.name}", '
+                            f'\nmcp.add_tool(_wrapped_func, name="{component.name}", '
                             f'description="{component.docstring or ""}"'
                         )
                         # Add annotations if present
@@ -691,13 +690,13 @@ class CodeGenerator:
                         registration += ")"
                     elif component_type == ComponentType.RESOURCE:
                         registration += (
-                            f"\\nmcp.add_resource_fn(_wrapped_func, "
+                            f"\nmcp.add_resource_fn(_wrapped_func, "
                             f'uri="{component.uri_template}", name="{component.name}", '
                             f'description="{component.docstring or ""}")'
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
+                            f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
                             f'description="{component.docstring or ""}")'
                         )
                 else:
