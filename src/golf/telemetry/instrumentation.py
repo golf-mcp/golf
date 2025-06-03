@@ -46,7 +46,8 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
         if not endpoint:
             print(
-                "[WARNING] OpenTelemetry tracing is disabled: OTEL_EXPORTER_OTLP_ENDPOINT is not set for OTLP HTTP exporter"
+                "[WARNING] OpenTelemetry tracing is disabled: "
+                "OTEL_EXPORTER_OTLP_ENDPOINT is not set for OTLP HTTP exporter"
             )
             return None
 
@@ -1005,7 +1006,7 @@ async def telemetry_lifespan(mcp_instance):
 
             mcp_instance.handle_request = traced_handle_request
 
-    except Exception as e:
+    except Exception:
         # Silently continue if middleware setup fails
         import traceback
 
