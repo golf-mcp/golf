@@ -56,14 +56,14 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         "service.version": os.environ.get("SERVICE_VERSION", "1.0.0"),
         "service.instance.id": os.environ.get("SERVICE_INSTANCE_ID", "default"),
     }
-    
+
     # Add Golf-specific attributes if available
     if golf_api_key:
         golf_server_id = os.environ.get("GOLF_SERVER_ID")
         if golf_server_id:
             resource_attributes["golf.server.id"] = golf_server_id
         resource_attributes["golf.platform.enabled"] = "true"
-    
+
     resource = Resource.create(resource_attributes)
 
     # Create provider
@@ -88,7 +88,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
             exporter = OTLPSpanExporter(
                 endpoint=endpoint, headers=header_dict if header_dict else None
             )
-            
+
             # Log successful configuration for Golf platform
             if golf_api_key:
                 print(f"[INFO] OpenTelemetry configured for Golf platform: {endpoint}")
