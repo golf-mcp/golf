@@ -985,6 +985,7 @@ def build_project(
     # Load Golf credentials from .env for build operations (platform registration, etc.)
     # This happens regardless of copy_env setting to ensure build process works
     from dotenv import load_dotenv
+
     project_env_file = project_path / ".env"
     if project_env_file.exists():
         # Load GOLF_* variables for build process
@@ -1148,7 +1149,9 @@ def build_project(
 
     # Platform registration (only for prod builds)
     if build_env == "prod":
-        console.print("[dim]Registering with Golf platform and updating resources...[/dim]")
+        console.print(
+            "[dim]Registering with Golf platform and updating resources...[/dim]"
+        )
         import asyncio
 
         try:
