@@ -691,7 +691,7 @@ class CodeGenerator:
                         registration += ")"
                     elif component_type == ComponentType.RESOURCE:
                         registration += (
-                            f'\\nmcp.add_resource_fn(_wrapped_func, '
+                            f"\\nmcp.add_resource_fn(_wrapped_func, "
                             f'uri="{component.uri_template}", name="{component.name}", '
                             f'description="{component.docstring or ""}")'
                         )
@@ -821,12 +821,14 @@ class CodeGenerator:
         # Add early telemetry initialization if enabled (before component registration)
         early_telemetry_init = []
         if self.settings.opentelemetry_enabled:
-            early_telemetry_init.extend([
-                "# Initialize telemetry early to ensure instrumentation works",
-                "from golf.telemetry.instrumentation import init_telemetry",
-                f"init_telemetry(\"{self.settings.name}\")",
-                ""
-            ])
+            early_telemetry_init.extend(
+                [
+                    "# Initialize telemetry early to ensure instrumentation works",
+                    "from golf.telemetry.instrumentation import init_telemetry",
+                    f'init_telemetry("{self.settings.name}")',
+                    "",
+                ]
+            )
 
         # Main entry point with transport-specific app initialization
         main_code = [
