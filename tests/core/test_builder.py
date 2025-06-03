@@ -1045,3 +1045,148 @@ export = test_function
             # Check that warning was printed
             captured = capsys.readouterr()
             assert "Platform registration failed" in captured.out
+
+
+class TestTelemetryIntegration:
+    """Test OpenTelemetry integration in generated code."""
+
+    def test_early_telemetry_initialization_included(self, sample_project: Path, temp_dir: Path):
+        """Test that early telemetry initialization is included before component registration."""
+        # Create a simple tool for the project  
+        tool_file = sample_project / "tools" / "test_tool.py"
+        tool_file.write_text(
+            '''"""Test tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def test_tool() -> Output:
+    return Output(result="test")
+
+export = test_tool
+'''
+        )
+        
+        # Update project config to enable OpenTelemetry
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "test-otel-project",
+            "opentelemetry_enabled": True
+        }
+        config_file.write_text(json.dumps(config))
+        
+        # Generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "output"
+        generator = CodeGenerator(sample_project, settings, output_dir)
+        generator.generate()
+        
+        # Read generated server.py
+        server_file = output_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify telemetry imports are included
+        assert "from golf.telemetry.instrumentation import init_telemetry" in server_content
+        assert "instrument_tool" in server_content
+        
+        # Verify early initialization is before component registration
+        early_init_line = server_content.find('init_telemetry("test-otel-project")')
+        component_reg_line = server_content.find("# Register the tool")
+        
+        assert early_init_line != -1, "Early telemetry initialization not found"
+        assert component_reg_line != -1, "Component registration not found"
+        assert early_init_line < component_reg_line, "Telemetry init should come before component registration"
+        
+    def test_no_telemetry_when_disabled(self, sample_project: Path, temp_dir: Path):
+        """Test that telemetry code is not included when OpenTelemetry is disabled."""
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "test_tool.py"
+        tool_file.write_text(
+            '''"""Test tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def test_tool() -> Output:
+    return Output(result="test")
+
+export = test_tool
+'''
+        )
+        
+        # Update project config to disable OpenTelemetry (default)
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "test-no-otel-project",
+            "opentelemetry_enabled": False
+        }
+        config_file.write_text(json.dumps(config))
+        
+        # Generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "output"
+        generator = CodeGenerator(sample_project, settings, output_dir)
+        generator.generate()
+        
+        # Read generated server.py
+        server_file = output_dir / "server.py"
+        server_content = server_file.read_text()
+        
+        # Verify telemetry code is not included
+        assert "init_telemetry" not in server_content
+        assert "instrument_tool" not in server_content
+        assert "telemetry_lifespan" not in server_content
+        
+    def test_telemetry_dependencies_in_pyproject(self, sample_project: Path, temp_dir: Path):
+        """Test that OpenTelemetry dependencies are included in pyproject.toml."""
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "test_tool.py"
+        tool_file.write_text(
+            '''"""Test tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def test_tool() -> Output:
+    return Output(result="test")
+
+export = test_tool
+'''
+        )
+        
+        # Update project config to enable OpenTelemetry
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "test-otel-deps",
+            "opentelemetry_enabled": True
+        }
+        config_file.write_text(json.dumps(config))
+        
+        # Build project
+        from golf.core.builder import build_project
+        
+        settings = load_settings(sample_project)
+        build_project(sample_project, settings, temp_dir / "built_output")
+        
+        # Read generated pyproject.toml
+        pyproject_file = temp_dir / "built_output" / "pyproject.toml"
+        assert pyproject_file.exists()
+        
+        pyproject_content = pyproject_file.read_text()
+        
+        # Verify OpenTelemetry dependencies are included
+        assert "opentelemetry-api" in pyproject_content
+        assert "opentelemetry-sdk" in pyproject_content
+        assert "opentelemetry-exporter-otlp" in pyproject_content
