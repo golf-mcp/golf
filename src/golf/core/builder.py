@@ -982,6 +982,15 @@ def build_project(
         build_env: Build environment ('dev' or 'prod')
         copy_env: Whether to copy environment variables to the built app
     """
+    # Load Golf credentials from .env for build operations (platform registration, etc.)
+    # This happens regardless of copy_env setting to ensure build process works
+    from dotenv import load_dotenv
+    project_env_file = project_path / ".env"
+    if project_env_file.exists():
+        # Load GOLF_* variables for build process
+        load_dotenv(project_env_file, override=False)
+        console.print("[dim]Loaded Golf credentials for build operations[/dim]")
+
     # Execute pre_build.py if it exists
     pre_build_path = project_path / "pre_build.py"
     if pre_build_path.exists():
@@ -1139,6 +1148,7 @@ def build_project(
 
     # Platform registration (only for prod builds)
     if build_env == "prod":
+        console.print("[dim]Registering with Golf platform and updating resources...[/dim]")
         import asyncio
 
         try:
@@ -1151,6 +1161,7 @@ def build_project(
                     components=generator.components,
                 )
             )
+            console.print("[green]✓ Platform registration completed[/green]")
         except ImportError:
             console.print(
                 "[yellow]Warning: Platform registration module not available[/yellow]"
@@ -1158,6 +1169,9 @@ def build_project(
         except Exception as e:
             console.print(
                 f"[yellow]Warning: Platform registration failed: {e}[/yellow]"
+            )
+            console.print(
+                "[yellow]Tip: Ensure GOLF_API_KEY and GOLF_SERVER_ID are available in your .env file[/yellow]"
             )
 
     # Create a simple README
