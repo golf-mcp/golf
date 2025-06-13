@@ -109,6 +109,12 @@ class Settings(BaseSettings):
     health_check_path: str = Field("/health", description="Health check endpoint path")
     health_check_response: str = Field("OK", description="Health check response text")
 
+    # HTTP session behaviour
+    stateless_http: bool = Field(
+        False,
+        description="Make Streamable-HTTP transport stateless (new session per request)",
+    )
+
 
 def find_config_path(start_path: Path | None = None) -> Path | None:
     """Find the golf config file by searching upwards from the given path.
