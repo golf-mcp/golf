@@ -109,9 +109,9 @@ def is_telemetry_enabled() -> bool:
         _telemetry_enabled = saved_preference
         return saved_preference
 
-    # Default to enabled (opt-out model)
-    _telemetry_enabled = True
-    return True
+    # Default to disabled (opt-in model)
+    _telemetry_enabled = False
+    return False
 
 
 def set_telemetry_enabled(enabled: bool, persist: bool = True) -> None:
