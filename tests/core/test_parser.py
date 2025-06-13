@@ -59,7 +59,7 @@ export = run
         components = parser.parse_directory(sample_project / "tools")
 
         assert len(components) == 1
-        assert components[0].name == "charge-stripe-payments"
+        assert components[0].name == "charge_stripe_payments"
         assert components[0].parent_module == "payments.stripe"
 
     def test_skips_pycache_and_hidden_files(self, sample_project: Path) -> None:
@@ -534,8 +534,8 @@ export = run
         components = parser.parse_file(tool_file)
 
         # According to spec: filename + reversed parent dirs
-        # refund + stripe + payments = "refund-stripe-payments"
-        assert components[0].name == "refund-stripe-payments"
+        # refund + stripe + payments = "refund_stripe_payments"
+        assert components[0].name == "refund_stripe_payments"
 
     def test_id_collision_detection(self, sample_project: Path) -> None:
         """Test that ID collisions are detected."""
