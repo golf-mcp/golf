@@ -90,7 +90,7 @@ A Golf project initialized with `golf init` will have a structure similar to thi
 
 -   **`golf.json`**: Configures server name, port, transport, telemetry, and other build settings.
 -   **`tools/`**, **`resources/`**, **`prompts/`**: Contain your Python files, each defining a single component. These directories can also contain nested subdirectories to further organize your components (e.g., `tools/payments/charge.py`). The module docstring of each file serves as the component's description.
-    -   Component IDs are automatically derived from their file path. For example, `tools/hello.py` becomes `hello`, and a nested file like `tools/payments/submit.py` would become `submit-payments` (filename, followed by reversed parent directories under the main category, joined by hyphens).
+    -   Component IDs are automatically derived from their file path. For example, `tools/hello.py` becomes `hello`, and a nested file like `tools/payments/submit.py` would become `submit_payments` (filename, followed by reversed parent directories under the main category, joined by underscores).
 -   **`common.py`** (not shown, but can be placed in subdirectories like `tools/payments/common.py`): Used to share code (clients, models, etc.) among components in the same subdirectory.
 
 ## Example: Defining a Tool
