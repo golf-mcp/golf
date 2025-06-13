@@ -809,6 +809,10 @@ class CodeGenerator:
             for key, value in auth_components["fastmcp_args"].items():
                 mcp_constructor_args.append(f"{key}={value}")
 
+        # Add stateless HTTP parameter if enabled
+        if self.settings.stateless_http:
+            mcp_constructor_args.append("stateless_http=True")
+
         # Add OpenTelemetry parameters if enabled
         if self.settings.opentelemetry_enabled:
             mcp_constructor_args.append("lifespan=telemetry_lifespan")
