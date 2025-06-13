@@ -109,9 +109,9 @@ def is_telemetry_enabled() -> bool:
         _telemetry_enabled = saved_preference
         return saved_preference
 
-    # Default to enabled (opt-out model)
-    _telemetry_enabled = True
-    return True
+    # Default to disabled (opt-in model)
+    _telemetry_enabled = False
+    return False
 
 
 def set_telemetry_enabled(enabled: bool, persist: bool = True) -> None:
@@ -209,13 +209,24 @@ def initialize_telemetry() -> None:
         posthog.disabled = False
         posthog.debug = False
 
+        # Disable IP collection and GeoIP enrichment at the SDK level
+        posthog.set_global_event_properties(
+            {
+                "$ip": "0",  # Override IP with dummy value to prevent collection
+                "$geoip_disable": True,  # Disable all GeoIP enrichment
+            }
+        )
+
     except Exception:
         # Telemetry should never break the application
         pass
 
 
 def track_event(event_name: str, properties: dict[str, Any] | None = None) -> None:
-    """Track an anonymous event with minimal data.
+    """Track an anonymous event with NO IP address or geolocation data.
+
+    IP collection and GeoIP enrichment are disabled at the SDK level to ensure
+    complete privacy protection. No IP addresses or location data ever reach PostHog.
 
     Args:
         event_name: Name of the event (e.g., "cli_init", "cli_build")
@@ -257,8 +268,16 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
                 }
             }
 
-            # Identify the user with properties
-            posthog.identify(distinct_id=anonymous_id, properties=person_properties)
+            # Identify the user with properties (IP tracking disabled)
+            posthog.identify(
+                distinct_id=anonymous_id,
+                properties={
+                    **person_properties,
+                    # Explicitly disable IP tracking in identify call
+                    "$ip": "0",
+                    "$geoip_disable": True,
+                },
+            )
 
             _user_identified = True
 
@@ -267,8 +286,9 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
             "golf_version": __version__,
             "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
             "os": platform.system(),
-            # Explicitly disable IP tracking
-            "$ip": None,
+            # Explicitly disable IP tracking and GeoIP enrichment
+            "$ip": "0",  # Override IP to prevent collection
+            "$geoip_disable": True,  # Disable GeoIP enrichment
         }
 
         # Filter properties to only include safe ones
