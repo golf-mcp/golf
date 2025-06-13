@@ -79,7 +79,7 @@ class TestInitCommand:
         assert "health_check_enabled" not in config  # Should not be included by default
         assert "health_check_path" not in config
         assert "health_check_response" not in config
-        
+
         # But should include the basic configuration fields
         assert config["name"] == "health_check_project"
         assert config["host"] == "127.0.0.1"
