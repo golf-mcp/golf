@@ -990,10 +990,10 @@ def build_project(
     if project_env_file.exists():
         # Load GOLF_* variables for build process
         load_dotenv(project_env_file, override=False)
-        
+
         # Only log if we actually found the specific Golf platform credentials
-        has_api_key = 'GOLF_API_KEY' in os.environ
-        has_server_id = 'GOLF_SERVER_ID' in os.environ
+        has_api_key = "GOLF_API_KEY" in os.environ
+        has_server_id = "GOLF_SERVER_ID" in os.environ
         if has_api_key and has_server_id:
             console.print("[dim]Loaded Golf credentials for build operations[/dim]")
 
