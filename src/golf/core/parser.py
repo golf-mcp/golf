@@ -622,7 +622,7 @@ class AstParser:
     ) -> str:
         """Derive a component name from its file path according to the spec.
 
-        Following the spec: <filename> + ("-" + "-".join(PathRev) if PathRev else "")
+        Following the spec: <filename> + ("_" + "_".join(PathRev) if PathRev else "")
         where PathRev is the reversed list of parent directories under the category.
         """
         rel_path = file_path.relative_to(self.project_root)
@@ -648,7 +648,7 @@ class AstParser:
 
         # Form the ID according to spec
         if parent_dirs:
-            return f"{filename}-{'-'.join(parent_dirs)}"
+            return f"{filename}_{'_'.join(parent_dirs)}"
         else:
             return filename
 
