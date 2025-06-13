@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 
-from golf.core.telemetry import track_command, track_event
+from golf.core.telemetry import track_command, track_event, set_telemetry_enabled, load_telemetry_preference
 
 console = Console()
 
@@ -94,6 +94,9 @@ def initialize_project(
 
             # Copy directory structure
             _copy_template(template_dir, output_dir, project_name)
+
+        # Ask for telemetry consent
+        _prompt_for_telemetry_consent()
 
         # Create virtual environment
         console.print("[bold green]Project initialized successfully![/bold green]")
@@ -205,6 +208,58 @@ def _copy_template(source_dir: Path, target_dir: Path, project_name: str) -> Non
             f.write("# GolfMCP\n")
             f.write(".golf/\n")
             f.write("dist/\n")
+
+
+def _prompt_for_telemetry_consent() -> None:
+    """Prompt user for telemetry consent and save their preference."""
+    import os
+    
+    # Skip prompt in test mode, when telemetry is explicitly disabled, or if preference already exists
+    if os.environ.get("GOLF_TEST_MODE", "").lower() in ("1", "true", "yes", "on"):
+        return
+        
+    # Skip if telemetry is explicitly disabled in environment
+    if os.environ.get("GOLF_TELEMETRY", "").lower() in ("0", "false", "no", "off"):
+        return
+        
+    # Check if user already has a saved preference
+    existing_preference = load_telemetry_preference()
+    if existing_preference is not None:
+        return  # User already made a choice
+    
+    console.print("\n" + "="*60)
+    console.print("[bold blue]📊 Anonymous Usage Analytics[/bold blue]")
+    console.print("="*60)
+    console.print()
+    console.print("Golf can collect [bold]anonymous usage analytics[/bold] to help improve the tool.")
+    console.print()
+    console.print("[dim]What we collect:[/dim]")
+    console.print("  • Command usage (init, build, run)")
+    console.print("  • Error types (to fix bugs)")
+    console.print("  • Golf version and Python version")
+    console.print("  • Operating system type")
+    console.print()
+    console.print("[dim]What we DON'T collect:[/dim]")
+    console.print("  • Your code or project content")
+    console.print("  • File paths or project names")
+    console.print("  • Personal information")
+    console.print("  • IP addresses")
+    console.print()
+    console.print("You can change this anytime by setting GOLF_TELEMETRY=0 in your environment.")
+    console.print()
+    
+    enable_telemetry = Confirm.ask(
+        "[bold]Enable anonymous usage analytics?[/bold]",
+        default=False
+    )
+    
+    set_telemetry_enabled(enable_telemetry, persist=True)
+    
+    if enable_telemetry:
+        console.print("[green]✓[/green] Anonymous analytics enabled")
+    else:
+        console.print("[yellow]○[/yellow] Anonymous analytics disabled")
+    console.print()
 
 
 def _is_text_file(path: Path) -> bool:
