@@ -7,7 +7,12 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 
-from golf.core.telemetry import track_command, track_event, set_telemetry_enabled, load_telemetry_preference
+from golf.core.telemetry import (
+    track_command,
+    track_event,
+    set_telemetry_enabled,
+    load_telemetry_preference,
+)
 
 console = Console()
 
@@ -213,25 +218,27 @@ def _copy_template(source_dir: Path, target_dir: Path, project_name: str) -> Non
 def _prompt_for_telemetry_consent() -> None:
     """Prompt user for telemetry consent and save their preference."""
     import os
-    
+
     # Skip prompt in test mode, when telemetry is explicitly disabled, or if preference already exists
     if os.environ.get("GOLF_TEST_MODE", "").lower() in ("1", "true", "yes", "on"):
         return
-        
+
     # Skip if telemetry is explicitly disabled in environment
     if os.environ.get("GOLF_TELEMETRY", "").lower() in ("0", "false", "no", "off"):
         return
-        
+
     # Check if user already has a saved preference
     existing_preference = load_telemetry_preference()
     if existing_preference is not None:
         return  # User already made a choice
-    
-    console.print("\n" + "="*60)
+
+    console.print("\n" + "=" * 60)
     console.print("[bold blue]📊 Anonymous Usage Analytics[/bold blue]")
-    console.print("="*60)
+    console.print("=" * 60)
     console.print()
-    console.print("Golf can collect [bold]anonymous usage analytics[/bold] to help improve the tool.")
+    console.print(
+        "Golf can collect [bold]anonymous usage analytics[/bold] to help improve the tool."
+    )
     console.print()
     console.print("[dim]What we collect:[/dim]")
     console.print("  • Command usage (init, build, run)")
@@ -245,16 +252,17 @@ def _prompt_for_telemetry_consent() -> None:
     console.print("  • Personal information")
     console.print("  • IP addresses")
     console.print()
-    console.print("You can change this anytime by setting GOLF_TELEMETRY=0 in your environment.")
-    console.print()
-    
-    enable_telemetry = Confirm.ask(
-        "[bold]Enable anonymous usage analytics?[/bold]",
-        default=False
+    console.print(
+        "You can change this anytime by setting GOLF_TELEMETRY=0 in your environment."
     )
-    
+    console.print()
+
+    enable_telemetry = Confirm.ask(
+        "[bold]Enable anonymous usage analytics?[/bold]", default=False
+    )
+
     set_telemetry_enabled(enable_telemetry, persist=True)
-    
+
     if enable_telemetry:
         console.print("[green]✓[/green] Anonymous analytics enabled")
     else:
