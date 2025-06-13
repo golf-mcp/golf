@@ -7,26 +7,26 @@ This example demonstrates how to build a GitHub API MCP server using Golf's API 
 This MCP server provides tools for:
 
 - **Repository Management** 
-  - `list-repos` - List repositories for users, organizations, or the authenticated user
+  - `list_repos` - List repositories for users, organizations, or the authenticated user
   
 - **Issue Management** 
-  - `create-issues` - Create new issues with labels
-  - `list-issues` - List and filter issues by state and labels
+  - `create_issues` - Create new issues with labels
+  - `list_issues` - List and filter issues by state and labels
   
 - **Code Search**
-  - `code-search` - Search for code across GitHub with language and repository filters
+  - `code_search` - Search for code across GitHub with language and repository filters
   
 - **User Information**
-  - `get-users` - Get user profiles or verify authentication
+  - `get_users` - Get user profiles or verify authentication
 
 ## Tool Naming Convention
 
 Golf automatically derives tool names from the file structure:
-- `tools/issues/create.py` → `create-issues`
-- `tools/issues/list.py` → `list-issues`
-- `tools/repos/list.py` → `list-repos`
-- `tools/search/code.py` → `code-search`
-- `tools/users/get.py` → `get-users`
+- `tools/issues/create.py` → `create_issues`
+- `tools/issues/list.py` → `list_issues`
+- `tools/repos/list.py` → `list_repos`
+- `tools/search/code.py` → `code_search`
+- `tools/users/get.py` → `get_users`
 
 ## Configuration
 
