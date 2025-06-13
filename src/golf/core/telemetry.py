@@ -208,12 +208,14 @@ def initialize_telemetry() -> None:
         # Disable PostHog's own logging to avoid noise
         posthog.disabled = False
         posthog.debug = False
-        
+
         # Disable IP collection and GeoIP enrichment at the SDK level
-        posthog.set_global_event_properties({
-            "$ip": "0",             # Override IP with dummy value to prevent collection
-            "$geoip_disable": True  # Disable all GeoIP enrichment
-        })
+        posthog.set_global_event_properties(
+            {
+                "$ip": "0",  # Override IP with dummy value to prevent collection
+                "$geoip_disable": True,  # Disable all GeoIP enrichment
+            }
+        )
 
     except Exception:
         # Telemetry should never break the application
@@ -268,13 +270,13 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
 
             # Identify the user with properties (IP tracking disabled)
             posthog.identify(
-                distinct_id=anonymous_id, 
+                distinct_id=anonymous_id,
                 properties={
                     **person_properties,
                     # Explicitly disable IP tracking in identify call
                     "$ip": "0",
                     "$geoip_disable": True,
-                }
+                },
             )
 
             _user_identified = True
@@ -285,8 +287,8 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
             "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
             "os": platform.system(),
             # Explicitly disable IP tracking and GeoIP enrichment
-            "$ip": "0",             # Override IP to prevent collection
-            "$geoip_disable": True, # Disable GeoIP enrichment
+            "$ip": "0",  # Override IP to prevent collection
+            "$geoip_disable": True,  # Disable GeoIP enrichment
         }
 
         # Filter properties to only include safe ones
