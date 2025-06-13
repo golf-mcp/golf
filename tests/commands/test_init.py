@@ -69,16 +69,23 @@ class TestInitCommand:
         pass
 
     def test_basic_template_includes_health_check(self, temp_dir: Path) -> None:
-        """Test that basic template includes health check configuration."""
+        """Test that basic template does not include health check configuration by default."""
         project_dir = temp_dir / "health_check_project"
 
         initialize_project("health_check_project", project_dir, template="basic")
 
-        # Check that golf.json includes health check configuration (disabled by default)
+        # Check that golf.json does not include health check configuration by default
         config = json.loads((project_dir / "golf.json").read_text())
-        assert config["health_check_enabled"] is False  # Should be disabled by default
-        assert config["health_check_path"] == "/health"
-        assert config["health_check_response"] == "OK"
+        assert "health_check_enabled" not in config  # Should not be included by default
+        assert "health_check_path" not in config
+        assert "health_check_response" not in config
+
+        # But should include the basic configuration fields
+        assert config["name"] == "health_check_project"
+        assert config["host"] == "127.0.0.1"
+        assert config["port"] == 3000
+        assert config["transport"] == "sse"
+        assert config["opentelemetry_enabled"] is False
 
     def test_api_key_template_compatibility_with_health_check(
         self, temp_dir: Path
