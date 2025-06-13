@@ -232,9 +232,8 @@ def _prompt_for_telemetry_consent() -> None:
     if existing_preference is not None:
         return  # User already made a choice
 
-    console.print("\n" + "=" * 60)
-    console.print("[bold blue]📊 Anonymous Usage Analytics[/bold blue]")
-    console.print("=" * 60)
+    console.print()
+    console.rule("[bold blue]Anonymous usage analytics[/bold blue]", style="blue")
     console.print()
     console.print(
         "Golf can collect [bold]anonymous usage analytics[/bold] to help improve the tool."
