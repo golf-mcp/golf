@@ -562,13 +562,6 @@ class CodeGenerator:
         if self.settings.opentelemetry_enabled:
             imports.extend(generate_telemetry_imports())
 
-        # Add imports section for different transport methods
-        if self.settings.transport == "sse" or self.settings.transport in [
-            "streamable-http",
-            "http",
-        ]:
-            imports.append("import uvicorn")
-
         # Add health check imports if enabled
         if self.settings.health_check_enabled:
             imports.extend(
@@ -860,71 +853,64 @@ class CodeGenerator:
 
         # Transport-specific run methods
         if self.settings.transport == "sse":
-            # Check if we need to add API key middleware for SSE
+            # Check if we need middleware for SSE
+            middleware_setup = []
+            middleware_list = []
+            
             api_key_config = get_api_key_config()
             if auth_components.get("has_auth") and api_key_config:
-                main_code.extend(
-                    [
-                        "    # For SSE with API key auth, we need to get the app and add middleware",
-                        '    app = mcp.http_app(transport="sse")',
-                        "    app.add_middleware(ApiKeyMiddleware)",
-                    ]
-                )
+                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_list.append("Middleware(ApiKeyMiddleware)")
+
+            # Add OpenTelemetry middleware if enabled
+            if self.settings.opentelemetry_enabled:
+                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
+                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_list.append("Middleware(OpenTelemetryMiddleware)")
+
+            if middleware_setup:
+                main_code.extend(middleware_setup)
+                main_code.append(f"    middleware = [{', '.join(middleware_list)}]")
+                main_code.append("")
+                main_code.extend([
+                    "    # Run SSE server with middleware using FastMCP's run method",
+                    '    mcp.run(transport="sse", host=host, port=port, log_level="info", middleware=middleware)'
+                ])
             else:
-                main_code.extend(
-                    [
-                        "    # For SSE, get the app to add middleware",
-                        '    app = mcp.http_app(transport="sse")',
-                    ]
-                )
+                main_code.extend([
+                    "    # Run SSE server using FastMCP's run method",
+                    '    mcp.run(transport="sse", host=host, port=port, log_level="info")'
+                ])
 
-            # Add OpenTelemetry middleware to the SSE app if enabled
-            if self.settings.opentelemetry_enabled:
-                main_code.extend(
-                    [
-                        "    # Apply OpenTelemetry middleware to the SSE app",
-                        "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware",
-                        "    app = OpenTelemetryMiddleware(app)",
-                    ]
-                )
-
-            main_code.extend(
-                [
-                    "    # Run with the configured app",
-                    '    uvicorn.run(app, host=host, port=port, log_level="info")',
-                ]
-            )
         elif self.settings.transport in ["streamable-http", "http"]:
-            main_code.extend(
-                [
-                    "    # Create HTTP app and run with uvicorn",
-                    "    app = mcp.http_app()",
-                ]
-            )
+            # Check if we need middleware for streamable-http
+            middleware_setup = []
+            middleware_list = []
 
-            # Check if we need to add API key middleware
             api_key_config = get_api_key_config()
             if auth_components.get("has_auth") and api_key_config:
-                main_code.extend(
-                    [
-                        "    # Add API key middleware",
-                        "    app.add_middleware(ApiKeyMiddleware)",
-                    ]
-                )
+                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_list.append("Middleware(ApiKeyMiddleware)")
 
-            # Add OpenTelemetry middleware to the HTTP app if enabled
+            # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
-                main_code.extend(
-                    [
-                        "    # Apply OpenTelemetry middleware to the HTTP app",
-                        "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware",
-                        "    app = OpenTelemetryMiddleware(app)",
-                    ]
-                )
+                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
+                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_list.append("Middleware(OpenTelemetryMiddleware)")
 
-            main_code.extend(
-                ['    uvicorn.run(app, host=host, port=port, log_level="info")']
-            )
+            if middleware_setup:
+                main_code.extend(middleware_setup)
+                main_code.append(f"    middleware = [{', '.join(middleware_list)}]")
+                main_code.append("")
+                main_code.extend([
+                    "    # Run HTTP server with middleware using FastMCP's run method",
+                    '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info", middleware=middleware)'
+                ])
+            else:
+                main_code.extend([
+                    "    # Run HTTP server using FastMCP's run method",
+                    '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info")'
+                ])
         else:
             # For stdio transport, use mcp.run()
             main_code.extend(
