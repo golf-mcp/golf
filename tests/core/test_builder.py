@@ -1204,6 +1204,256 @@ export = simple_tool
         assert "stateless_http=True" not in server_content
 
 
+class TestModernServerGeneration:
+    """Test modern server generation using mcp.run() instead of uvicorn.run()."""
+
+    def test_uses_mcp_run_for_sse_transport(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that SSE transport uses mcp.run() instead of uvicorn.run()."""
+        # Update project config for SSE transport
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "SSEProject",
+            "transport": "sse",
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        # Load settings and generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+
+        # Check that the generated server.py uses mcp.run()
+        server_file = temp_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify we're using mcp.run() instead of uvicorn.run()
+        assert "mcp.run(" in server_content
+        assert "uvicorn.run(" not in server_content
+        
+        # Verify SSE transport is specified
+        assert 'transport="sse"' in server_content
+
+    def test_uses_mcp_run_for_streamable_http_transport(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that streamable-http transport uses mcp.run() instead of uvicorn.run()."""
+        # Update project config for streamable-http transport
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "HTTPProject",
+            "transport": "streamable-http",
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        # Load settings and generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+
+        # Check that the generated server.py uses mcp.run()
+        server_file = temp_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify we're using mcp.run() instead of uvicorn.run()
+        assert "mcp.run(" in server_content
+        assert "uvicorn.run(" not in server_content
+        
+        # Verify streamable-http transport is specified
+        assert 'transport="streamable-http"' in server_content
+
+    def test_uses_mcp_run_for_stdio_transport(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that stdio transport uses mcp.run()."""
+        # Update project config for stdio transport
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "StdioProject",
+            "transport": "stdio",
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        # Load settings and generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+
+        # Check that the generated server.py uses mcp.run()
+        server_file = temp_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify we're using mcp.run() for stdio
+        assert "mcp.run(" in server_content
+        assert 'transport="stdio"' in server_content
+        
+        # stdio should never use uvicorn
+        assert "uvicorn.run(" not in server_content
+
+    def test_no_uvicorn_import_in_generated_code(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that generated code doesn't import uvicorn since we use mcp.run()."""
+        # Update project config
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "NoUvicornProject",
+            "transport": "streamable-http",
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        # Load settings and generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+
+        # Check that the generated server.py doesn't import uvicorn
+        server_file = temp_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify no uvicorn import since we use mcp.run()
+        assert "import uvicorn" not in server_content
+        assert "from uvicorn" not in server_content
+
+    def test_modern_server_generation_features(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that modern server generation features are included."""
+        # Update project config with stateless HTTP to trigger modern features
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "ModernProject",
+            "transport": "streamable-http",
+            "stateless_http": True,
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+        )
+
+        # Load settings and generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+
+        # Check that the generated server.py includes modern features
+        server_file = temp_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify modern features are included
+        assert "mcp.run(" in server_content  # Uses mcp.run() instead of uvicorn
+        assert "stateless_http=True" in server_content  # Stateless HTTP support
+        assert "logging.getLogger('fastmcp').setLevel(logging.WARNING)" in server_content  # Log suppression
+
+
 class TestTelemetryIntegration:
     """Test OpenTelemetry integration in generated code."""
 
