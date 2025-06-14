@@ -1200,7 +1200,7 @@ export = simple_tool
 
         server_content = server_file.read_text()
 
-        # Verify stateless_http=True is NOT passed to FastMCP constructor (default is False)
+        # Verify stateless_http=True is NOT passed to FastMCP constructor
         assert "stateless_http=True" not in server_content
 
 
@@ -1260,7 +1260,7 @@ export = simple_tool
     def test_uses_mcp_run_for_streamable_http_transport(
         self, sample_project: Path, temp_dir: Path
     ) -> None:
-        """Test that streamable-http transport uses mcp.run() instead of uvicorn.run()."""
+        """Test that streamable-http transport uses mcp.run()."""
         # Update project config for streamable-http transport
         config_file = sample_project / "golf.json"
         config = {
