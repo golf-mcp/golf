@@ -140,6 +140,10 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
                                       // - "streamable-http": HTTP with streaming support
                                       // - "stdio": Standard I/O (for CLI integration)
   
+  // HTTP Transport Configuration (optional)
+  "stateless_http": false,            // Make streamable-http transport stateless (new session per request)
+                                      // When true, server restarts won't break existing client connections
+  
   // Health Check Configuration (optional)
   "health_check_enabled": false,      // Enable health check endpoint for Kubernetes/load balancers
   "health_check_path": "/health",     // HTTP path for health check endpoint
@@ -160,6 +164,7 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
   - `"streamable-http"` provides HTTP streaming for traditional API clients
   - `"stdio"` enables integration with command-line tools and scripts
 - **`host` & `port`**: Control where your server listens. Use `"127.0.0.1"` for local development or `"0.0.0.0"` to accept external connections.
+- **`stateless_http`**: When true, makes the streamable-http transport stateless by creating a new session for each request. This ensures that server restarts don't break existing client connections, making the server truly stateless.
 - **`health_check_enabled`**: When true, enables a health check endpoint for Kubernetes readiness/liveness probes and load balancers
 - **`health_check_path`**: Customizable path for the health check endpoint (defaults to "/health")
 - **`health_check_response`**: Customizable response text for successful health checks (defaults to "OK")
