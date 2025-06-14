@@ -1047,6 +1047,163 @@ export = test_function
             assert "Platform registration failed" in captured.out
 
 
+class TestStatelessHttpGeneration:
+    """Test stateless HTTP configuration generation."""
+
+    def test_generates_stateless_http_when_enabled(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that stateless_http parameter is passed when enabled."""
+        # Update project config to enable stateless HTTP
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "StatelessProject",
+            "transport": "streamable-http",
+            "stateless_http": True,
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    message: str
+
+class Output(BaseModel):
+    response: str
+
+def simple_tool(input: Input) -> Output:
+    """A simple tool for testing."""
+    return Output(response=f"Hello, {input.message}!")
+
+export = simple_tool
+'''
+        )
+
+        # Load settings and generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+
+        # Check that the generated server.py contains stateless_http=True
+        server_file = temp_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify stateless_http=True is passed to FastMCP constructor
+        assert "stateless_http=True" in server_content
+        
+        # Verify we're using mcp.run() instead of uvicorn.run()
+        assert "mcp.run(" in server_content
+        assert "uvicorn.run(" not in server_content
+
+    def test_no_stateless_http_when_disabled(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that stateless_http parameter is not passed when disabled."""
+        # Update project config with stateless HTTP disabled
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "RegularProject",
+            "transport": "streamable-http",
+            "stateless_http": False,
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    message: str
+
+class Output(BaseModel):
+    response: str
+
+def simple_tool(input: Input) -> Output:
+    """A simple tool for testing."""
+    return Output(response=f"Hello, {input.message}!")
+
+export = simple_tool
+'''
+        )
+
+        # Load settings and generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+
+        # Check that the generated server.py does not contain stateless_http=True
+        server_file = temp_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify stateless_http=True is NOT passed to FastMCP constructor
+        assert "stateless_http=True" not in server_content
+
+    def test_stateless_http_default_behavior(
+        self, sample_project: Path, temp_dir: Path
+    ) -> None:
+        """Test that stateless_http defaults to False when not specified."""
+        # Update project config without stateless_http setting
+        config_file = sample_project / "golf.json"
+        config = {
+            "name": "DefaultProject",
+            "transport": "streamable-http",
+        }
+        config_file.write_text(json.dumps(config))
+
+        # Create a simple tool
+        tool_file = sample_project / "tools" / "simple.py"
+        tool_file.write_text(
+            '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Input(BaseModel):
+    message: str
+
+class Output(BaseModel):
+    response: str
+
+def simple_tool(input: Input) -> Output:
+    """A simple tool for testing."""
+    return Output(response=f"Hello, {input.message}!")
+
+export = simple_tool
+'''
+        )
+
+        # Load settings and generate code
+        from golf.core.builder import CodeGenerator
+        
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+
+        # Check that the generated server.py does not contain stateless_http=True
+        server_file = temp_dir / "server.py"
+        assert server_file.exists()
+        
+        server_content = server_file.read_text()
+        
+        # Verify stateless_http=True is NOT passed to FastMCP constructor (default is False)
+        assert "stateless_http=True" not in server_content
+
+
 class TestTelemetryIntegration:
     """Test OpenTelemetry integration in generated code."""
 
