@@ -856,31 +856,41 @@ class CodeGenerator:
             # Check if we need middleware for SSE
             middleware_setup = []
             middleware_list = []
-            
+
             api_key_config = get_api_key_config()
             if auth_components.get("has_auth") and api_key_config:
-                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_setup.append(
+                    "    from starlette.middleware import Middleware"
+                )
                 middleware_list.append("Middleware(ApiKeyMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
-                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
-                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_setup.append(
+                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware"
+                )
+                middleware_setup.append(
+                    "    from starlette.middleware import Middleware"
+                )
                 middleware_list.append("Middleware(OpenTelemetryMiddleware)")
 
             if middleware_setup:
                 main_code.extend(middleware_setup)
                 main_code.append(f"    middleware = [{', '.join(middleware_list)}]")
                 main_code.append("")
-                main_code.extend([
-                    "    # Run SSE server with middleware using FastMCP's run method",
-                    '    mcp.run(transport="sse", host=host, port=port, log_level="info", middleware=middleware)'
-                ])
+                main_code.extend(
+                    [
+                        "    # Run SSE server with middleware using FastMCP's run method",
+                        '    mcp.run(transport="sse", host=host, port=port, log_level="info", middleware=middleware)',
+                    ]
+                )
             else:
-                main_code.extend([
-                    "    # Run SSE server using FastMCP's run method",
-                    '    mcp.run(transport="sse", host=host, port=port, log_level="info")'
-                ])
+                main_code.extend(
+                    [
+                        "    # Run SSE server using FastMCP's run method",
+                        '    mcp.run(transport="sse", host=host, port=port, log_level="info")',
+                    ]
+                )
 
         elif self.settings.transport in ["streamable-http", "http"]:
             # Check if we need middleware for streamable-http
@@ -889,28 +899,38 @@ class CodeGenerator:
 
             api_key_config = get_api_key_config()
             if auth_components.get("has_auth") and api_key_config:
-                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_setup.append(
+                    "    from starlette.middleware import Middleware"
+                )
                 middleware_list.append("Middleware(ApiKeyMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
-                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
-                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_setup.append(
+                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware"
+                )
+                middleware_setup.append(
+                    "    from starlette.middleware import Middleware"
+                )
                 middleware_list.append("Middleware(OpenTelemetryMiddleware)")
 
             if middleware_setup:
                 main_code.extend(middleware_setup)
                 main_code.append(f"    middleware = [{', '.join(middleware_list)}]")
                 main_code.append("")
-                main_code.extend([
-                    "    # Run HTTP server with middleware using FastMCP's run method",
-                    '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info", middleware=middleware)'
-                ])
+                main_code.extend(
+                    [
+                        "    # Run HTTP server with middleware using FastMCP's run method",
+                        '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info", middleware=middleware)',
+                    ]
+                )
             else:
-                main_code.extend([
-                    "    # Run HTTP server using FastMCP's run method",
-                    '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info")'
-                ])
+                main_code.extend(
+                    [
+                        "    # Run HTTP server using FastMCP's run method",
+                        '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info")',
+                    ]
+                )
         else:
             # For stdio transport, use mcp.run()
             main_code.extend(

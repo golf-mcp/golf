@@ -1086,7 +1086,7 @@ export = simple_tool
 
         # Load settings and generate code
         from golf.core.builder import CodeGenerator
-        
+
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
@@ -1094,12 +1094,12 @@ export = simple_tool
         # Check that the generated server.py contains stateless_http=True
         server_file = temp_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Verify stateless_http=True is passed to FastMCP constructor
         assert "stateless_http=True" in server_content
-        
+
         # Verify we're using mcp.run() instead of uvicorn.run()
         assert "mcp.run(" in server_content
         assert "uvicorn.run(" not in server_content
@@ -1140,7 +1140,7 @@ export = simple_tool
 
         # Load settings and generate code
         from golf.core.builder import CodeGenerator
-        
+
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
@@ -1148,9 +1148,9 @@ export = simple_tool
         # Check that the generated server.py does not contain stateless_http=True
         server_file = temp_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Verify stateless_http=True is NOT passed to FastMCP constructor
         assert "stateless_http=True" not in server_content
 
@@ -1189,7 +1189,7 @@ export = simple_tool
 
         # Load settings and generate code
         from golf.core.builder import CodeGenerator
-        
+
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
@@ -1197,9 +1197,9 @@ export = simple_tool
         # Check that the generated server.py does not contain stateless_http=True
         server_file = temp_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Verify stateless_http=True is NOT passed to FastMCP constructor (default is False)
         assert "stateless_http=True" not in server_content
 
@@ -1239,7 +1239,7 @@ export = simple_tool
 
         # Load settings and generate code
         from golf.core.builder import CodeGenerator
-        
+
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
@@ -1247,13 +1247,13 @@ export = simple_tool
         # Check that the generated server.py uses mcp.run()
         server_file = temp_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Verify we're using mcp.run() instead of uvicorn.run()
         assert "mcp.run(" in server_content
         assert "uvicorn.run(" not in server_content
-        
+
         # Verify SSE transport is specified
         assert 'transport="sse"' in server_content
 
@@ -1289,7 +1289,7 @@ export = simple_tool
 
         # Load settings and generate code
         from golf.core.builder import CodeGenerator
-        
+
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
@@ -1297,13 +1297,13 @@ export = simple_tool
         # Check that the generated server.py uses mcp.run()
         server_file = temp_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Verify we're using mcp.run() instead of uvicorn.run()
         assert "mcp.run(" in server_content
         assert "uvicorn.run(" not in server_content
-        
+
         # Verify streamable-http transport is specified
         assert 'transport="streamable-http"' in server_content
 
@@ -1339,7 +1339,7 @@ export = simple_tool
 
         # Load settings and generate code
         from golf.core.builder import CodeGenerator
-        
+
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
@@ -1347,13 +1347,13 @@ export = simple_tool
         # Check that the generated server.py uses mcp.run()
         server_file = temp_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Verify we're using mcp.run() for stdio
         assert "mcp.run(" in server_content
         assert 'transport="stdio"' in server_content
-        
+
         # stdio should never use uvicorn
         assert "uvicorn.run(" not in server_content
 
@@ -1389,7 +1389,7 @@ export = simple_tool
 
         # Load settings and generate code
         from golf.core.builder import CodeGenerator
-        
+
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
@@ -1397,9 +1397,9 @@ export = simple_tool
         # Check that the generated server.py doesn't import uvicorn
         server_file = temp_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Verify no uvicorn import since we use mcp.run()
         assert "import uvicorn" not in server_content
         assert "from uvicorn" not in server_content
@@ -1437,7 +1437,7 @@ export = simple_tool
 
         # Load settings and generate code
         from golf.core.builder import CodeGenerator
-        
+
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
@@ -1445,13 +1445,15 @@ export = simple_tool
         # Check that the generated server.py includes modern features
         server_file = temp_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Verify modern features are included
         assert "mcp.run(" in server_content  # Uses mcp.run() instead of uvicorn
         assert "stateless_http=True" in server_content  # Stateless HTTP support
-        assert 'logging.getLogger("fastmcp").setLevel(logging.WARNING)' in server_content  # Log suppression
+        assert (
+            'logging.getLogger("fastmcp").setLevel(logging.WARNING)' in server_content
+        )  # Log suppression
 
 
 class TestTelemetryIntegration:
