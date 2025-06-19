@@ -890,6 +890,8 @@ class CodeGenerator:
             "",
         ]
 
+
+
         # Add startup message
         if self.settings.transport != "stdio":
             main_code.append(
