@@ -205,45 +205,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             if session_id_from_baggage:
                 span.set_attribute("mcp.session.id", session_id_from_baggage)
 
-            # Add tool arguments as span attributes (be careful with sensitive data)
-            for i, arg in enumerate(args):
-                if isinstance(arg, str | int | float | bool) or arg is None:
-                    span.set_attribute(f"mcp.tool.arg.{i}", str(arg))
-                elif hasattr(arg, "__dict__"):
-                    # For objects, just record the type
-                    span.set_attribute(f"mcp.tool.arg.{i}.type", type(arg).__name__)
-
-            # Add named arguments with better naming
-            for key, value in kwargs.items():
-                if key != "ctx":
-                    if value is None:
-                        span.set_attribute(f"mcp.tool.input.{key}", "null")
-                    elif isinstance(value, str | int | float | bool):
-                        span.set_attribute(f"mcp.tool.input.{key}", str(value))
-                    elif isinstance(value, list | tuple):
-                        span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
-                        span.set_attribute(f"mcp.tool.input.{key}.type", "array")
-                    elif isinstance(value, dict):
-                        span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
-                        span.set_attribute(f"mcp.tool.input.{key}.type", "object")
-                        # Only show first few keys to avoid exceeding attribute limits
-                        if len(value) > 0 and len(value) <= 5:
-                            keys_list = list(value.keys())[:5]
-                            # Limit key length and join
-                            truncated_keys = [
-                                str(k)[:20] + "..." if len(str(k)) > 20 else str(k)
-                                for k in keys_list
-                            ]
-                            span.set_attribute(
-                                f"mcp.tool.input.{key}.sample_keys",
-                                ",".join(truncated_keys),
-                            )
-                    else:
-                        # For other types, at least record the type
-                        span.set_attribute(
-                            f"mcp.tool.input.{key}.type", type(value).__name__
-                        )
-
             # Add event for tool execution start
             span.add_event("tool.execution.started", {"tool.name": tool_name})
 
@@ -343,45 +304,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             session_id_from_baggage = baggage.get_baggage("mcp.session.id")
             if session_id_from_baggage:
                 span.set_attribute("mcp.session.id", session_id_from_baggage)
-
-            # Add tool arguments as span attributes (be careful with sensitive data)
-            for i, arg in enumerate(args):
-                if isinstance(arg, str | int | float | bool) or arg is None:
-                    span.set_attribute(f"mcp.tool.arg.{i}", str(arg))
-                elif hasattr(arg, "__dict__"):
-                    # For objects, just record the type
-                    span.set_attribute(f"mcp.tool.arg.{i}.type", type(arg).__name__)
-
-            # Add named arguments with better naming
-            for key, value in kwargs.items():
-                if key != "ctx":
-                    if value is None:
-                        span.set_attribute(f"mcp.tool.input.{key}", "null")
-                    elif isinstance(value, str | int | float | bool):
-                        span.set_attribute(f"mcp.tool.input.{key}", str(value))
-                    elif isinstance(value, list | tuple):
-                        span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
-                        span.set_attribute(f"mcp.tool.input.{key}.type", "array")
-                    elif isinstance(value, dict):
-                        span.set_attribute(f"mcp.tool.input.{key}.count", len(value))
-                        span.set_attribute(f"mcp.tool.input.{key}.type", "object")
-                        # Only show first few keys to avoid exceeding attribute limits
-                        if len(value) > 0 and len(value) <= 5:
-                            keys_list = list(value.keys())[:5]
-                            # Limit key length and join
-                            truncated_keys = [
-                                str(k)[:20] + "..." if len(str(k)) > 20 else str(k)
-                                for k in keys_list
-                            ]
-                            span.set_attribute(
-                                f"mcp.tool.input.{key}.sample_keys",
-                                ",".join(truncated_keys),
-                            )
-                    else:
-                        # For other types, at least record the type
-                        span.set_attribute(
-                            f"mcp.tool.input.{key}.type", type(value).__name__
-                        )
 
             # Add event for tool execution start
             span.add_event("tool.execution.started", {"tool.name": tool_name})
@@ -683,16 +605,6 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
             if session_id_from_baggage:
                 span.set_attribute("mcp.session.id", session_id_from_baggage)
 
-            # Add prompt arguments
-            for key, value in kwargs.items():
-                if key != "ctx":
-                    if isinstance(value, str | int | float | bool) or value is None:
-                        span.set_attribute(f"mcp.prompt.arg.{key}", str(value))
-                    else:
-                        span.set_attribute(
-                            f"mcp.prompt.arg.{key}.type", type(value).__name__
-                        )
-
             # Add event for prompt generation start
             span.add_event("prompt.generation.started", {"prompt.name": prompt_name})
 
@@ -786,16 +698,6 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
             session_id_from_baggage = baggage.get_baggage("mcp.session.id")
             if session_id_from_baggage:
                 span.set_attribute("mcp.session.id", session_id_from_baggage)
-
-            # Add prompt arguments
-            for key, value in kwargs.items():
-                if key != "ctx":
-                    if isinstance(value, str | int | float | bool) or value is None:
-                        span.set_attribute(f"mcp.prompt.arg.{key}", str(value))
-                    else:
-                        span.set_attribute(
-                            f"mcp.prompt.arg.{key}.type", type(value).__name__
-                        )
 
             # Add event for prompt generation start
             span.add_event("prompt.generation.started", {"prompt.name": prompt_name})
