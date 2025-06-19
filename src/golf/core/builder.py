@@ -562,6 +562,11 @@ class CodeGenerator:
         if self.settings.opentelemetry_enabled:
             imports.extend(generate_telemetry_imports())
 
+        # Add metrics imports if enabled
+        if self.settings.metrics_enabled:
+            from golf.core.builder_metrics import generate_metrics_imports
+            imports.extend(generate_metrics_imports())
+
         # Add health check imports if enabled
         if self.settings.health_check_enabled:
             imports.extend(
@@ -826,6 +831,12 @@ class CodeGenerator:
                 ]
             )
 
+        # Add metrics initialization if enabled
+        early_metrics_init = []
+        if self.settings.metrics_enabled:
+            from golf.core.builder_metrics import generate_metrics_initialization
+            early_metrics_init.extend(generate_metrics_initialization(self.settings.name))
+
         # Main entry point with transport-specific app initialization
         main_code = [
             'if __name__ == "__main__":',
@@ -937,6 +948,12 @@ class CodeGenerator:
                 ["    # Run with stdio transport", '    mcp.run(transport="stdio")']
             )
 
+        # Add metrics route if enabled
+        metrics_route_code = []
+        if self.settings.metrics_enabled:
+            from golf.core.builder_metrics import generate_metrics_route
+            metrics_route_code = generate_metrics_route(self.settings.metrics_path)
+
         # Add health check route if enabled
         health_check_code = []
         if self.settings.health_check_enabled:
@@ -953,14 +970,16 @@ class CodeGenerator:
 
         # Combine all sections
         # Order: imports, env_section, auth_setup, server_code (mcp init),
-        # early_telemetry_init, component_registrations, health_check_code, main_code (run block)
+        # early_telemetry_init, early_metrics_init, component_registrations, metrics_route_code, health_check_code, main_code (run block)
         code = "\n".join(
             imports
             + env_section
             + auth_setup_code
             + server_code_lines
             + early_telemetry_init
+            + early_metrics_init
             + component_registrations
+            + metrics_route_code
             + health_check_code
             + main_code
         )
