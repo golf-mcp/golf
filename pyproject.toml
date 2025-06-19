@@ -45,6 +45,9 @@ telemetry = [
     "opentelemetry-exporter-otlp-proto-http>=0.40b0",
     "wrapt>=1.17.0"
 ]
+metrics = [
+    "prometheus-client>=0.22.1"
+]
 
 [project.scripts]
 golf = "golf.cli.main:app"
@@ -100,9 +103,11 @@ opentelemetry-sdk = {version = ">=1.33.1", optional = true}
 opentelemetry-instrumentation-asgi = {version = ">=0.40b0", optional = true}
 opentelemetry-exporter-otlp-proto-http = {version = ">=0.40b0", optional = true}
 wrapt = {version = ">=1.17.0", optional = true}
+prometheus-client = {version = ">=0.22.1", optional = true}
 
 [tool.poetry.extras]
 telemetry = ["opentelemetry-api", "opentelemetry-sdk", "opentelemetry-instrumentation-asgi", "opentelemetry-exporter-otlp-proto-http", "wrapt"]
+metrics = ["prometheus-client"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

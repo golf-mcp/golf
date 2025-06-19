@@ -562,6 +562,18 @@ class CodeGenerator:
         if self.settings.opentelemetry_enabled:
             imports.extend(generate_telemetry_imports())
 
+        # Add metrics imports if enabled
+        if self.settings.metrics_enabled:
+            from golf.core.builder_metrics import (
+                generate_metrics_imports,
+                generate_metrics_instrumentation,
+                generate_session_tracking,
+            )
+
+            imports.extend(generate_metrics_imports())
+            imports.extend(generate_metrics_instrumentation())
+            imports.extend(generate_session_tracking())
+
         # Add health check imports if enabled
         if self.settings.health_check_enabled:
             imports.extend(
@@ -659,6 +671,44 @@ class CodeGenerator:
                     registration = (
                         f"# Register the {component_type.value} "
                         f"'{component.name}' with telemetry"
+                    )
+                    entry_func = (
+                        component.entry_function
+                        if hasattr(component, "entry_function")
+                        and component.entry_function
+                        else "export"
+                    )
+
+                    registration += (
+                        f"\n_wrapped_func = instrument_{component_type.value}("
+                        f"{full_module_path}.{entry_func}, '{component.name}')"
+                    )
+
+                    if component_type == ComponentType.TOOL:
+                        registration += (
+                            f'\nmcp.add_tool(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}"'
+                        )
+                        # Add annotations if present
+                        if hasattr(component, "annotations") and component.annotations:
+                            registration += f", annotations={component.annotations}"
+                        registration += ")"
+                    elif component_type == ComponentType.RESOURCE:
+                        registration += (
+                            f"\nmcp.add_resource_fn(_wrapped_func, "
+                            f'uri="{component.uri_template}", name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
+                        )
+                    else:  # PROMPT
+                        registration += (
+                            f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
+                        )
+                elif self.settings.metrics_enabled:
+                    # Use metrics instrumentation
+                    registration = (
+                        f"# Register the {component_type.value} "
+                        f"'{component.name}' with metrics"
                     )
                     entry_func = (
                         component.entry_function
@@ -826,6 +876,15 @@ class CodeGenerator:
                 ]
             )
 
+        # Add metrics initialization if enabled
+        early_metrics_init = []
+        if self.settings.metrics_enabled:
+            from golf.core.builder_metrics import generate_metrics_initialization
+
+            early_metrics_init.extend(
+                generate_metrics_initialization(self.settings.name)
+            )
+
         # Main entry point with transport-specific app initialization
         main_code = [
             'if __name__ == "__main__":',
@@ -863,6 +922,13 @@ class CodeGenerator:
                     "    from starlette.middleware import Middleware"
                 )
                 middleware_list.append("Middleware(ApiKeyMiddleware)")
+
+            # Add metrics middleware if enabled
+            if self.settings.metrics_enabled:
+                middleware_setup.append(
+                    "    from starlette.middleware import Middleware"
+                )
+                middleware_list.append("Middleware(MetricsMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
@@ -904,6 +970,13 @@ class CodeGenerator:
                 )
                 middleware_list.append("Middleware(ApiKeyMiddleware)")
 
+            # Add metrics middleware if enabled
+            if self.settings.metrics_enabled:
+                middleware_setup.append(
+                    "    from starlette.middleware import Middleware"
+                )
+                middleware_list.append("Middleware(MetricsMiddleware)")
+
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
                 middleware_setup.append(
@@ -937,6 +1010,13 @@ class CodeGenerator:
                 ["    # Run with stdio transport", '    mcp.run(transport="stdio")']
             )
 
+        # Add metrics route if enabled
+        metrics_route_code = []
+        if self.settings.metrics_enabled:
+            from golf.core.builder_metrics import generate_metrics_route
+
+            metrics_route_code = generate_metrics_route(self.settings.metrics_path)
+
         # Add health check route if enabled
         health_check_code = []
         if self.settings.health_check_enabled:
@@ -953,14 +1033,16 @@ class CodeGenerator:
 
         # Combine all sections
         # Order: imports, env_section, auth_setup, server_code (mcp init),
-        # early_telemetry_init, component_registrations, health_check_code, main_code (run block)
+        # early_telemetry_init, early_metrics_init, component_registrations, metrics_route_code, health_check_code, main_code (run block)
         code = "\n".join(
             imports
             + env_section
             + auth_setup_code
             + server_code_lines
             + early_telemetry_init
+            + early_metrics_init
             + component_registrations
+            + metrics_route_code
             + health_check_code
             + main_code
         )
