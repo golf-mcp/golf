@@ -1,6 +1,5 @@
 """Metrics collector for Golf MCP servers."""
 
-import time
 from typing import Optional
 
 # Global metrics collector instance
