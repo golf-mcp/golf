@@ -165,8 +165,9 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     async def async_wrapper(*args, **kwargs):
         # Record metrics timing
         import time
+
         start_time = time.time()
-        
+
         # Create a more descriptive span name
         span_name = f"mcp.tool.{tool_name}.execute"
 
@@ -222,9 +223,12 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 # Record metrics for successful execution
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_tool_execution(tool_name, "success")
-                    metrics_collector.record_tool_duration(tool_name, time.time() - start_time)
+                    metrics_collector.record_tool_duration(
+                        tool_name, time.time() - start_time
+                    )
                 except ImportError:
                     # Metrics not available, continue without metrics
                     pass
@@ -277,6 +281,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 # Record metrics for failed execution
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_tool_execution(tool_name, "error")
                     metrics_collector.increment_error("tool", type(e).__name__)
@@ -290,8 +295,9 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     def sync_wrapper(*args, **kwargs):
         # Record metrics timing
         import time
+
         start_time = time.time()
-        
+
         # Create a more descriptive span name
         span_name = f"mcp.tool.{tool_name}.execute"
 
@@ -347,9 +353,12 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 # Record metrics for successful execution
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_tool_execution(tool_name, "success")
-                    metrics_collector.record_tool_duration(tool_name, time.time() - start_time)
+                    metrics_collector.record_tool_duration(
+                        tool_name, time.time() - start_time
+                    )
                 except ImportError:
                     # Metrics not available, continue without metrics
                     pass
@@ -402,6 +411,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 # Record metrics for failed execution
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_tool_execution(tool_name, "error")
                     metrics_collector.increment_error("tool", type(e).__name__)
@@ -837,12 +847,13 @@ async def telemetry_lifespan(mcp_instance):
                 self.seen_sessions = set()
                 # Track session start times for duration calculation
                 self.session_start_times = {}
-            
+
             async def dispatch(self, request: Request, call_next):
                 # Record HTTP request timing
                 import time
+
                 start_time = time.time()
-                
+
                 # Extract session ID from query params or headers
                 session_id = request.query_params.get("session_id")
                 if not session_id:
@@ -852,13 +863,14 @@ async def telemetry_lifespan(mcp_instance):
                 # Track session metrics
                 if session_id:
                     current_time = time.time()
-                    
+
                     # Record new session if we haven't seen this session ID before
                     if session_id not in self.seen_sessions:
                         self.seen_sessions.add(session_id)
                         self.session_start_times[session_id] = current_time
                         try:
                             from golf.metrics import get_metrics_collector
+
                             metrics_collector = get_metrics_collector()
                             metrics_collector.increment_session()
                         except ImportError:
@@ -866,14 +878,17 @@ async def telemetry_lifespan(mcp_instance):
                     else:
                         # Update session duration (time since first request)
                         if session_id in self.session_start_times:
-                            duration = current_time - self.session_start_times[session_id]
+                            duration = (
+                                current_time - self.session_start_times[session_id]
+                            )
                             try:
                                 from golf.metrics import get_metrics_collector
+
                                 metrics_collector = get_metrics_collector()
                                 metrics_collector.record_session_duration(duration)
                             except ImportError:
                                 pass
-                    
+
                     # Clean up old session data periodically
                     if len(self.seen_sessions) > 10000:
                         # Keep only the most recent 5000 sessions
@@ -962,15 +977,22 @@ async def telemetry_lifespan(mcp_instance):
                         # Record HTTP request metrics
                         try:
                             from golf.metrics import get_metrics_collector
+
                             metrics_collector = get_metrics_collector()
-                            
+
                             # Clean up path for metrics (remove query params, normalize)
-                            clean_path = path.split('?')[0]  # Remove query parameters
-                            if clean_path.startswith('/'):
-                                clean_path = clean_path[1:] or 'root'  # Remove leading slash, handle root
-                            
-                            metrics_collector.increment_http_request(method, response.status_code, clean_path)
-                            metrics_collector.record_http_duration(method, clean_path, time.time() - start_time)
+                            clean_path = path.split("?")[0]  # Remove query parameters
+                            if clean_path.startswith("/"):
+                                clean_path = (
+                                    clean_path[1:] or "root"
+                                )  # Remove leading slash, handle root
+
+                            metrics_collector.increment_http_request(
+                                method, response.status_code, clean_path
+                            )
+                            metrics_collector.record_http_duration(
+                                method, clean_path, time.time() - start_time
+                            )
                         except ImportError:
                             # Metrics not available, continue without metrics
                             pass
@@ -994,14 +1016,17 @@ async def telemetry_lifespan(mcp_instance):
                         # Record HTTP error metrics
                         try:
                             from golf.metrics import get_metrics_collector
+
                             metrics_collector = get_metrics_collector()
-                            
+
                             # Clean up path for metrics
-                            clean_path = path.split('?')[0]
-                            if clean_path.startswith('/'):
-                                clean_path = clean_path[1:] or 'root'
-                            
-                            metrics_collector.increment_http_request(method, 500, clean_path)  # Assume 500 for exceptions
+                            clean_path = path.split("?")[0]
+                            if clean_path.startswith("/"):
+                                clean_path = clean_path[1:] or "root"
+
+                            metrics_collector.increment_http_request(
+                                method, 500, clean_path
+                            )  # Assume 500 for exceptions
                             metrics_collector.increment_error("http", type(e).__name__)
                         except ImportError:
                             pass

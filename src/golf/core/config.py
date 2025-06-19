@@ -119,9 +119,7 @@ class Settings(BaseSettings):
     metrics_enabled: bool = Field(
         False, description="Enable Prometheus metrics endpoint"
     )
-    metrics_path: str = Field(
-        "/metrics", description="Metrics endpoint path"
-    )
+    metrics_path: str = Field("/metrics", description="Metrics endpoint path")
 
 
 def find_config_path(start_path: Path | None = None) -> Path | None:

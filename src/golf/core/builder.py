@@ -564,7 +564,12 @@ class CodeGenerator:
 
         # Add metrics imports if enabled
         if self.settings.metrics_enabled:
-            from golf.core.builder_metrics import generate_metrics_imports, generate_metrics_instrumentation, generate_session_tracking
+            from golf.core.builder_metrics import (
+                generate_metrics_imports,
+                generate_metrics_instrumentation,
+                generate_session_tracking,
+            )
+
             imports.extend(generate_metrics_imports())
             imports.extend(generate_metrics_instrumentation())
             imports.extend(generate_session_tracking())
@@ -875,7 +880,10 @@ class CodeGenerator:
         early_metrics_init = []
         if self.settings.metrics_enabled:
             from golf.core.builder_metrics import generate_metrics_initialization
-            early_metrics_init.extend(generate_metrics_initialization(self.settings.name))
+
+            early_metrics_init.extend(
+                generate_metrics_initialization(self.settings.name)
+            )
 
         # Main entry point with transport-specific app initialization
         main_code = [
@@ -889,8 +897,6 @@ class CodeGenerator:
             f'    transport_to_run = "{self.settings.transport}"',
             "",
         ]
-
-
 
         # Add startup message
         if self.settings.transport != "stdio":
@@ -1008,6 +1014,7 @@ class CodeGenerator:
         metrics_route_code = []
         if self.settings.metrics_enabled:
             from golf.core.builder_metrics import generate_metrics_route
+
             metrics_route_code = generate_metrics_route(self.settings.metrics_path)
 
         # Add health check route if enabled

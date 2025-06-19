@@ -24,10 +24,10 @@ def generate_metrics_imports() -> list[str]:
 
 def generate_metrics_initialization(server_name: str) -> list[str]:
     """Generate metrics initialization code.
-    
+
     Args:
         server_name: Name of the MCP server
-        
+
     Returns:
         List of code lines for metrics initialization
     """
@@ -40,15 +40,15 @@ def generate_metrics_initialization(server_name: str) -> list[str]:
 
 def generate_metrics_route(metrics_path: str) -> list[str]:
     """Generate the metrics endpoint route code.
-    
+
     Args:
         metrics_path: Path for the metrics endpoint (e.g., "/metrics")
-        
+
     Returns:
         List of code lines for the metrics route
     """
     return [
-        f"# Add metrics endpoint",
+        "# Add metrics endpoint",
         f'@mcp.custom_route("{metrics_path}", methods=["GET"])',
         "async def metrics_endpoint(request):",
         '    """Prometheus metrics endpoint for monitoring."""',
@@ -72,7 +72,7 @@ def get_metrics_dependencies() -> list[str]:
 
 def generate_metrics_instrumentation() -> list[str]:
     """Generate metrics instrumentation wrapper functions.
-    
+
     Returns:
         List of code lines for metrics instrumentation
     """
@@ -193,7 +193,7 @@ def generate_metrics_instrumentation() -> list[str]:
 
 def generate_session_tracking() -> list[str]:
     """Generate session tracking integration code.
-    
+
     Returns:
         List of code lines for session tracking
     """
@@ -229,4 +229,4 @@ def generate_session_tracking() -> list[str]:
         "    # Fallback: track sessions via request patterns",
         "    pass",
         "",
-    ] 
+    ]

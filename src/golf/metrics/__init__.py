@@ -5,6 +5,6 @@ from golf.metrics.registry import init_metrics
 
 __all__ = [
     "MetricsCollector",
-    "get_metrics_collector", 
+    "get_metrics_collector",
     "init_metrics",
-] 
+]
