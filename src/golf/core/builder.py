@@ -564,8 +564,9 @@ class CodeGenerator:
 
         # Add metrics imports if enabled
         if self.settings.metrics_enabled:
-            from golf.core.builder_metrics import generate_metrics_imports
+            from golf.core.builder_metrics import generate_metrics_imports, generate_metrics_instrumentation
             imports.extend(generate_metrics_imports())
+            imports.extend(generate_metrics_instrumentation())
 
         # Add health check imports if enabled
         if self.settings.health_check_enabled:
@@ -664,6 +665,44 @@ class CodeGenerator:
                     registration = (
                         f"# Register the {component_type.value} "
                         f"'{component.name}' with telemetry"
+                    )
+                    entry_func = (
+                        component.entry_function
+                        if hasattr(component, "entry_function")
+                        and component.entry_function
+                        else "export"
+                    )
+
+                    registration += (
+                        f"\n_wrapped_func = instrument_{component_type.value}("
+                        f"{full_module_path}.{entry_func}, '{component.name}')"
+                    )
+
+                    if component_type == ComponentType.TOOL:
+                        registration += (
+                            f'\nmcp.add_tool(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}"'
+                        )
+                        # Add annotations if present
+                        if hasattr(component, "annotations") and component.annotations:
+                            registration += f", annotations={component.annotations}"
+                        registration += ")"
+                    elif component_type == ComponentType.RESOURCE:
+                        registration += (
+                            f"\nmcp.add_resource_fn(_wrapped_func, "
+                            f'uri="{component.uri_template}", name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
+                        )
+                    else:  # PROMPT
+                        registration += (
+                            f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
+                        )
+                elif self.settings.metrics_enabled:
+                    # Use metrics instrumentation
+                    registration = (
+                        f"# Register the {component_type.value} "
+                        f"'{component.name}' with metrics"
                     )
                     entry_func = (
                         component.entry_function
