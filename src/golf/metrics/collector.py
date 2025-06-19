@@ -73,12 +73,18 @@ class MetricsCollector:
                 ["component_type", "error_type"]
             )
             
-            # System metrics
-            self._metrics["active_sessions"] = Gauge(
-                "golf_active_sessions",
-                "Number of active sessions"
+            # Session metrics
+            self._metrics["sessions_total"] = Counter(
+                "golf_sessions_total",
+                "Total number of sessions created"
             )
             
+            self._metrics["session_duration"] = Histogram(
+                "golf_session_duration_seconds",
+                "Session duration in seconds"
+            )
+            
+            # System metrics
             self._metrics["uptime"] = Gauge(
                 "golf_uptime_seconds", 
                 "Server uptime in seconds"
@@ -185,16 +191,23 @@ class MetricsCollector:
             error_type=error_type
         ).inc()
     
-    def set_active_sessions(self, count: int) -> None:
-        """Set the number of active sessions.
-        
-        Args:
-            count: Current number of active sessions
-        """
-        if not self.enabled or "active_sessions" not in self._metrics:
+    def increment_session(self) -> None:
+        """Record a new session."""
+        if not self.enabled or "sessions_total" not in self._metrics:
             return
             
-        self._metrics["active_sessions"].set(count)
+        self._metrics["sessions_total"].inc()
+    
+    def record_session_duration(self, duration: float) -> None:
+        """Record session duration.
+        
+        Args:
+            duration: Session duration in seconds
+        """
+        if not self.enabled or "session_duration" not in self._metrics:
+            return
+            
+        self._metrics["session_duration"].observe(duration)
     
     def set_uptime(self, seconds: float) -> None:
         """Set the server uptime.
