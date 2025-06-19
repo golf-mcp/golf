@@ -564,9 +564,10 @@ class CodeGenerator:
 
         # Add metrics imports if enabled
         if self.settings.metrics_enabled:
-            from golf.core.builder_metrics import generate_metrics_imports, generate_metrics_instrumentation
+            from golf.core.builder_metrics import generate_metrics_imports, generate_metrics_instrumentation, generate_session_tracking
             imports.extend(generate_metrics_imports())
             imports.extend(generate_metrics_instrumentation())
+            imports.extend(generate_session_tracking())
 
         # Add health check imports if enabled
         if self.settings.health_check_enabled:
@@ -914,6 +915,13 @@ class CodeGenerator:
                 )
                 middleware_list.append("Middleware(ApiKeyMiddleware)")
 
+            # Add metrics middleware if enabled
+            if self.settings.metrics_enabled:
+                middleware_setup.append(
+                    "    from starlette.middleware import Middleware"
+                )
+                middleware_list.append("Middleware(MetricsMiddleware)")
+
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
                 middleware_setup.append(
@@ -953,6 +961,13 @@ class CodeGenerator:
                     "    from starlette.middleware import Middleware"
                 )
                 middleware_list.append("Middleware(ApiKeyMiddleware)")
+
+            # Add metrics middleware if enabled
+            if self.settings.metrics_enabled:
+                middleware_setup.append(
+                    "    from starlette.middleware import Middleware"
+                )
+                middleware_list.append("Middleware(MetricsMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
