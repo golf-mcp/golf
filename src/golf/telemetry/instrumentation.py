@@ -163,6 +163,10 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
+        # Record metrics timing
+        import time
+        start_time = time.time()
+        
         # Create a more descriptive span name
         span_name = f"mcp.tool.{tool_name}.execute"
 
@@ -215,6 +219,16 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 # Add event for successful completion
                 span.add_event("tool.execution.completed", {"tool.name": tool_name})
 
+                # Record metrics for successful execution
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_tool_execution(tool_name, "success")
+                    metrics_collector.record_tool_duration(tool_name, time.time() - start_time)
+                except ImportError:
+                    # Metrics not available, continue without metrics
+                    pass
+
                 # Capture result metadata with better structure
                 if result is not None:
                     if isinstance(result, str | int | float | bool):
@@ -259,10 +273,25 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                         "error.message": str(e),
                     },
                 )
+
+                # Record metrics for failed execution
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_tool_execution(tool_name, "error")
+                    metrics_collector.increment_error("tool", type(e).__name__)
+                except ImportError:
+                    # Metrics not available, continue without metrics
+                    pass
+
                 raise
 
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
+        # Record metrics timing
+        import time
+        start_time = time.time()
+        
         # Create a more descriptive span name
         span_name = f"mcp.tool.{tool_name}.execute"
 
@@ -315,6 +344,16 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 # Add event for successful completion
                 span.add_event("tool.execution.completed", {"tool.name": tool_name})
 
+                # Record metrics for successful execution
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_tool_execution(tool_name, "success")
+                    metrics_collector.record_tool_duration(tool_name, time.time() - start_time)
+                except ImportError:
+                    # Metrics not available, continue without metrics
+                    pass
+
                 # Capture result metadata with better structure
                 if result is not None:
                     if isinstance(result, str | int | float | bool):
@@ -359,6 +398,17 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                         "error.message": str(e),
                     },
                 )
+
+                # Record metrics for failed execution
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_tool_execution(tool_name, "error")
+                    metrics_collector.increment_error("tool", type(e).__name__)
+                except ImportError:
+                    # Metrics not available, continue without metrics
+                    pass
+
                 raise
 
     # Return appropriate wrapper based on function type
