@@ -115,6 +115,14 @@ class Settings(BaseSettings):
         description="Make Streamable-HTTP transport stateless (new session per request)",
     )
 
+    # Metrics configuration
+    metrics_enabled: bool = Field(
+        False, description="Enable Prometheus metrics endpoint"
+    )
+    metrics_path: str = Field(
+        "/metrics", description="Metrics endpoint path"
+    )
+
 
 def find_config_path(start_path: Path | None = None) -> Path | None:
     """Find the golf config file by searching upwards from the given path.
