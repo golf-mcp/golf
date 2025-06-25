@@ -829,54 +829,58 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
 # Add the BoundedSessionTracker class before SessionTracingMiddleware
 class BoundedSessionTracker:
     """Memory-safe session tracker with automatic expiration."""
-    
+
     def __init__(self, max_sessions: int = 1000, session_ttl: int = 3600):
         self.max_sessions = max_sessions
         self.session_ttl = session_ttl
         self.sessions: OrderedDict[str, float] = OrderedDict()
         self.last_cleanup = time.time()
-        
+
     def track_session(self, session_id: str) -> bool:
         """Track a session, returns True if it's new."""
         current_time = time.time()
-        
+
         # Periodic cleanup (every 5 minutes)
         if current_time - self.last_cleanup > 300:
             self._cleanup_expired(current_time)
             self.last_cleanup = current_time
-        
+
         # Check if session exists and is still valid
         if session_id in self.sessions:
             # Move to end (mark as recently used)
             self.sessions.move_to_end(session_id)
             return False
-        
+
         # New session
         self.sessions[session_id] = current_time
-        
+
         # Enforce max size
         while len(self.sessions) > self.max_sessions:
             self.sessions.popitem(last=False)  # Remove oldest
-            
+
         return True
-    
+
     def _cleanup_expired(self, current_time: float):
         """Remove expired sessions."""
         expired = [
-            sid for sid, timestamp in self.sessions.items()
+            sid
+            for sid, timestamp in self.sessions.items()
             if current_time - timestamp > self.session_ttl
         ]
         for sid in expired:
             del self.sessions[sid]
-    
+
     def get_active_session_count(self) -> int:
         return len(self.sessions)
+
 
 class SessionTracingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):
         super().__init__(app)
         # Use memory-safe session tracker instead of unbounded collections
-        self.session_tracker = BoundedSessionTracker(max_sessions=1000, session_ttl=3600)
+        self.session_tracker = BoundedSessionTracker(
+            max_sessions=1000, session_ttl=3600
+        )
 
     async def dispatch(self, request: Request, call_next):
         # Record HTTP request timing
@@ -893,7 +897,7 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
         # Track session metrics using memory-safe tracker
         if session_id:
             is_new_session = self.session_tracker.track_session(session_id)
-            
+
             if is_new_session:
                 try:
                     from golf.metrics import get_metrics_collector
@@ -944,7 +948,10 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
             # Add session tracking
             if session_id:
                 span.set_attribute("mcp.session.id", session_id)
-                span.set_attribute("mcp.session.active_count", self.session_tracker.get_active_session_count())
+                span.set_attribute(
+                    "mcp.session.active_count",
+                    self.session_tracker.get_active_session_count(),
+                )
                 # Add to baggage for propagation
                 ctx = baggage.set_baggage("mcp.session.id", session_id)
                 from opentelemetry import context
@@ -959,9 +966,7 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
                 span.set_attribute("http.request.size", int(content_length))
 
             # Add event for request start
-            span.add_event(
-                "http.request.started", {"method": method, "path": path}
-            )
+            span.add_event("http.request.started", {"method": method, "path": path})
 
             try:
                 response = await call_next(request)
@@ -1069,8 +1074,6 @@ async def telemetry_lifespan(mcp_instance):
 
     # Try to add session tracking middleware if possible
     try:
-        from starlette.middleware.base import BaseHTTPMiddleware
-        from starlette.requests import Request
 
         # Try to add middleware to FastMCP app if it has Starlette app
         if hasattr(mcp_instance, "app") or hasattr(mcp_instance, "_app"):
