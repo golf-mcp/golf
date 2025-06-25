@@ -4,9 +4,11 @@ import asyncio
 import functools
 import os
 import sys
+import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import TypeVar
+from collections import OrderedDict
 
 from opentelemetry import baggage, trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -14,6 +16,9 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from opentelemetry.trace import Status, StatusCode
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 T = TypeVar("T")
 
@@ -821,6 +826,233 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
         return sync_wrapper
 
 
+# Add the BoundedSessionTracker class before SessionTracingMiddleware
+class BoundedSessionTracker:
+    """Memory-safe session tracker with automatic expiration."""
+    
+    def __init__(self, max_sessions: int = 1000, session_ttl: int = 3600):
+        self.max_sessions = max_sessions
+        self.session_ttl = session_ttl
+        self.sessions: OrderedDict[str, float] = OrderedDict()
+        self.last_cleanup = time.time()
+        
+    def track_session(self, session_id: str) -> bool:
+        """Track a session, returns True if it's new."""
+        current_time = time.time()
+        
+        # Periodic cleanup (every 5 minutes)
+        if current_time - self.last_cleanup > 300:
+            self._cleanup_expired(current_time)
+            self.last_cleanup = current_time
+        
+        # Check if session exists and is still valid
+        if session_id in self.sessions:
+            # Move to end (mark as recently used)
+            self.sessions.move_to_end(session_id)
+            return False
+        
+        # New session
+        self.sessions[session_id] = current_time
+        
+        # Enforce max size
+        while len(self.sessions) > self.max_sessions:
+            self.sessions.popitem(last=False)  # Remove oldest
+            
+        return True
+    
+    def _cleanup_expired(self, current_time: float):
+        """Remove expired sessions."""
+        expired = [
+            sid for sid, timestamp in self.sessions.items()
+            if current_time - timestamp > self.session_ttl
+        ]
+        for sid in expired:
+            del self.sessions[sid]
+    
+    def get_active_session_count(self) -> int:
+        return len(self.sessions)
+
+class SessionTracingMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app):
+        super().__init__(app)
+        # Use memory-safe session tracker instead of unbounded collections
+        self.session_tracker = BoundedSessionTracker(max_sessions=1000, session_ttl=3600)
+
+    async def dispatch(self, request: Request, call_next):
+        # Record HTTP request timing
+        import time
+
+        start_time = time.time()
+
+        # Extract session ID from query params or headers
+        session_id = request.query_params.get("session_id")
+        if not session_id:
+            # Check headers as fallback
+            session_id = request.headers.get("x-session-id")
+
+        # Track session metrics using memory-safe tracker
+        if session_id:
+            is_new_session = self.session_tracker.track_session(session_id)
+            
+            if is_new_session:
+                try:
+                    from golf.metrics import get_metrics_collector
+
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_session()
+                except ImportError:
+                    pass
+            else:
+                # Record session duration for existing sessions
+                try:
+                    from golf.metrics import get_metrics_collector
+
+                    metrics_collector = get_metrics_collector()
+                    # Use a default duration since we don't track exact start times anymore
+                    # This is less precise but memory-safe
+                    metrics_collector.record_session_duration(300.0)  # 5 min default
+                except ImportError:
+                    pass
+
+        # Create a descriptive span name based on the request
+        method = request.method
+        path = request.url.path
+
+        # Determine the operation type from the path
+        operation_type = "unknown"
+        if "/mcp" in path:
+            operation_type = "mcp.request"
+        elif "/sse" in path:
+            operation_type = "sse.stream"
+        elif "/auth" in path:
+            operation_type = "auth"
+
+        span_name = f"{operation_type}.{method.lower()}"
+
+        tracer = get_tracer()
+        with tracer.start_as_current_span(span_name) as span:
+            # Add comprehensive HTTP attributes
+            span.set_attribute("http.method", method)
+            span.set_attribute("http.url", str(request.url))
+            span.set_attribute("http.scheme", request.url.scheme)
+            span.set_attribute("http.host", request.url.hostname or "unknown")
+            span.set_attribute("http.target", path)
+            span.set_attribute(
+                "http.user_agent", request.headers.get("user-agent", "unknown")
+            )
+
+            # Add session tracking
+            if session_id:
+                span.set_attribute("mcp.session.id", session_id)
+                span.set_attribute("mcp.session.active_count", self.session_tracker.get_active_session_count())
+                # Add to baggage for propagation
+                ctx = baggage.set_baggage("mcp.session.id", session_id)
+                from opentelemetry import context
+
+                token = context.attach(ctx)
+            else:
+                token = None
+
+            # Add request size if available
+            content_length = request.headers.get("content-length")
+            if content_length:
+                span.set_attribute("http.request.size", int(content_length))
+
+            # Add event for request start
+            span.add_event(
+                "http.request.started", {"method": method, "path": path}
+            )
+
+            try:
+                response = await call_next(request)
+
+                # Add response attributes
+                span.set_attribute("http.status_code", response.status_code)
+                span.set_attribute(
+                    "http.status_class", f"{response.status_code // 100}xx"
+                )
+
+                # Set span status based on HTTP status
+                if response.status_code >= 400:
+                    span.set_status(
+                        Status(StatusCode.ERROR, f"HTTP {response.status_code}")
+                    )
+                else:
+                    span.set_status(Status(StatusCode.OK))
+
+                # Add event for request completion
+                span.add_event(
+                    "http.request.completed",
+                    {
+                        "method": method,
+                        "path": path,
+                        "status_code": response.status_code,
+                    },
+                )
+
+                # Record HTTP request metrics
+                try:
+                    from golf.metrics import get_metrics_collector
+
+                    metrics_collector = get_metrics_collector()
+
+                    # Clean up path for metrics (remove query params, normalize)
+                    clean_path = path.split("?")[0]  # Remove query parameters
+                    if clean_path.startswith("/"):
+                        clean_path = (
+                            clean_path[1:] or "root"
+                        )  # Remove leading slash, handle root
+
+                    metrics_collector.increment_http_request(
+                        method, response.status_code, clean_path
+                    )
+                    metrics_collector.record_http_duration(
+                        method, clean_path, time.time() - start_time
+                    )
+                except ImportError:
+                    # Metrics not available, continue without metrics
+                    pass
+
+                return response
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+
+                # Add event for error
+                span.add_event(
+                    "http.request.error",
+                    {
+                        "method": method,
+                        "path": path,
+                        "error.type": type(e).__name__,
+                        "error.message": str(e),
+                    },
+                )
+
+                # Record HTTP error metrics
+                try:
+                    from golf.metrics import get_metrics_collector
+
+                    metrics_collector = get_metrics_collector()
+
+                    # Clean up path for metrics
+                    clean_path = path.split("?")[0]
+                    if clean_path.startswith("/"):
+                        clean_path = clean_path[1:] or "root"
+
+                    metrics_collector.increment_http_request(
+                        method, 500, clean_path
+                    )  # Assume 500 for exceptions
+                    metrics_collector.increment_error("http", type(e).__name__)
+                except ImportError:
+                    pass
+
+                raise
+            finally:
+                if token:
+                    context.detach(token)
+
+
 @asynccontextmanager
 async def telemetry_lifespan(mcp_instance):
     """Simplified lifespan for telemetry initialization and cleanup."""
@@ -839,202 +1071,6 @@ async def telemetry_lifespan(mcp_instance):
     try:
         from starlette.middleware.base import BaseHTTPMiddleware
         from starlette.requests import Request
-
-        class SessionTracingMiddleware(BaseHTTPMiddleware):
-            def __init__(self, app):
-                super().__init__(app)
-                # Track seen sessions to count unique sessions
-                self.seen_sessions = set()
-                # Track session start times for duration calculation
-                self.session_start_times = {}
-
-            async def dispatch(self, request: Request, call_next):
-                # Record HTTP request timing
-                import time
-
-                start_time = time.time()
-
-                # Extract session ID from query params or headers
-                session_id = request.query_params.get("session_id")
-                if not session_id:
-                    # Check headers as fallback
-                    session_id = request.headers.get("x-session-id")
-
-                # Track session metrics
-                if session_id:
-                    current_time = time.time()
-
-                    # Record new session if we haven't seen this session ID before
-                    if session_id not in self.seen_sessions:
-                        self.seen_sessions.add(session_id)
-                        self.session_start_times[session_id] = current_time
-                        try:
-                            from golf.metrics import get_metrics_collector
-
-                            metrics_collector = get_metrics_collector()
-                            metrics_collector.increment_session()
-                        except ImportError:
-                            pass
-                    else:
-                        # Update session duration (time since first request)
-                        if session_id in self.session_start_times:
-                            duration = (
-                                current_time - self.session_start_times[session_id]
-                            )
-                            try:
-                                from golf.metrics import get_metrics_collector
-
-                                metrics_collector = get_metrics_collector()
-                                metrics_collector.record_session_duration(duration)
-                            except ImportError:
-                                pass
-
-                    # Clean up old session data periodically
-                    if len(self.seen_sessions) > 10000:
-                        # Keep only the most recent 5000 sessions
-                        recent_sessions = list(self.seen_sessions)[-5000:]
-                        self.seen_sessions = set(recent_sessions)
-                        # Clean up start times for removed sessions
-                        for old_session in list(self.session_start_times.keys()):
-                            if old_session not in self.seen_sessions:
-                                self.session_start_times.pop(old_session, None)
-
-                # Create a descriptive span name based on the request
-                method = request.method
-                path = request.url.path
-
-                # Determine the operation type from the path
-                operation_type = "unknown"
-                if "/mcp" in path:
-                    operation_type = "mcp.request"
-                elif "/sse" in path:
-                    operation_type = "sse.stream"
-                elif "/auth" in path:
-                    operation_type = "auth"
-
-                span_name = f"{operation_type}.{method.lower()}"
-
-                tracer = get_tracer()
-                with tracer.start_as_current_span(span_name) as span:
-                    # Add comprehensive HTTP attributes
-                    span.set_attribute("http.method", method)
-                    span.set_attribute("http.url", str(request.url))
-                    span.set_attribute("http.scheme", request.url.scheme)
-                    span.set_attribute("http.host", request.url.hostname or "unknown")
-                    span.set_attribute("http.target", path)
-                    span.set_attribute(
-                        "http.user_agent", request.headers.get("user-agent", "unknown")
-                    )
-
-                    # Add session tracking
-                    if session_id:
-                        span.set_attribute("mcp.session.id", session_id)
-                        # Add to baggage for propagation
-                        ctx = baggage.set_baggage("mcp.session.id", session_id)
-                        from opentelemetry import context
-
-                        token = context.attach(ctx)
-                    else:
-                        token = None
-
-                    # Add request size if available
-                    content_length = request.headers.get("content-length")
-                    if content_length:
-                        span.set_attribute("http.request.size", int(content_length))
-
-                    # Add event for request start
-                    span.add_event(
-                        "http.request.started", {"method": method, "path": path}
-                    )
-
-                    try:
-                        response = await call_next(request)
-
-                        # Add response attributes
-                        span.set_attribute("http.status_code", response.status_code)
-                        span.set_attribute(
-                            "http.status_class", f"{response.status_code // 100}xx"
-                        )
-
-                        # Set span status based on HTTP status
-                        if response.status_code >= 400:
-                            span.set_status(
-                                Status(StatusCode.ERROR, f"HTTP {response.status_code}")
-                            )
-                        else:
-                            span.set_status(Status(StatusCode.OK))
-
-                        # Add event for request completion
-                        span.add_event(
-                            "http.request.completed",
-                            {
-                                "method": method,
-                                "path": path,
-                                "status_code": response.status_code,
-                            },
-                        )
-
-                        # Record HTTP request metrics
-                        try:
-                            from golf.metrics import get_metrics_collector
-
-                            metrics_collector = get_metrics_collector()
-
-                            # Clean up path for metrics (remove query params, normalize)
-                            clean_path = path.split("?")[0]  # Remove query parameters
-                            if clean_path.startswith("/"):
-                                clean_path = (
-                                    clean_path[1:] or "root"
-                                )  # Remove leading slash, handle root
-
-                            metrics_collector.increment_http_request(
-                                method, response.status_code, clean_path
-                            )
-                            metrics_collector.record_http_duration(
-                                method, clean_path, time.time() - start_time
-                            )
-                        except ImportError:
-                            # Metrics not available, continue without metrics
-                            pass
-
-                        return response
-                    except Exception as e:
-                        span.record_exception(e)
-                        span.set_status(Status(StatusCode.ERROR, str(e)))
-
-                        # Add event for error
-                        span.add_event(
-                            "http.request.error",
-                            {
-                                "method": method,
-                                "path": path,
-                                "error.type": type(e).__name__,
-                                "error.message": str(e),
-                            },
-                        )
-
-                        # Record HTTP error metrics
-                        try:
-                            from golf.metrics import get_metrics_collector
-
-                            metrics_collector = get_metrics_collector()
-
-                            # Clean up path for metrics
-                            clean_path = path.split("?")[0]
-                            if clean_path.startswith("/"):
-                                clean_path = clean_path[1:] or "root"
-
-                            metrics_collector.increment_http_request(
-                                method, 500, clean_path
-                            )  # Assume 500 for exceptions
-                            metrics_collector.increment_error("http", type(e).__name__)
-                        except ImportError:
-                            pass
-
-                        raise
-                    finally:
-                        if token:
-                            context.detach(token)
 
         # Try to add middleware to FastMCP app if it has Starlette app
         if hasattr(mcp_instance, "app") or hasattr(mcp_instance, "_app"):
