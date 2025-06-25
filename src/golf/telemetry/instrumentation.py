@@ -1074,7 +1074,6 @@ async def telemetry_lifespan(mcp_instance):
 
     # Try to add session tracking middleware if possible
     try:
-
         # Try to add middleware to FastMCP app if it has Starlette app
         if hasattr(mcp_instance, "app") or hasattr(mcp_instance, "_app"):
             app = getattr(mcp_instance, "app", getattr(mcp_instance, "_app", None))
