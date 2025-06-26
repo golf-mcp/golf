@@ -1251,14 +1251,17 @@ def build_project(
         try:
             from golf.core.platform import register_project_with_platform
 
-            asyncio.run(
+            success = asyncio.run(
                 register_project_with_platform(
                     project_path=project_path,
                     settings=settings,
                     components=generator.components,
                 )
             )
-            console.print("[green]✓ Platform registration completed[/green]")
+
+            if success:
+                console.print("[green]✓ Platform registration completed[/green]")
+            # If success is False, the platform module already printed appropriate warnings
         except ImportError:
             console.print(
                 "[yellow]Warning: Platform registration module not available[/yellow]"
