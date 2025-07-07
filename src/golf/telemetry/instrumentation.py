@@ -36,11 +36,27 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
 
     # Check for Golf platform integration first
     golf_api_key = os.environ.get("GOLF_API_KEY")
-    if golf_api_key and not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
-        # Auto-configure for Golf platform
+    if golf_api_key:
+        # Auto-configure for Golf platform - always use OTLP when Golf API key is present
         os.environ["OTEL_TRACES_EXPORTER"] = "otlp_http"
-        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:8000/api/v1/otel"
-        os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"X-Golf-Key={golf_api_key}"
+        
+        # Only set endpoint if not already configured (allow user override)
+        if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+            os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
+                "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/v1/otel"
+            )
+        
+        # Set Golf platform headers (append to existing if present)
+        existing_headers = os.environ.get("OTEL_EXPORTER_OTLP_HEADERS", "")
+        golf_header = f"X-Golf-Key={golf_api_key}"
+        
+        if existing_headers:
+            # Check if Golf key is already in headers
+            if "X-Golf-Key=" not in existing_headers:
+                os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"{existing_headers},{golf_header}"
+        else:
+            os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = golf_header
+            
         print("[INFO] Auto-configured OpenTelemetry for Golf platform ingestion")
 
     # Check for required environment variables based on exporter type

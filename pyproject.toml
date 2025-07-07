@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "golf-mcp"
-version = "0.1.19"
+version = "0.1.20"
 description = "Framework for building MCP servers"
 authors = [
     {name = "Antoni Gmitruk", email = "antoni@golf.dev"}
@@ -34,17 +34,15 @@ dependencies = [
     "black>=24.10.0",
     "pyjwt>=2.0.0",
     "httpx>=0.28.1",
-    "posthog>=4.1.0"
-]
-
-[project.optional-dependencies]
-telemetry = [
+    "posthog>=4.1.0",
     "opentelemetry-api>=1.33.1",
     "opentelemetry-sdk>=1.33.1",
     "opentelemetry-instrumentation-asgi>=0.40b0",
     "opentelemetry-exporter-otlp-proto-http>=0.40b0",
     "wrapt>=1.17.0"
 ]
+
+[project.optional-dependencies]
 metrics = [
     "prometheus-client>=0.22.1"
 ]
@@ -67,7 +65,7 @@ golf = ["examples/**/*"]
 
 [tool.poetry]
 name = "golf-mcp"
-version = "0.1.19"
+version = "0.1.20"
 description = "Framework for building MCP servers with zero boilerplate"
 authors = ["Antoni Gmitruk <antoni@golf.dev>"]
 license = "Apache-2.0"
@@ -97,16 +95,15 @@ python-dotenv = ">=1.1.0"
 black = ">=24.10.0"
 pyjwt = ">=2.0.0"
 httpx = ">=0.28.1"
-# Optional dependencies listed separately for poetry if desired, or managed by extras
-opentelemetry-api = {version = ">=1.33.1", optional = true}
-opentelemetry-sdk = {version = ">=1.33.1", optional = true}
-opentelemetry-instrumentation-asgi = {version = ">=0.40b0", optional = true}
-opentelemetry-exporter-otlp-proto-http = {version = ">=0.40b0", optional = true}
-wrapt = {version = ">=1.17.0", optional = true}
+posthog = ">=4.1.0"
+opentelemetry-api = ">=1.33.1"
+opentelemetry-sdk = ">=1.33.1"
+opentelemetry-instrumentation-asgi = ">=0.40b0"
+opentelemetry-exporter-otlp-proto-http = ">=0.40b0"
+wrapt = ">=1.17.0"
 prometheus-client = {version = ">=0.22.1", optional = true}
 
 [tool.poetry.extras]
-telemetry = ["opentelemetry-api", "opentelemetry-sdk", "opentelemetry-instrumentation-asgi", "opentelemetry-exporter-otlp-proto-http", "wrapt"]
 metrics = ["prometheus-client"]
 
 [tool.poetry.group.dev.dependencies]
