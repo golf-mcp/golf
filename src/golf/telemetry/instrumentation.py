@@ -39,7 +39,9 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
     if golf_api_key and not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
         # Auto-configure for Golf platform
         os.environ["OTEL_TRACES_EXPORTER"] = "otlp_http"
-        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:8000/api/v1/otel"
+        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
+            "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/v1/otel"
+        )
         os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"X-Golf-Key={golf_api_key}"
         print("[INFO] Auto-configured OpenTelemetry for Golf platform ingestion")
 

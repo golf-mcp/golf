@@ -65,7 +65,7 @@ async def register_project_with_platform(
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                "http://localhost:8000/api/resources",
+                "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/resources",
                 json=metadata,
                 headers={
                     "X-Golf-Key": api_key,
