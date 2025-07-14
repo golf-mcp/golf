@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/golf-mcp-golf-badge.png)](https://mseep.ai/app/golf-mcp-golf)
+
 <div align="center">
   <img src="./golf-banner.png" alt="Golf Banner">
   
