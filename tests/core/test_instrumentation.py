@@ -358,7 +358,7 @@ class TestIntegrationScenarios:
         monkeypatch.delenv("OTEL_EXPORTER_OTLP_HEADERS", raising=False)
         monkeypatch.delenv("OTEL_TRACES_EXPORTER", raising=False)
         monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-        
+
         # Simulate Golf platform environment
         monkeypatch.setenv("GOLF_API_KEY", "golf_test_key_123")
         monkeypatch.setenv("GOLF_SERVER_ID", "server_abc")
