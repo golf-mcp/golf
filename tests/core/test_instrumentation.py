@@ -354,10 +354,14 @@ class TestIntegrationScenarios:
 
     def test_golf_platform_integration_workflow(self, monkeypatch):
         """Test Golf platform integration scenario."""
+        # Clean up any existing OTEL environment variables from previous tests
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_HEADERS", raising=False)
+        monkeypatch.delenv("OTEL_TRACES_EXPORTER", raising=False)
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+        
         # Simulate Golf platform environment
         monkeypatch.setenv("GOLF_API_KEY", "golf_test_key_123")
         monkeypatch.setenv("GOLF_SERVER_ID", "server_abc")
-        monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
 
         with patch("golf.telemetry.instrumentation.trace.set_tracer_provider"):
             provider = init_telemetry("golf-server")
