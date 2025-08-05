@@ -20,7 +20,7 @@ async def calculate(
             description="Mathematical expression to evaluate (e.g., '2 + 3', '10 * 5', '100 / 4')",
             examples=["2 + 3", "10 * 5.5", "(8 - 3) * 2"],
         ),
-    ]
+    ],
 ) -> CalculationResult:
     """Evaluate a simple mathematical expression.
 
@@ -31,7 +31,7 @@ async def calculate(
     - Division (/)
     - Parentheses for grouping
     - Decimal numbers
-    
+
     Examples:
     - calculate("2 + 3") → 5
     - calculate("10 * 5.5") → 55.0
@@ -43,30 +43,30 @@ async def calculate(
         allowed_chars = set("0123456789+-*/.() ")
         if not all(c in allowed_chars for c in expression):
             raise ValueError("Expression contains invalid characters")
-        
+
         # Evaluate the expression
         result = eval(expression, {"__builtins__": {}}, {})
-        
+
         # Ensure result is a number
         if not isinstance(result, (int, float)):
             raise ValueError("Expression did not evaluate to a number")
-        
+
         return CalculationResult(
             result=float(result),
             operation="evaluate",
             expression=expression,
         )
-        
+
     except ZeroDivisionError:
         return CalculationResult(
-            result=float('inf'),
+            result=float("inf"),
             operation="error",
             expression=f"{expression} → Division by zero",
         )
     except Exception as e:
         return CalculationResult(
             result=0.0,
-            operation="error", 
+            operation="error",
             expression=f"{expression} → Error: {str(e)}",
         )
 

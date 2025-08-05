@@ -7,7 +7,7 @@ This example shows different authentication options available in Golf 0.2.x:
 
 # Example 1: JWT authentication with a static public key
 # from golf.auth import configure_jwt_auth
-# 
+#
 # configure_jwt_auth(
 #     public_key_env_var="JWT_PUBLIC_KEY",  # PEM-encoded public key
 #     issuer="https://your-auth-server.com",
@@ -17,7 +17,7 @@ This example shows different authentication options available in Golf 0.2.x:
 
 # Example 2: JWT authentication with JWKS (recommended for production)
 # from golf.auth import configure_jwt_auth
-# 
+#
 # configure_jwt_auth(
 #     jwks_uri_env_var="JWKS_URI",  # e.g., "https://your-domain.auth0.com/.well-known/jwks.json"
 #     issuer_env_var="JWT_ISSUER",  # e.g., "https://your-domain.auth0.com/"
@@ -35,7 +35,7 @@ configure_dev_auth(
             "scopes": ["read", "write"],
         },
         "admin-token-456": {
-            "client_id": "admin-client", 
+            "client_id": "admin-client",
             "scopes": ["read", "write", "admin"],
         },
     },

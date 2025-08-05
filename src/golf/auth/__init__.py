@@ -32,14 +32,43 @@ from .helpers import (
     set_api_key,
 )
 
+# Public API
+__all__ = [
+    # Main configuration functions
+    "configure_auth",
+    "configure_jwt_auth", 
+    "configure_dev_auth",
+    "get_auth_config",
+    # Provider configurations
+    "AuthConfig",
+    "JWTAuthConfig",
+    "StaticTokenConfig", 
+    "OAuthServerConfig",
+    "RemoteAuthConfig",
+    # Factory functions
+    "create_auth_provider",
+    "create_simple_jwt_provider",
+    "create_dev_token_provider",
+    # API key functions (backward compatibility)
+    "configure_api_key",
+    "get_api_key_config",
+    "is_api_key_configured",
+    # Helper functions
+    "debug_api_key_context",
+    "extract_token_from_header",
+    "get_access_token",
+    "get_api_key",
+    "get_provider_token",
+    "set_api_key",
+]
+
 # Global storage for auth configuration
 _auth_config: tuple[AuthConfig, list[str] | None] | None = None
 _api_key_context: str | None = None
 
 
 def configure_auth(
-    config: AuthConfig, 
-    required_scopes: list[str] | None = None
+    config: AuthConfig, required_scopes: list[str] | None = None
 ) -> None:
     """Configure authentication for the Golf server.
 
@@ -53,7 +82,7 @@ def configure_auth(
     Examples:
         # JWT authentication with Auth0
         from golf.auth import configure_auth, JWTAuthConfig
-        
+
         configure_auth(
             JWTAuthConfig(
                 jwks_uri="https://your-domain.auth0.com/.well-known/jwks.json",
@@ -65,7 +94,7 @@ def configure_auth(
 
         # Development with static tokens
         from golf.auth import configure_auth, StaticTokenConfig
-        
+
         configure_auth(
             StaticTokenConfig(
                 tokens={
@@ -79,7 +108,7 @@ def configure_auth(
 
         # Full OAuth server
         from golf.auth import configure_auth, OAuthServerConfig
-        
+
         configure_auth(
             OAuthServerConfig(
                 base_url="https://your-server.example.com",
@@ -99,17 +128,18 @@ def configure_jwt_auth(
     issuer: str | None = None,
     audience: str | list[str] | None = None,
     required_scopes: list[str] | None = None,
-    **env_vars: str
+    **env_vars: str,
 ) -> None:
     """Convenience function to configure JWT authentication.
-    
+
     Args:
         jwks_uri: JWKS URI for key fetching
         public_key: Static public key (PEM format)
         issuer: Expected issuer claim
         audience: Expected audience claim(s)
         required_scopes: Required scopes for all requests
-        **env_vars: Environment variable names (public_key_env_var, jwks_uri_env_var, etc.)
+        **env_vars: Environment variable names (public_key_env_var, 
+            jwks_uri_env_var, etc.)
     """
     config = JWTAuthConfig(
         jwks_uri=jwks_uri,
@@ -117,7 +147,7 @@ def configure_jwt_auth(
         issuer=issuer,
         audience=audience,
         required_scopes=required_scopes or [],
-        **env_vars
+        **env_vars,
     )
     configure_auth(config, required_scopes)
 
@@ -127,7 +157,7 @@ def configure_dev_auth(
     required_scopes: list[str] | None = None,
 ) -> None:
     """Convenience function to configure development authentication.
-    
+
     Args:
         tokens: Token dictionary or None for defaults
         required_scopes: Required scopes for all requests
@@ -143,7 +173,7 @@ def configure_dev_auth(
                 "scopes": ["read", "write", "admin"],
             },
         }
-    
+
     config = StaticTokenConfig(
         tokens=tokens,
         required_scopes=required_scopes or [],
@@ -169,40 +199,21 @@ def is_auth_configured() -> bool:
     return _auth_config is not None
 
 
-def set_api_key(api_key: str) -> None:
-    """Set the API key for the current request context.
-    
-    This is used internally by the API key middleware.
-    
-    Args:
-        api_key: The API key to store
-    """
-    global _api_key_context
-    _api_key_context = api_key
-
-
-def get_api_key() -> str | None:
-    """Get the current API key from the request context.
-    
-    Returns:
-        The API key string if available, None otherwise
-    """
-    return _api_key_context
 
 
 # Breaking change in Golf 0.2.x: Legacy auth system removed
 # Users must migrate to modern auth configurations
 
 
-def create_auth_provider_from_config():
+def create_auth_provider_from_config() -> Any:
     """Create an auth provider from the current configuration.
-    
+
     Returns:
         FastMCP AuthProvider instance or None if not configured
     """
     config_tuple = get_auth_config()
     if not config_tuple:
         return None
-    
+
     config, _ = config_tuple
     return create_auth_provider(config)

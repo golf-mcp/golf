@@ -1094,14 +1094,16 @@ def build_project(
     # Also support legacy pre_build.py for backward compatibility
     auth_path = project_path / "auth.py"
     legacy_path = project_path / "pre_build.py"
-    
+
     config_path = None
     if auth_path.exists():
         config_path = auth_path
     elif legacy_path.exists():
         config_path = legacy_path
-        console.print("[yellow]Warning: pre_build.py is deprecated. Rename to auth.py[/yellow]")
-    
+        console.print(
+            "[yellow]Warning: pre_build.py is deprecated. Rename to auth.py[/yellow]"
+        )
+
     if config_path:
         # Save the current directory and path - handle case where cwd might be invalid
         try:
@@ -1111,7 +1113,7 @@ def build_project(
             original_dir = str(project_path)
             os.chdir(original_dir)
         original_path = sys.path.copy()
-        
+
         try:
             # Change to the project directory and add it to Python path
             os.chdir(project_path)

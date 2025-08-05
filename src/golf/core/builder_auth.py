@@ -183,7 +183,7 @@ def generate_api_key_auth_components(
 
 def generate_auth_routes() -> str:
     """Generate code for auth routes in the FastMCP app.
-    
+
     FastMCP 2.11+ handles auth routes automatically through the auth provider,
     so we don't need to generate custom routes anymore.
     """

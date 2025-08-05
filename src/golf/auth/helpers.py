@@ -4,7 +4,6 @@ from contextvars import ContextVar
 from typing import Any
 
 # Re-export get_access_token from the MCP SDK
-from mcp.server.auth.middleware.auth_context import get_access_token
 
 # Context variable to store the current request's API key
 _current_api_key: ContextVar[str | None] = ContextVar("current_api_key", default=None)
@@ -13,7 +12,7 @@ _current_api_key: ContextVar[str | None] = ContextVar("current_api_key", default
 def get_provider_token() -> str | None:
     """
     Get a provider token (legacy function - no longer supported in Golf 0.2.x).
-    
+
     In Golf 0.2.x, use FastMCP's built-in auth providers for OAuth flows.
     This function returns None and is kept for backwards compatibility.
     """
