@@ -1,8 +1,9 @@
-"""Simple calculator tool for basic arithmetic operations."""
+"""Enhanced calculator tool with optional LLM-powered explanations."""
 
 from typing import Annotated
 
 from pydantic import BaseModel, Field
+from golf.utilities import sample
 
 
 class CalculationResult(BaseModel):
@@ -21,21 +22,25 @@ async def calculate(
             examples=["2 + 3", "10 * 5.5", "(8 - 3) * 2"],
         ),
     ],
+    explain: Annotated[
+        bool,
+        Field(
+            description="Whether to provide an LLM-powered step-by-step explanation",
+            default=False,
+        ),
+    ] = False,
 ) -> CalculationResult:
-    """Evaluate a simple mathematical expression.
+    """Evaluate a mathematical expression with optional LLM explanation.
 
-    This tool can perform basic arithmetic operations including:
-    - Addition (+)
-    - Subtraction (-)
-    - Multiplication (*)
-    - Division (/)
-    - Parentheses for grouping
-    - Decimal numbers
+    This enhanced calculator can:
+    - Perform basic arithmetic operations (+, -, *, /, parentheses)
+    - Handle decimal numbers
+    - Optionally provide LLM-powered step-by-step explanations
 
     Examples:
     - calculate("2 + 3") → 5
     - calculate("10 * 5.5") → 55.0
-    - calculate("(8 - 3) * 2") → 10
+    - calculate("(8 - 3) * 2", explain=True) → 10 with explanation
     """
     try:
         # Simple expression evaluation using eval (safe for basic math)
@@ -51,10 +56,24 @@ async def calculate(
         if not isinstance(result, (int, float)):
             raise ValueError("Expression did not evaluate to a number")
 
+        # Generate explanation if requested
+        result_expression = expression
+        if explain:
+            try:
+                explanation = await sample(
+                    f"Explain this mathematical expression step by step: {expression} = {result}",
+                    system_prompt="You are a helpful math tutor. Provide clear, step-by-step explanations.",
+                    max_tokens=200
+                )
+                result_expression = f"{expression}\n\nExplanation: {explanation}"
+            except Exception:
+                # If sampling fails, continue without explanation
+                result_expression = f"{expression}\n\n(Explanation unavailable)"
+
         return CalculationResult(
             result=float(result),
             operation="evaluate",
-            expression=expression,
+            expression=result_expression,
         )
 
     except ZeroDivisionError:

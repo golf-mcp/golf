@@ -1,8 +1,9 @@
-"""Hello World tool for the Golf MCP server."""
+"""Enhanced hello tool with elicitation capabilities."""
 
 from typing import Annotated
 
 from pydantic import BaseModel, Field
+from golf.utilities import elicit
 
 
 class Output(BaseModel):
@@ -16,18 +17,60 @@ async def hello(
         str, Field(description="The name of the person to greet")
     ] = "World",
     greeting: Annotated[str, Field(description="The greeting phrase to use")] = "Hello",
+    personalized: Annotated[
+        bool,
+        Field(
+            description="Whether to ask for additional personal details to create a personalized greeting",
+            default=False,
+        ),
+    ] = False,
 ) -> Output:
-    """Say hello to the given name.
+    """Say hello with optional personalized elicitation.
 
-    This is a simple example tool that demonstrates the basic structure
-    of a tool implementation in GolfMCP.
+    This enhanced tool can:
+    - Provide basic greetings
+    - Elicit additional personal information for personalized messages
+    - Demonstrate Golf's elicitation capabilities
+
+    Examples:
+    - hello("Alice") → "Hello, Alice!"
+    - hello("Bob", personalized=True) → Asks for details, then personalized greeting
     """
-    # The framework will add a context object automatically
-    # You can log using regular print during development
+    # Basic greeting
+    basic_message = f"{greeting}, {name}!"
+    
+    # If personalized greeting is requested, elicit additional info
+    if personalized:
+        try:
+            # Ask for user's favorite activity
+            favorite_activity = await elicit(
+                "What's your favorite activity or hobby?",
+                str
+            )
+            
+            # Ask for their mood
+            mood = await elicit(
+                "How are you feeling today?",
+                ["happy", "excited", "calm", "focused", "creative"]
+            )
+            
+            # Create personalized message
+            personalized_message = (
+                f"{greeting}, {name}! "
+                f"Hope you're having a {mood} day. "
+                f"Maybe later you can enjoy some {favorite_activity}!"
+            )
+            
+            return Output(message=personalized_message)
+            
+        except Exception as e:
+            # If elicitation fails, fall back to basic greeting
+            print(f"Personalization failed: {e}")
+            return Output(message=f"{basic_message} (personalization unavailable)")
+    
+    # Return basic greeting
     print(f"{greeting} {name}...")
-
-    # Create and return the response
-    return Output(message=f"{greeting}, {name}!")
+    return Output(message=basic_message)
 
 
 # Designate the entry point function
