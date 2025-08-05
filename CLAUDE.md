@@ -12,7 +12,7 @@ Golf 0.2.x introduces breaking changes to align with FastMCP 2.11.x:
 
 - **Authentication System**: Complete rewrite using FastMCP's built-in auth providers (JWT, OAuth, Static tokens)
 - **Legacy OAuth Removed**: Custom OAuth implementation replaced with standards-compliant FastMCP providers  
-- **Configuration Changes**: `pre_build.py` auth configuration must be updated to use new auth configs
+- **Configuration Changes**: `auth.py` configuration must be updated to use new auth configs (legacy `pre_build.py` supported)
 - **Dependency Updates**: Requires FastMCP >=2.11.0
 - **Removed Files**: Legacy `oauth.py` and `provider.py` files removed from auth module
 - **Deprecated Functions**: `get_provider_token()` and OAuth-related helpers return None (legacy compatibility)
@@ -105,7 +105,7 @@ project/
 ├── tools/            # Tool implementations
 ├── resources/        # Resource implementations
 ├── prompts/          # Prompt templates
-└── pre_build.py      # Optional pre-build hooks
+└── auth.py           # Optional authentication configuration
 ```
 
 Component IDs are derived from file paths: `tools/payments/charge.py` becomes `charge_payments`.
@@ -116,7 +116,7 @@ Golf 0.2.x uses FastMCP's built-in authentication providers:
 
 ### JWT Authentication (Production)
 ```python
-# In pre_build.py
+# In auth.py
 from golf.auth import configure_jwt_auth
 
 configure_jwt_auth(
@@ -129,7 +129,7 @@ configure_jwt_auth(
 
 ### Development Authentication
 ```python
-# In pre_build.py
+# In auth.py
 from golf.auth import configure_dev_auth
 
 configure_dev_auth(
@@ -145,7 +145,7 @@ configure_dev_auth(
 
 ### API Key Authentication
 ```python
-# In pre_build.py  
+# In auth.py  
 from golf.auth import configure_api_key
 
 configure_api_key(
