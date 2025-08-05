@@ -6,13 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Golf is a Python framework for building MCP (Model Context Protocol) servers with zero boilerplate. It automatically discovers, parses, and compiles Python files containing tools, resources, and prompts into a runnable FastMCP server.
 
+## Breaking Changes in Golf 0.2.x
+
+Golf 0.2.x introduces breaking changes to align with FastMCP 2.11.x:
+
+- **Authentication System**: Complete rewrite using FastMCP's built-in auth providers (JWT, OAuth, Static tokens)
+- **Legacy OAuth Removed**: Custom OAuth implementation replaced with standards-compliant FastMCP providers  
+- **Configuration Changes**: `pre_build.py` auth configuration must be updated to use new auth configs
+- **Dependency Updates**: Requires FastMCP >=2.11.0
+
 ## Key Architecture
 
 - **Component Discovery**: Golf automatically scans `tools/`, `resources/`, and `prompts/` directories for Python files
 - **Code Generation**: The `ManifestBuilder` in `src/golf/core/builder.py` generates FastMCP server code from parsed components
 - **CLI Interface**: Entry point is `src/golf/cli/main.py` with commands: `init`, `build`, `run`
 - **Configuration**: Project settings managed via `golf.json` files, parsed by `src/golf/core/config.py`
-- **Authentication**: OAuth and API key auth support in `src/golf/auth/`
+- **Authentication**: Modern JWT/OAuth auth using FastMCP 2.11+ providers in `src/golf/auth/`
 - **Telemetry**: Anonymous usage tracking with OpenTelemetry support in `src/golf/telemetry/`
 
 ## Common Development Commands
