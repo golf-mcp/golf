@@ -7,8 +7,8 @@ from typing import Any
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from fastmcp.server.auth import AuthProvider
-    from fastmcp.server.auth.providers.jwt import JWTVerifier, StaticTokenVerifier
+    from fastmcp.server.auth.auth import AuthProvider
+    from fastmcp.server.auth import JWTVerifier, StaticTokenVerifier
 from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
 
 from .providers import (
@@ -86,7 +86,7 @@ def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
         raise ValueError("Provide either public_key or jwks_uri, not both")
 
     try:
-        from fastmcp.server.auth.providers.jwt import JWTVerifier
+        from fastmcp.server.auth import JWTVerifier
     except ImportError:
         raise ImportError("JWTVerifier not available. Please install fastmcp>=2.11.0")
 
@@ -106,7 +106,7 @@ def _create_static_provider(config: StaticTokenConfig) -> "StaticTokenVerifier":
         raise ValueError("Static token provider requires at least one token")
 
     try:
-        from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
+        from fastmcp.server.auth import StaticTokenVerifier
     except ImportError:
         raise ImportError(
             "StaticTokenVerifier not available. Please install fastmcp>=2.11.0"
