@@ -1,14 +1,27 @@
-"""Authentication module for GolfMCP servers.
+"""Modern authentication for Golf MCP servers using FastMCP 2.11+ providers.
 
-This module provides a simple API for configuring OAuth authentication
-for GolfMCP servers. Users can configure authentication in their pre_build.py
-file without needing to understand the complexities of the MCP SDK.
+This module provides authentication configuration and utilities for Golf servers,
+leveraging FastMCP's built-in authentication system with JWT verification,
+OAuth providers, and token management.
 """
 
-from typing import List, Optional, Tuple
+from typing import Any
 
-from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
+# Modern auth provider configurations and factory functions
+from .providers import (
+    AuthConfig,
+    JWTAuthConfig,
+    StaticTokenConfig,
+    OAuthServerConfig,
+    RemoteAuthConfig,
+)
+from .factory import (
+    create_auth_provider,
+    create_simple_jwt_provider,
+    create_dev_token_provider,
+)
 
+# Re-export for backward compatibility
 from .api_key import configure_api_key, get_api_key_config, is_api_key_configured
 from .helpers import (
     debug_api_key_context,
@@ -18,105 +31,178 @@ from .helpers import (
     get_provider_token,
     set_api_key,
 )
-from .oauth import GolfOAuthProvider, create_callback_handler
-from .provider import ProviderConfig
 
-
-class AuthConfig:
-    """Configuration for OAuth authentication in GolfMCP."""
-
-    def __init__(
-        self,
-        provider_config: ProviderConfig,
-        required_scopes: list[str],
-        callback_path: str = "/auth/callback",
-        login_path: str = "/login",
-        error_path: str = "/auth-error",
-    ) -> None:
-        """Initialize authentication configuration.
-
-        Args:
-            provider_config: Configuration for the OAuth provider
-            required_scopes: Scopes required for all authenticated requests
-            callback_path: Path for the OAuth callback
-            login_path: Path for the login redirect
-            error_path: Path for displaying authentication errors
-        """
-        self.provider_config = provider_config
-        self.required_scopes = required_scopes
-        self.callback_path = callback_path
-        self.login_path = login_path
-        self.error_path = error_path
-
-        # Create the OAuth provider
-        self.provider = GolfOAuthProvider(provider_config)
-
-        # Create auth settings for FastMCP
-        self.auth_settings = AuthSettings(
-            issuer_url=provider_config.issuer_url or "http://localhost:3000",
-            client_registration_options=ClientRegistrationOptions(
-                enabled=True,
-                valid_scopes=provider_config.scopes,
-                default_scopes=provider_config.scopes,
-            ),
-            required_scopes=required_scopes or provider_config.scopes,
-        )
-
-
-# Global state for the build process
-_auth_config: AuthConfig | None = None
+# Global storage for auth configuration
+_auth_config: tuple[AuthConfig, list[str] | None] | None = None
+_api_key_context: str | None = None
 
 
 def configure_auth(
-    provider_config=None,
-    provider=None,
-    required_scopes: list[str] | None = None,
-    callback_path: str = "/auth/callback",
+    config: AuthConfig, 
+    required_scopes: list[str] | None = None
 ) -> None:
-    """Configure authentication for a GolfMCP server.
+    """Configure authentication for the Golf server.
 
-    This function should be called in pre_build.py to set up authentication.
+    This function should be called in pre_build.py to set up authentication
+    using FastMCP's modern auth providers.
 
     Args:
-        provider_config: Configuration for the OAuth provider (new parameter name)
-        provider: Configuration for the OAuth provider (old parameter name, deprecated)
-        required_scopes: Scopes required for authentication
-        callback_path: Path for the OAuth callback
-        public_paths: List of paths that don't require authentication (deprecated, no longer used)
+        config: Authentication configuration (JWT, OAuth, Static, or Remote)
+        required_scopes: Optional list of scopes required for all requests
+
+    Examples:
+        # JWT authentication with Auth0
+        from golf.auth import configure_auth, JWTAuthConfig
+        
+        configure_auth(
+            JWTAuthConfig(
+                jwks_uri="https://your-domain.auth0.com/.well-known/jwks.json",
+                issuer="https://your-domain.auth0.com/",
+                audience="https://your-api.example.com",
+                required_scopes=["read:data"],
+            )
+        )
+
+        # Development with static tokens
+        from golf.auth import configure_auth, StaticTokenConfig
+        
+        configure_auth(
+            StaticTokenConfig(
+                tokens={
+                    "dev-token-123": {
+                        "client_id": "dev-client",
+                        "scopes": ["read", "write"],
+                    }
+                }
+            )
+        )
+
+        # Full OAuth server
+        from golf.auth import configure_auth, OAuthServerConfig
+        
+        configure_auth(
+            OAuthServerConfig(
+                base_url="https://your-server.example.com",
+                valid_scopes=["read", "write", "admin"],
+                default_scopes=["read"],
+            )
+        )
     """
     global _auth_config
+    _auth_config = (config, required_scopes)
 
-    # Handle backward compatibility with old parameter name
-    if provider_config is None and provider is not None:
-        provider_config = provider
-    elif provider_config is None and provider is None:
-        raise ValueError("Either provider_config or provider must be provided")
 
-    _auth_config = AuthConfig(
-        provider_config=provider_config,
-        required_scopes=required_scopes or provider_config.scopes,
-        callback_path=callback_path,
+def configure_jwt_auth(
+    *,
+    jwks_uri: str | None = None,
+    public_key: str | None = None,
+    issuer: str | None = None,
+    audience: str | list[str] | None = None,
+    required_scopes: list[str] | None = None,
+    **env_vars: str
+) -> None:
+    """Convenience function to configure JWT authentication.
+    
+    Args:
+        jwks_uri: JWKS URI for key fetching
+        public_key: Static public key (PEM format)
+        issuer: Expected issuer claim
+        audience: Expected audience claim(s)
+        required_scopes: Required scopes for all requests
+        **env_vars: Environment variable names (public_key_env_var, jwks_uri_env_var, etc.)
+    """
+    config = JWTAuthConfig(
+        jwks_uri=jwks_uri,
+        public_key=public_key,
+        issuer=issuer,
+        audience=audience,
+        required_scopes=required_scopes or [],
+        **env_vars
     )
+    configure_auth(config, required_scopes)
 
 
-def get_auth_config() -> tuple[ProviderConfig | None, list[str]]:
-    """Get the current authentication configuration.
+def configure_dev_auth(
+    tokens: dict[str, Any] | None = None,
+    required_scopes: list[str] | None = None,
+) -> None:
+    """Convenience function to configure development authentication.
+    
+    Args:
+        tokens: Token dictionary or None for defaults
+        required_scopes: Required scopes for all requests
+    """
+    if tokens is None:
+        tokens = {
+            "dev-token-123": {
+                "client_id": "dev-client",
+                "scopes": ["read", "write"],
+            },
+            "admin-token-456": {
+                "client_id": "admin-client",
+                "scopes": ["read", "write", "admin"],
+            },
+        }
+    
+    config = StaticTokenConfig(
+        tokens=tokens,
+        required_scopes=required_scopes or [],
+    )
+    configure_auth(config, required_scopes)
+
+
+def get_auth_config() -> tuple[AuthConfig, list[str] | None] | None:
+    """Get the current auth configuration.
 
     Returns:
-        Tuple of (provider_config, required_scopes)
+        Tuple of (auth_config, required_scopes) if configured, None otherwise
     """
-    if _auth_config:
-        return _auth_config.provider_config, _auth_config.required_scopes
-    return None, []
+    return _auth_config
 
 
-def create_auth_provider() -> GolfOAuthProvider | None:
-    """Create an OAuth provider from the configured provider settings.
+def is_auth_configured() -> bool:
+    """Check if authentication is configured.
 
     Returns:
-        GolfOAuthProvider instance or None if not configured
+        True if authentication is configured, False otherwise
     """
-    if not _auth_config:
+    return _auth_config is not None
+
+
+def set_api_key(api_key: str) -> None:
+    """Set the API key for the current request context.
+    
+    This is used internally by the API key middleware.
+    
+    Args:
+        api_key: The API key to store
+    """
+    global _api_key_context
+    _api_key_context = api_key
+
+
+def get_api_key() -> str | None:
+    """Get the current API key from the request context.
+    
+    Returns:
+        The API key string if available, None otherwise
+    """
+    return _api_key_context
+
+
+# Breaking change in Golf 0.2.x: Legacy auth system removed
+# Users must migrate to modern auth configurations
+
+
+def create_auth_provider_from_config():
+    """Create an auth provider from the current configuration.
+    
+    Returns:
+        FastMCP AuthProvider instance or None if not configured
+    """
+    config_tuple = get_auth_config()
+    if not config_tuple:
         return None
-
-    return _auth_config.provider
+    
+    config, _ = config_tuple
+    return create_auth_provider(config)
