@@ -721,9 +721,9 @@ export = annotated_tool
         # Read the generated server code
         server_code = server_file.read_text()
 
-        # Should contain the tool registration with annotations
+        # Should contain the tool registration with annotations using .with_annotations()
         assert "mcp.add_tool(" in server_code
-        assert "annotations=" in server_code
+        assert ".with_annotations(" in server_code
         assert (
             '"readOnlyHint": False' in server_code
             or "'readOnlyHint': False" in server_code

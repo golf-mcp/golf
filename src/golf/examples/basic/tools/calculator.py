@@ -63,7 +63,7 @@ async def calculate(
                 explanation = await sample(
                     f"Explain this mathematical expression step by step: {expression} = {result}",
                     system_prompt="You are a helpful math tutor. Provide clear, step-by-step explanations.",
-                    max_tokens=200
+                    max_tokens=200,
                 )
                 result_expression = f"{expression}\n\nExplanation: {explanation}"
             except Exception:

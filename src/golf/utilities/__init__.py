@@ -1,7 +1,7 @@
 """Golf utilities for enhanced MCP tool development.
 
 This module provides convenient utilities for Golf tool authors to access
-advanced MCP features like elicitation and sampling without needing to 
+advanced MCP features like elicitation and sampling without needing to
 manage FastMCP Context objects directly.
 """
 

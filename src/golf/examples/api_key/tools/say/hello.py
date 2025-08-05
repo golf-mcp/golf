@@ -38,26 +38,28 @@ async def hello(
     """
     # Basic greeting
     basic_message = f"{greeting}, {name}!"
-    
+
     # If personalized greeting is requested, elicit additional info
     if personalized:
         try:
             # Ask for user's mood
             mood = await elicit(
                 "How are you feeling today?",
-                ["happy", "excited", "calm", "focused", "creative"]
+                ["happy", "excited", "calm", "focused", "creative"],
             )
-            
+
             # Create personalized message
-            personalized_message = f"{greeting}, {name}! Hope you're having a {mood} day!"
-            
+            personalized_message = (
+                f"{greeting}, {name}! Hope you're having a {mood} day!"
+            )
+
             return Output(message=personalized_message)
-            
+
         except Exception as e:
             # If elicitation fails, fall back to basic greeting
             print(f"Personalization failed: {e}")
             return Output(message=f"{basic_message} (personalization unavailable)")
-    
+
     # Return basic greeting
     print(f"{greeting} {name}...")
     return Output(message=basic_message)
