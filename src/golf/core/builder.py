@@ -555,6 +555,9 @@ class CodeGenerator:
             "logging.getLogger('fastmcp').setLevel(logging.WARNING)",
             "logging.getLogger('mcp').setLevel(logging.WARNING)",
             "",
+            "# Golf utilities for MCP features (available for tool functions)",
+            "# from golf.utilities import elicit, sample, get_current_context",
+            "",
         ]
 
         # Add auth imports if auth is configured
