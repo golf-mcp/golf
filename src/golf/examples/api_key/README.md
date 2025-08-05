@@ -1,84 +1,133 @@
-# GitHub MCP Server with API Key Authentication
+# Golf MCP Project Template (API Key Authentication)
 
-This example demonstrates how to build a GitHub API MCP server using Golf's API key authentication feature. The server wraps common GitHub operations and passes through authentication tokens from MCP clients to the GitHub API.
+This template demonstrates how to create MCP servers with API key authentication using Golf. Use `golf init <project-name> --template=api_key` to bootstrap new projects from this template.
 
-## Features
+## About Golf
 
-This MCP server provides tools for:
+Golf is a Python framework for building MCP (Model Context Protocol) servers with minimal boilerplate. Define your server's capabilities as simple Python files, and Golf automatically discovers and compiles them into a runnable FastMCP server.
 
-- **Repository Management** 
-  - `list_repos` - List repositories for users, organizations, or the authenticated user
-  
-- **Issue Management** 
-  - `create_issues` - Create new issues with labels
-  - `list_issues` - List and filter issues by state and labels
-  
-- **Code Search**
-  - `code_search` - Search for code across GitHub with language and repository filters
-  
-- **User Information**
-  - `get_users` - Get user profiles or verify authentication
+## Getting Started
 
-## Tool Naming Convention
+After initializing your project:
 
-Golf automatically derives tool names from the file structure:
-- `tools/issues/create.py` → `create_issues`
-- `tools/issues/list.py` → `list_issues`
-- `tools/repos/list.py` → `list_repos`
-- `tools/search/code.py` → `code_search`
-- `tools/users/get.py` → `get_users`
+1. **Navigate to your project directory:**
+   ```bash
+   cd your-project-name
+   ```
 
-## Configuration
+2. **Configure authentication:**
+   This template includes API key authentication configured in `auth.py`. Set your API key environment variables as needed.
 
-The server is configured in `pre_build.py` to extract GitHub tokens from the `Authorization` header:
+3. **Build and run your server:**
+   ```bash
+   golf build dev    # Development build
+   golf run          # Start the server
+   ```
+
+## Project Structure
+
+```
+your-project/
+├── tools/           # Tool implementations (functions LLMs can call)
+├── resources/       # Resource implementations (data LLMs can read)  
+├── prompts/         # Prompt templates (conversation structures)
+├── golf.json        # Server configuration
+└── auth.py          # Authentication setup
+```
+
+## Adding Components
+
+### Tools
+Create `.py` files in `tools/` directory. Each file should export a single async function:
 
 ```python
+# tools/calculator.py
+async def add(a: int, b: int) -> int:
+    """Add two numbers together."""
+    return a + b
+
+export = add
+```
+
+### Resources  
+Create `.py` files in `resources/` directory with a `resource_uri` and export function:
+
+```python
+# resources/status.py
+resource_uri = "status://server"
+
+async def status() -> dict:
+    """Get server status information."""
+    return {"status": "running", "timestamp": "2024-01-01T00:00:00Z"}
+
+export = status
+```
+
+### Prompts
+Create `.py` files in `prompts/` directory that return message lists:
+
+```python
+# prompts/assistant.py
+async def assistant() -> list[dict]:
+    """System prompt for a helpful assistant."""
+    return [
+        {
+            "role": "system", 
+            "content": "You are a helpful assistant for {{project_name}}."
+        }
+    ]
+
+export = assistant
+```
+
+## Authentication Examples
+
+### No Authentication (Default)
+Leave `auth.py` empty or remove it entirely.
+
+### API Key Authentication
+```python
+# auth.py
+from golf.auth import configure_api_key
+
 configure_api_key(
     header_name="Authorization",
     header_prefix="Bearer ",
-    required=True  # Reject requests without a valid API key
+    required=True
 )
 ```
 
-This configuration:
-- Handles GitHub's token format: `Authorization: Bearer ghp_xxxxxxxxxxxx`
-- **Enforces authentication**: When `required=True` (default), requests without a valid API key will be rejected with a 401 Unauthorized error
-- For optional authentication (pass-through mode), set `required=False`
+### JWT Authentication  
+```python
+# auth.py
+from golf.auth import configure_jwt_auth
 
-## How It Works
+configure_jwt_auth(
+    jwks_uri="https://your-domain.auth0.com/.well-known/jwks.json",
+    issuer="https://your-domain.auth0.com/",
+    audience="https://your-api.example.com"
+)
+```
 
-1. **Client sends request** with GitHub token in the Authorization header
-2. **Golf middleware** checks if API key is required and present
-3. **If required and missing**, the request is rejected with 401 Unauthorized
-4. **If present**, the token is extracted based on your configuration
-5. **Tools retrieve token** using `get_api_key()` 
-6. **Token is forwarded** to GitHub API in the appropriate format
-7. **GitHub validates** the token and returns results
+### Development Tokens
+```python
+# auth.py  
+from golf.auth import configure_dev_auth
 
-## Running the Server
+configure_dev_auth(
+    tokens={
+        "dev-token-123": {
+            "client_id": "dev-client",
+            "scopes": ["read", "write"]
+        }
+    }
+)
+```
 
-1. Build and run:
-   ```bash
-   golf build
-   golf run
-   ```
+## Documentation
 
-2. The server will start on `http://127.0.0.1:3000` (configurable in `golf.json`)
+For comprehensive documentation, visit: [https://docs.golf.dev](https://docs.golf.dev)
 
-3. Test authentication enforcement:
-   ```bash
-   # This will fail with 401 Unauthorized
-   curl http://localhost:3000/mcp
-   
-   # This will succeed
-   curl -H "Authorization: Bearer ghp_your_token_here" http://localhost:3000/mcp
-   ```
+---
 
-## GitHub Token Permissions
-
-Depending on which tools you use, you'll need different token permissions:
-
-- **Public repositories**: No token needed for read-only access
-- **Private repositories**: Token with `repo` scope
-- **Creating issues**: Token with `repo` or `public_repo` scope
-- **User information**: Token with `user` scope
+Happy building! 🏌️‍♂️

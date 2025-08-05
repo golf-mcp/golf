@@ -1,61 +1,133 @@
-# GolfMCP Project Boilerplate
+# Golf MCP Project Template (Basic)
 
-This directory serves as a starting template for new GolfMCP projects. Initialize a project using the `golf init <your-project-name>` command.
-## About GolfMCP
+This is a basic template for creating MCP servers with Golf. It includes development authentication for easy testing. Use `golf init <project-name>` to bootstrap new projects from this template.
 
-GolfMCP is a Python framework designed to build MCP servers with minimal boilerplate. It allows you to define tools, resources, and prompts as simple Python files. These components are then automatically discovered and compiled into a runnable [FastMCP](https://github.com/fastmcp/fastmcp) server.
+## About Golf
 
-## Getting Started (After `golf init`)
+Golf is a Python framework for building MCP (Model Context Protocol) servers with minimal boilerplate. Define your server's capabilities as simple Python files, and Golf automatically discovers and compiles them into a runnable FastMCP server.
 
-Once you've initialized your new project from this boilerplate:
+## Getting Started
 
-1.  **Navigate to your project directory:**
-    ```bash
-    cd your-project-name
-    ```
+After initializing your project:
 
-2.  **Start the development server:**
-    ```bash
-    golf build dev  # For a development build
-    # or
-    golf build prod # For a production build
-    
-    golf run
-    ```
+1. **Navigate to your project directory:**
+   ```bash
+   cd your-project-name
+   ```
+
+2. **Configure authentication (optional):**
+   This template includes development authentication in `auth.py` with sample tokens. Edit the file to set up JWT, OAuth, or API key authentication for production use.
+
+3. **Build and run your server:**
+   ```bash
+   golf build dev    # Development build
+   golf run          # Start the server
+   ```
 
 ## Project Structure
 
-Your initialized GolfMCP project will typically have the following structure:
+```
+your-project/
+├── tools/           # Tool implementations (functions LLMs can call)
+├── resources/       # Resource implementations (data LLMs can read)  
+├── prompts/         # Prompt templates (conversation structures)
+├── golf.json        # Server configuration
+└── auth.py          # Authentication setup
+```
 
--   `tools/`: Directory for your tool implementations (Python files defining functions an LLM can call).
--   `resources/`: Directory for your resource implementations (Python files defining data an LLM can read).
--   `prompts/`: Directory for your prompt templates (Python files defining reusable conversation structures).
--   `golf.json`: The main configuration file for your project, including settings like the server name, port, and transport.
--   `pre_build.py`: (Optional) A Python script that can be used to run custom logic before the build process begins, such as configuring authentication.
--   `.env`: File to store environment-specific variables (e.g., API keys). This is created during `golf init`.
+## Adding Components
 
-## Adding New Components
+### Tools
+Create `.py` files in `tools/` directory. Each file should export a single async function:
 
-To add new functionalities:
+```python
+# tools/calculator.py
+async def add(a: int, b: int) -> int:
+    """Add two numbers together."""
+    return a + b
 
--   **Tools**: Create a new `.py` file in the `tools/` directory.
--   **Resources**: Create a new `.py` file in the `resources/` directory.
--   **Prompts**: Create a new `.py` file in the `prompts/` directory.
+export = add
+```
 
-Each Python file should generally define a single component. A module-level docstring in the file will be used as the description for the component. See the example files (e.g., `tools/hello.py`, `resources/info.py`) provided in this boilerplate for reference.
+### Resources  
+Create `.py` files in `resources/` directory with a `resource_uri` and export function:
 
-For shared functionality within a component subdirectory (e.g., `tools/payments/common.py`), you can use a `common.py` file.
+```python
+# resources/status.py
+resource_uri = "status://server"
+
+async def status() -> dict:
+    """Get server status information."""
+    return {"status": "running", "timestamp": "2024-01-01T00:00:00Z"}
+
+export = status
+```
+
+### Prompts
+Create `.py` files in `prompts/` directory that return message lists:
+
+```python
+# prompts/assistant.py
+async def assistant() -> list[dict]:
+    """System prompt for a helpful assistant."""
+    return [
+        {
+            "role": "system", 
+            "content": "You are a helpful assistant for {{project_name}}."
+        }
+    ]
+
+export = assistant
+```
+
+## Authentication Examples
+
+### No Authentication (Default)
+Leave `auth.py` empty or remove it entirely.
+
+### API Key Authentication
+```python
+# auth.py
+from golf.auth import configure_api_key
+
+configure_api_key(
+    header_name="Authorization",
+    header_prefix="Bearer ",
+    required=True
+)
+```
+
+### JWT Authentication  
+```python
+# auth.py
+from golf.auth import configure_jwt_auth
+
+configure_jwt_auth(
+    jwks_uri="https://your-domain.auth0.com/.well-known/jwks.json",
+    issuer="https://your-domain.auth0.com/",
+    audience="https://your-api.example.com"
+)
+```
+
+### Development Tokens
+```python
+# auth.py  
+from golf.auth import configure_dev_auth
+
+configure_dev_auth(
+    tokens={
+        "dev-token-123": {
+            "client_id": "dev-client",
+            "scopes": ["read", "write"]
+        }
+    }
+)
+```
 
 ## Documentation
 
-For comprehensive details on the GolfMCP framework, including component specifications, advanced configurations, CLI commands, and more, please refer to the official documentation:
-
-[https://docs.golf.dev](https://docs.golf.dev)
+For comprehensive documentation, visit: [https://docs.golf.dev](https://docs.golf.dev)
 
 ---
 
-Happy Building! 
-
-<div align="center">
-Made with ❤️ in San Francisco
-</div>
+Happy building! 🏌️‍♂️

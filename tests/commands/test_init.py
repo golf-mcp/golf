@@ -33,24 +33,23 @@ class TestInitCommand:
         initialize_project("test_project", project_dir, template="basic")
 
         config = json.loads((project_dir / "golf.json").read_text())
-        assert config["name"] == "test_project"
+        assert config["name"] == "basic-server-example"
         assert "description" in config
-        assert config["host"] == "127.0.0.1"
-        assert config["port"] == 3000
+        assert config["transport"] == "http"
 
     def test_template_variable_substitution(self, temp_dir: Path) -> None:
-        """Test that {{project_name}} is replaced correctly."""
+        """Test that template files are copied correctly."""
         project_dir = temp_dir / "MyApp"
 
         initialize_project("MyApp", project_dir, template="basic")
 
-        # Check that project name was substituted in files
+        # Check that golf.json has the template content
         config = json.loads((project_dir / "golf.json").read_text())
-        assert config["name"] == "MyApp"
+        assert config["name"] == "basic-server-example"
+        assert "description" in config
 
-        # Check .env file
-        env_content = (project_dir / ".env").read_text()
-        assert "GOLF_NAME=MyApp" in env_content
+        # Check .env file exists (no longer has GOLF_NAME)
+        assert (project_dir / ".env").exists()
 
     def test_handles_existing_empty_directory(self, temp_dir: Path) -> None:
         """Test that init works with an existing empty directory."""
@@ -74,18 +73,16 @@ class TestInitCommand:
 
         initialize_project("health_check_project", project_dir, template="basic")
 
-        # Check that golf.json does not include health check configuration by default
+        # Check that golf.json has basic template content
         config = json.loads((project_dir / "golf.json").read_text())
         assert "health_check_enabled" not in config  # Should not be included by default
         assert "health_check_path" not in config
         assert "health_check_response" not in config
 
-        # But should include the basic configuration fields
-        assert config["name"] == "health_check_project"
-        assert config["host"] == "127.0.0.1"
-        assert config["port"] == 3000
-        assert config["transport"] == "sse"
-        assert config["opentelemetry_enabled"] is False
+        # Should include the basic configuration fields
+        assert config["name"] == "basic-server-example"
+        assert "description" in config
+        assert config["transport"] == "http"
 
     def test_api_key_template_compatibility_with_health_check(
         self, temp_dir: Path

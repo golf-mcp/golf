@@ -1,4 +1,4 @@
-"""Hello World tool {{project_name}}."""
+"""Hello World tool for the Golf MCP server."""
 
 from typing import Annotated
 

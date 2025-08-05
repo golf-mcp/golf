@@ -6,13 +6,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Golf is a Python framework for building MCP (Model Context Protocol) servers with zero boilerplate. It automatically discovers, parses, and compiles Python files containing tools, resources, and prompts into a runnable FastMCP server.
 
+## Breaking Changes in Golf 0.2.x
+
+Golf 0.2.x introduces breaking changes to align with FastMCP 2.11.x:
+
+- **Authentication System**: Complete rewrite using FastMCP's built-in auth providers (JWT, OAuth, Static tokens)
+- **Legacy OAuth Removed**: Custom OAuth implementation replaced with standards-compliant FastMCP providers  
+- **Configuration Changes**: `auth.py` configuration must be updated to use new auth configs (legacy `pre_build.py` supported)
+- **Dependency Updates**: Requires FastMCP >=2.11.0
+- **Removed Files**: Legacy `oauth.py` and `provider.py` files removed from auth module
+- **Deprecated Functions**: `get_provider_token()` and OAuth-related helpers return None (legacy compatibility)
+
 ## Key Architecture
 
 - **Component Discovery**: Golf automatically scans `tools/`, `resources/`, and `prompts/` directories for Python files
 - **Code Generation**: The `ManifestBuilder` in `src/golf/core/builder.py` generates FastMCP server code from parsed components
 - **CLI Interface**: Entry point is `src/golf/cli/main.py` with commands: `init`, `build`, `run`
 - **Configuration**: Project settings managed via `golf.json` files, parsed by `src/golf/core/config.py`
-- **Authentication**: OAuth and API key auth support in `src/golf/auth/`
+- **Authentication**: Modern JWT/OAuth auth using FastMCP 2.11+ providers in `src/golf/auth/`
 - **Telemetry**: Anonymous usage tracking with OpenTelemetry support in `src/golf/telemetry/`
 
 ## Common Development Commands
@@ -94,7 +105,52 @@ project/
 ├── tools/            # Tool implementations
 ├── resources/        # Resource implementations
 ├── prompts/          # Prompt templates
-└── pre_build.py      # Optional pre-build hooks
+└── auth.py           # Optional authentication configuration
 ```
 
 Component IDs are derived from file paths: `tools/payments/charge.py` becomes `charge_payments`.
+
+## Authentication in Golf 0.2.x
+
+Golf 0.2.x uses FastMCP's built-in authentication providers:
+
+### JWT Authentication (Production)
+```python
+# In auth.py
+from golf.auth import configure_jwt_auth
+
+configure_jwt_auth(
+    jwks_uri_env_var="JWKS_URI",  # JWKS endpoint
+    issuer_env_var="JWT_ISSUER",
+    audience_env_var="JWT_AUDIENCE", 
+    required_scopes=["read:user"],
+)
+```
+
+### Development Authentication
+```python
+# In auth.py
+from golf.auth import configure_dev_auth
+
+configure_dev_auth(
+    tokens={
+        "dev-token-123": {
+            "client_id": "dev-client",
+            "scopes": ["read", "write"],
+        }
+    },
+    required_scopes=["read"],
+)
+```
+
+### API Key Authentication
+```python
+# In auth.py  
+from golf.auth import configure_api_key
+
+configure_api_key(
+    header_name="Authorization",
+    header_prefix="Bearer ",
+    required=True,
+)
+```

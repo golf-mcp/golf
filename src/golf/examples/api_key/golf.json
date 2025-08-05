@@ -1,8 +1,5 @@
 {
-  "name": "github-mcp-server",
+  "name": "api-key-mcp-server",
   "description": "MCP server for GitHub API operations with API key authentication",
-  "host": "127.0.0.1",
-  "port": 3000,
-  "transport": "sse",
-  "opentelemetry_enabled": false
-} 
+  "transport": "http"
+}

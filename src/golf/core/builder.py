@@ -11,7 +11,7 @@ import black
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from golf.auth import get_auth_config
+from golf.auth import get_auth_config, is_auth_configured
 from golf.auth.api_key import get_api_key_config
 from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.core.builder_telemetry import (
@@ -359,7 +359,9 @@ class CodeGenerator:
         # Get relative path for display
         try:
             output_dir_display = self.output_dir.relative_to(Path.cwd())
-        except ValueError:
+        except (ValueError, FileNotFoundError, OSError):
+            # ValueError: paths don't have a common base
+            # FileNotFoundError/OSError: current directory was deleted
             output_dir_display = self.output_dir
 
         # Show success message with output directory
@@ -529,7 +531,6 @@ class CodeGenerator:
         server_file = self.output_dir / "server.py"
 
         # Get auth components
-        provider_config, _ = get_auth_config()
         auth_components = generate_auth_code(
             server_name=self.settings.name,
             host=self.settings.host,
@@ -1089,59 +1090,80 @@ def build_project(
         if has_api_key and has_server_id:
             console.print("[dim]Loaded Golf credentials for build operations[/dim]")
 
-    # Execute pre_build.py if it exists
-    pre_build_path = project_path / "pre_build.py"
-    if pre_build_path.exists():
-        try:
-            # Save the current directory and path
-            original_dir = os.getcwd()
-            original_path = sys.path.copy()
+    # Execute auth.py if it exists (for authentication configuration)
+    # Also support legacy pre_build.py for backward compatibility
+    auth_path = project_path / "auth.py"
+    legacy_path = project_path / "pre_build.py"
 
+    config_path = None
+    if auth_path.exists():
+        config_path = auth_path
+    elif legacy_path.exists():
+        config_path = legacy_path
+        console.print(
+            "[yellow]Warning: pre_build.py is deprecated. Rename to auth.py[/yellow]"
+        )
+
+    if config_path:
+        # Save the current directory and path - handle case where cwd might be invalid
+        try:
+            original_dir = os.getcwd()
+        except (FileNotFoundError, OSError):
+            # Current directory might have been deleted by previous operations, use project_path as fallback
+            original_dir = str(project_path)
+            os.chdir(original_dir)
+        original_path = sys.path.copy()
+
+        try:
             # Change to the project directory and add it to Python path
             os.chdir(project_path)
             sys.path.insert(0, str(project_path))
 
-            # Execute the pre_build script
-            with open(pre_build_path) as f:
+            # Execute the auth configuration script
+            with open(config_path) as f:
                 script_content = f.read()
 
             # Print the first few lines for debugging
             "\n".join(script_content.split("\n")[:5]) + "\n..."
 
             # Use exec to run the script as a module
-            code = compile(script_content, str(pre_build_path), "exec")
+            code = compile(script_content, str(config_path), "exec")
             exec(code, {})
 
             # Check if auth was configured by the script
             provider, scopes = get_auth_config()
 
-            # Restore original directory and path
-            os.chdir(original_dir)
-            sys.path = original_path
-
         except Exception as e:
-            console.print(f"[red]Error executing pre_build.py: {str(e)}[/red]")
+            console.print(f"[red]Error executing {config_path.name}: {str(e)}[/red]")
             import traceback
 
             console.print(f"[red]{traceback.format_exc()}[/red]")
 
-            # Track detailed error for pre_build.py execution failures
+            # Track detailed error for auth.py execution failures
             try:
                 from golf.core.telemetry import track_detailed_error
 
                 track_detailed_error(
-                    "build_pre_build_failed",
+                    "build_auth_failed",
                     e,
-                    context="Executing pre_build.py configuration script",
-                    operation="pre_build_execution",
+                    context=f"Executing {config_path.name} configuration script",
+                    operation="auth_execution",
                     additional_props={
-                        "file_path": str(pre_build_path.relative_to(project_path)),
+                        "file_path": str(config_path.relative_to(project_path)),
                         "build_env": build_env,
                     },
                 )
             except Exception:
                 # Don't let telemetry errors break the build
                 pass
+        finally:
+            # Always restore original directory and path, even if an exception occurred
+            try:
+                os.chdir(original_dir)
+                sys.path = original_path
+            except Exception:
+                # If we can't restore the directory, at least try to reset the path
+                sys.path = original_path
 
     # Clear the output directory if it exists
     if output_dir.exists():
@@ -1294,7 +1316,7 @@ This is a standalone FastMCP server generated by GolfMCP.
 
     # Copy pyproject.toml with required dependencies
     base_dependencies = [
-        "fastmcp>=2.0.0,<2.6.0",
+        "fastmcp>=2.11.0,<3.0.0",
         "uvicorn>=0.20.0",
         "pydantic>=2.0.0",
         "python-dotenv>=1.0.0",
@@ -1305,10 +1327,7 @@ This is a standalone FastMCP server generated by GolfMCP.
         base_dependencies.extend(get_otel_dependencies())
 
     # Add authentication dependencies if enabled, before generating pyproject_content
-    provider_config, required_scopes = (
-        get_auth_config()
-    )  # Ensure this is called to check for auth
-    if provider_config:
+    if is_auth_configured() or get_api_key_config():
         base_dependencies.extend(
             [
                 "pyjwt>=2.0.0",
@@ -1345,15 +1364,15 @@ dependencies = [
         f.write(
             """\"\"\"Auth module for GolfMCP.\"\"\"
 
-from golf.auth.provider import ProviderConfig
-from golf.auth.oauth import GolfOAuthProvider, create_callback_handler
+# Legacy ProviderConfig removed in Golf 0.2.x - use modern auth configurations
+# Legacy OAuth imports removed in Golf 0.2.x - use FastMCP 2.11+ auth providers
 from golf.auth.helpers import get_access_token, get_provider_token, extract_token_from_header, get_api_key, set_api_key
 from golf.auth.api_key import configure_api_key, get_api_key_config
 """
         )
 
-    # Copy provider, oauth, and helper modules
-    for module in ["provider.py", "oauth.py", "helpers.py", "api_key.py"]:
+    # Copy auth helper modules (oauth.py and provider.py removed in Golf 0.2.x)
+    for module in ["helpers.py", "api_key.py"]:
         src_file = Path(__file__).parent.parent.parent / "golf" / "auth" / module
         dst_file = auth_dir / module
 
@@ -1393,8 +1412,7 @@ from golf.auth.api_key import configure_api_key, get_api_key_config
             )
 
     # Check if auth routes need to be added
-    provider_config, _ = get_auth_config()
-    if provider_config:
+    if is_auth_configured() or get_api_key_config():
         auth_routes_code = generate_auth_routes()
 
         server_file = output_dir / "server.py"
