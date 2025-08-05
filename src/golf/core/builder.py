@@ -1090,9 +1090,19 @@ def build_project(
         if has_api_key and has_server_id:
             console.print("[dim]Loaded Golf credentials for build operations[/dim]")
 
-    # Execute pre_build.py if it exists
-    pre_build_path = project_path / "pre_build.py"
-    if pre_build_path.exists():
+    # Execute auth.py if it exists (for authentication configuration)
+    # Also support legacy pre_build.py for backward compatibility
+    auth_path = project_path / "auth.py"
+    legacy_path = project_path / "pre_build.py"
+    
+    config_path = None
+    if auth_path.exists():
+        config_path = auth_path
+    elif legacy_path.exists():
+        config_path = legacy_path
+        console.print("[yellow]Warning: pre_build.py is deprecated. Rename to auth.py[/yellow]")
+    
+    if config_path:
         # Save the current directory and path - handle case where cwd might be invalid
         try:
             original_dir = os.getcwd()
@@ -1107,37 +1117,37 @@ def build_project(
             os.chdir(project_path)
             sys.path.insert(0, str(project_path))
 
-            # Execute the pre_build script
-            with open(pre_build_path) as f:
+            # Execute the auth configuration script
+            with open(config_path) as f:
                 script_content = f.read()
 
             # Print the first few lines for debugging
             "\n".join(script_content.split("\n")[:5]) + "\n..."
 
             # Use exec to run the script as a module
-            code = compile(script_content, str(pre_build_path), "exec")
+            code = compile(script_content, str(config_path), "exec")
             exec(code, {})
 
             # Check if auth was configured by the script
             provider, scopes = get_auth_config()
 
         except Exception as e:
-            console.print(f"[red]Error executing pre_build.py: {str(e)}[/red]")
+            console.print(f"[red]Error executing {config_path.name}: {str(e)}[/red]")
             import traceback
 
             console.print(f"[red]{traceback.format_exc()}[/red]")
 
-            # Track detailed error for pre_build.py execution failures
+            # Track detailed error for auth.py execution failures
             try:
                 from golf.core.telemetry import track_detailed_error
 
                 track_detailed_error(
-                    "build_pre_build_failed",
+                    "build_auth_failed",
                     e,
-                    context="Executing pre_build.py configuration script",
-                    operation="pre_build_execution",
+                    context=f"Executing {config_path.name} configuration script",
+                    operation="auth_execution",
                     additional_props={
-                        "file_path": str(pre_build_path.relative_to(project_path)),
+                        "file_path": str(config_path.relative_to(project_path)),
                         "build_env": build_env,
                     },
                 )
