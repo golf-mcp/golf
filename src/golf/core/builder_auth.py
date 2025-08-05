@@ -74,8 +74,8 @@ def generate_auth_code(
         "",
     ]
 
-    # FastMCP constructor arguments - FastMCP 2.11+ uses auth_provider directly
-    fastmcp_args = {"auth_provider": "auth_provider"}
+    # FastMCP constructor arguments - FastMCP 2.11+ uses auth parameter
+    fastmcp_args = {"auth": "auth_provider"}
 
     return {
         "imports": auth_imports,
