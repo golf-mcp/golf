@@ -1092,11 +1092,11 @@ def build_project(
     # Execute pre_build.py if it exists
     pre_build_path = project_path / "pre_build.py"
     if pre_build_path.exists():
+        # Save the current directory and path
+        original_dir = os.getcwd()
+        original_path = sys.path.copy()
+        
         try:
-            # Save the current directory and path
-            original_dir = os.getcwd()
-            original_path = sys.path.copy()
-
             # Change to the project directory and add it to Python path
             os.chdir(project_path)
             sys.path.insert(0, str(project_path))
@@ -1114,10 +1114,6 @@ def build_project(
 
             # Check if auth was configured by the script
             provider, scopes = get_auth_config()
-
-            # Restore original directory and path
-            os.chdir(original_dir)
-            sys.path = original_path
 
         except Exception as e:
             console.print(f"[red]Error executing pre_build.py: {str(e)}[/red]")
@@ -1142,6 +1138,14 @@ def build_project(
             except Exception:
                 # Don't let telemetry errors break the build
                 pass
+        finally:
+            # Always restore original directory and path, even if an exception occurred
+            try:
+                os.chdir(original_dir)
+                sys.path = original_path
+            except Exception:
+                # If we can't restore the directory, at least try to reset the path
+                sys.path = original_path
 
     # Clear the output directory if it exists
     if output_dir.exists():
