@@ -35,13 +35,13 @@ from .helpers import (
 __all__ = [
     # Main configuration functions
     "configure_auth",
-    "configure_jwt_auth", 
+    "configure_jwt_auth",
     "configure_dev_auth",
     "get_auth_config",
     # Provider configurations
     "AuthConfig",
     "JWTAuthConfig",
-    "StaticTokenConfig", 
+    "StaticTokenConfig",
     "OAuthServerConfig",
     "RemoteAuthConfig",
     # Factory functions
@@ -136,7 +136,7 @@ def configure_jwt_auth(
         issuer: Expected issuer claim
         audience: Expected audience claim(s)
         required_scopes: Required scopes for all requests
-        **env_vars: Environment variable names (public_key_env_var, 
+        **env_vars: Environment variable names (public_key_env_var,
             jwks_uri_env_var, etc.)
     """
     config = JWTAuthConfig(
@@ -195,8 +195,6 @@ def is_auth_configured() -> bool:
         True if authentication is configured, False otherwise
     """
     return _auth_config is not None
-
-
 
 
 # Breaking change in Golf 0.2.x: Legacy auth system removed

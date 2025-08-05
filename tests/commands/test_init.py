@@ -37,7 +37,7 @@ class TestInitCommand:
         assert "description" in config
         assert config["transport"] == "http"
 
-    def test_template_variable_substitution(self, temp_dir: Path) -> None:  
+    def test_template_variable_substitution(self, temp_dir: Path) -> None:
         """Test that template files are copied correctly."""
         project_dir = temp_dir / "MyApp"
 
@@ -73,7 +73,7 @@ class TestInitCommand:
 
         initialize_project("health_check_project", project_dir, template="basic")
 
-        # Check that golf.json has basic template content  
+        # Check that golf.json has basic template content
         config = json.loads((project_dir / "golf.json").read_text())
         assert "health_check_enabled" not in config  # Should not be included by default
         assert "health_check_path" not in config
