@@ -32,7 +32,7 @@ def configure_api_key(
 ) -> None:
     """Configure API key extraction from request headers.
 
-    This function should be called in pre_build.py to set up API key handling.
+    This function should be called in auth.py to set up API key handling.
 
     Args:
         header_name: Name of the header containing the API key (default: "X-API-Key")
@@ -40,7 +40,7 @@ def configure_api_key(
         required: Whether API key is required for all requests (default: True)
 
     Example:
-        # In pre_build.py
+        # In auth.py
         from golf.auth.api_key import configure_api_key
 
         # Require API key for all requests
