@@ -6,45 +6,20 @@ from typing import Any
 # Re-export get_access_token from the MCP SDK
 from mcp.server.auth.middleware.auth_context import get_access_token
 
-from .oauth import GolfOAuthProvider
-
-# Context variable to store the active OAuth provider
-_active_golf_oauth_provider: GolfOAuthProvider | None = None
-
 # Context variable to store the current request's API key
 _current_api_key: ContextVar[str | None] = ContextVar("current_api_key", default=None)
 
 
-def _set_active_golf_oauth_provider(provider: GolfOAuthProvider) -> None:
-    """
-    Sets the active GolfOAuthProvider instance.
-    Should only be called once during server startup.
-    """
-    global _active_golf_oauth_provider
-    _active_golf_oauth_provider = provider
-
-
 def get_provider_token() -> str | None:
     """
-    Get a provider token (e.g., GitHub token) associated with the current
-    MCP session's access token.
-
-    This relies on _set_active_golf_oauth_provider being called at server startup.
+    Get a provider token (legacy function - no longer supported in Golf 0.2.x).
+    
+    In Golf 0.2.x, use FastMCP's built-in auth providers for OAuth flows.
+    This function returns None and is kept for backwards compatibility.
     """
-    mcp_access_token = get_access_token()  # From MCP SDK, uses its own ContextVar
-    if not mcp_access_token:
-        # No active MCP session token.
-        return None
-
-    provider = _active_golf_oauth_provider
-    if not provider:
-        return None
-
-    if not hasattr(provider, "get_provider_token"):
-        return None
-
-    # Call the get_provider_token method on the actual GolfOAuthProvider instance
-    return provider.get_provider_token(mcp_access_token.token)
+    # Legacy OAuth provider support removed in Golf 0.2.x
+    # Use FastMCP 2.11+ auth providers instead
+    return None
 
 
 def extract_token_from_header(auth_header: str) -> str | None:
