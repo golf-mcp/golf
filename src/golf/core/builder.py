@@ -962,14 +962,14 @@ class CodeGenerator:
                 main_code.extend(
                     [
                         "    # Run SSE server with middleware using FastMCP's run method",
-                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware)',
+                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware, show_banner=False)',
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run SSE server using FastMCP's run method",
-                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info")',
+                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", show_banner=False)',
                     ]
                 )
 
@@ -1009,20 +1009,20 @@ class CodeGenerator:
                 main_code.extend(
                     [
                         "    # Run HTTP server with middleware using FastMCP's run method",
-                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware)',
+                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware, show_banner=False)',
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run HTTP server using FastMCP's run method",
-                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info")',
+                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", show_banner=False)',
                     ]
                 )
         else:
             # For stdio transport, use mcp.run()
             main_code.extend(
-                ["    # Run with stdio transport", '    mcp.run(transport="stdio")']
+                ["    # Run with stdio transport", '    mcp.run(transport="stdio", show_banner=False)']
             )
 
         # Add metrics route if enabled
