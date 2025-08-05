@@ -201,7 +201,7 @@ def is_auth_configured() -> bool:
 # Users must migrate to modern auth configurations
 
 
-def create_auth_provider_from_config() -> Any:
+def create_auth_provider_from_config() -> object | None:
     """Create an auth provider from the current configuration.
 
     Returns:

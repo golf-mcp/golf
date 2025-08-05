@@ -152,7 +152,7 @@ async def sample_with_context(
     messages: str | list[str],
     context_data: dict[str, Any],
     system_prompt: str | None = None,
-    **kwargs: Any,
+    **kwargs,
 ) -> str:
     """Request an LLM completion with additional context data.
 

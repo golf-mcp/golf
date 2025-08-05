@@ -269,7 +269,7 @@ class AstParser:
             if cleanup_path and project_root_str in sys.path:
                 sys.path.remove(project_root_str)
 
-    def _extract_input_schema(self, func) -> dict[str, Any] | None:
+    def _extract_input_schema(self, func: Any) -> dict[str, Any] | None:
         """Extract input schema from function signature using runtime inspection."""
         import inspect
         from typing import get_type_hints
@@ -320,7 +320,7 @@ class AstParser:
 
         return None
 
-    def _extract_output_schema(self, func) -> dict[str, Any] | None:
+    def _extract_output_schema(self, func: Any) -> dict[str, Any] | None:
         """Extract output schema from return type annotation."""
         from typing import get_type_hints
 
@@ -345,7 +345,7 @@ class AstParser:
 
         return None
 
-    def _extract_pydantic_model_schema(self, model_class) -> dict[str, Any]:
+    def _extract_pydantic_model_schema(self, model_class: Any) -> dict[str, Any]:
         """Extract schema from Pydantic model by inspecting fields directly."""
         try:
             schema = {"type": "object", "properties": {}, "required": []}
@@ -408,11 +408,11 @@ class AstParser:
             )
             return {"type": "object"}
 
-    def _clean_schema(self, schema) -> dict[str, Any]:
+    def _clean_schema(self, schema: Any) -> dict[str, Any]:
         """Clean up a schema to remove non-JSON-serializable objects."""
         import json
 
-        def clean_object(obj):
+        def clean_object(obj: Any) -> Any:
             if obj is None:
                 return None
             elif isinstance(obj, (str, int, float, bool)):
@@ -456,7 +456,7 @@ class AstParser:
         return cleaned if cleaned else {"type": "object"}
 
     def _extract_param_schema_from_hint(
-        self, type_hint, param_name: str
+        self, type_hint: Any, param_name: str
     ) -> dict[str, Any] | None:
         """Extract parameter schema from type hint (including Annotated types)."""
         from typing import get_args, get_origin
@@ -493,7 +493,7 @@ class AstParser:
         # For non-Annotated types, just convert the type
         return self._type_to_schema(type_hint)
 
-    def _type_to_schema(self, type_hint) -> dict[str, Any]:
+    def _type_to_schema(self, type_hint: object) -> dict[str, Any]:
         """Convert a Python type to JSON schema."""
         from typing import get_args, get_origin
         import types

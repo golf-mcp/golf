@@ -1149,7 +1149,8 @@ def build_project(
             if auth_config_result:
                 provider, scopes = auth_config_result
             else:
-                provider, scopes = None, None
+                # No auth configuration found
+                pass
 
         except Exception as e:
             console.print(f"[red]Error executing {config_path.name}: {str(e)}[/red]")
