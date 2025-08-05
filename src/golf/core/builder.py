@@ -522,7 +522,7 @@ class CodeGenerator:
             config["endpoint_path"] = ""  # No HTTP endpoint
         else:
             # Default to streamable-http
-            config["endpoint_path"] = "/mcp"  # Default MCP path for FastMCP
+            config["endpoint_path"] = "/mcp/"  # Default MCP path for FastMCP
 
         return config
 
