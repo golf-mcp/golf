@@ -1,11 +1,15 @@
-"""Configure API key authentication for GitHub MCP server."""
+"""API key authentication configuration for your Golf MCP server.
+
+This example shows how to configure API key authentication, which is useful
+for services that require API tokens (like GitHub, OpenAI, etc.).
+"""
 
 from golf.auth import configure_api_key
 
-# Configure Golf to extract GitHub personal access tokens from the Authorization header
-# GitHub expects: Authorization: Bearer ghp_xxxx or Authorization: token ghp_xxxx
+# Configure API key extraction from Authorization header
+# This will extract API keys from headers like: Authorization: Bearer your-api-key
 configure_api_key(
     header_name="Authorization",
-    header_prefix="Bearer ",  # Will handle both "Bearer " and "token " prefixes
+    header_prefix="Bearer ",  # Will strip "Bearer " prefix from the header value
     required=True,  # Reject requests without a valid API key
 )
