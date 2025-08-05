@@ -43,7 +43,7 @@ def configure_auth(
 ) -> None:
     """Configure authentication for the Golf server.
 
-    This function should be called in pre_build.py to set up authentication
+    This function should be called in auth.py to set up authentication
     using FastMCP's modern auth providers.
 
     Args:
