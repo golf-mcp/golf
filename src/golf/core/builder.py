@@ -522,7 +522,7 @@ class CodeGenerator:
             config["endpoint_path"] = ""  # No HTTP endpoint
         else:
             # Default to streamable-http
-            config["endpoint_path"] = "/mcp/"  # Default MCP path for FastMCP
+            config["endpoint_path"] = "/mcp"  # Default MCP path for FastMCP
 
         return config
 
@@ -960,14 +960,14 @@ class CodeGenerator:
                 main_code.extend(
                     [
                         "    # Run SSE server with middleware using FastMCP's run method",
-                        '    mcp.run(transport="sse", host=host, port=port, log_level="info", middleware=middleware)',
+                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware)',
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run SSE server using FastMCP's run method",
-                        '    mcp.run(transport="sse", host=host, port=port, log_level="info")',
+                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info")',
                     ]
                 )
 
@@ -1007,14 +1007,14 @@ class CodeGenerator:
                 main_code.extend(
                     [
                         "    # Run HTTP server with middleware using FastMCP's run method",
-                        '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info", middleware=middleware)',
+                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware)',
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run HTTP server using FastMCP's run method",
-                        '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info")',
+                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info")',
                     ]
                 )
         else:
