@@ -1140,7 +1140,11 @@ def build_project(
             exec(code, {})
 
             # Check if auth was configured by the script
-            provider, scopes = get_auth_config()
+            auth_config_result = get_auth_config()
+            if auth_config_result:
+                provider, scopes = auth_config_result
+            else:
+                provider, scopes = None, None
 
         except Exception as e:
             console.print(f"[red]Error executing {config_path.name}: {str(e)}[/red]")
