@@ -173,7 +173,7 @@ def debug_api_key_context() -> dict[str, Any]:
         if task:
             debug_info["has_async_task"] = True
             debug_info["task_id"] = id(task)
-    except:
+    except Exception:
         pass
 
     try:
@@ -189,7 +189,7 @@ def debug_api_key_context() -> dict[str, Any]:
             if hasattr(main_module, "request_id_context"):
                 request_id_context = main_module.request_id_context
                 debug_info["request_id_from_context"] = request_id_context.get()
-    except:
+    except Exception:
         pass
 
     return debug_info

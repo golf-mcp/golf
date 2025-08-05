@@ -7,7 +7,8 @@ import sys
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import TypeVar
+from typing import Any, TypeVar
+from collections.abc import AsyncGenerator
 from collections import OrderedDict
 
 from opentelemetry import baggage, trace
@@ -18,7 +19,6 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 from opentelemetry.trace import Status, StatusCode
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
 
 T = TypeVar("T")
 
@@ -848,7 +848,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
 class BoundedSessionTracker:
     """Memory-safe session tracker with automatic expiration."""
 
-    def __init__(self, max_sessions: int = 1000, session_ttl: int = 3600):
+    def __init__(self, max_sessions: int = 1000, session_ttl: int = 3600) -> None:
         self.max_sessions = max_sessions
         self.session_ttl = session_ttl
         self.sessions: OrderedDict[str, float] = OrderedDict()
@@ -878,7 +878,7 @@ class BoundedSessionTracker:
 
         return True
 
-    def _cleanup_expired(self, current_time: float):
+    def _cleanup_expired(self, current_time: float) -> None:
         """Remove expired sessions."""
         expired = [
             sid
@@ -893,14 +893,14 @@ class BoundedSessionTracker:
 
 
 class SessionTracingMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app):
+    def __init__(self, app: Any) -> None:
         super().__init__(app)
         # Use memory-safe session tracker instead of unbounded collections
         self.session_tracker = BoundedSessionTracker(
             max_sessions=1000, session_ttl=3600
         )
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Any, call_next: Callable) -> Any:
         # Record HTTP request timing
         import time
 
@@ -1077,7 +1077,7 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
 
 
 @asynccontextmanager
-async def telemetry_lifespan(mcp_instance):
+async def telemetry_lifespan(mcp_instance: Any) -> AsyncGenerator[None, None]:
     """Simplified lifespan for telemetry initialization and cleanup."""
     global _provider
 
@@ -1109,7 +1109,7 @@ async def telemetry_lifespan(mcp_instance):
         if hasattr(mcp_instance, "handle_request"):
             original_handle_request = mcp_instance.handle_request
 
-            async def traced_handle_request(*args, **kwargs):
+            async def traced_handle_request(*args: Any, **kwargs: Any) -> Any:
                 tracer = get_tracer()
                 with tracer.start_as_current_span("mcp.handle_request") as span:
                     span.set_attribute("mcp.request.handler", "handle_request")

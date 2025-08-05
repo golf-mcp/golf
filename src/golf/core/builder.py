@@ -522,7 +522,7 @@ class CodeGenerator:
             config["endpoint_path"] = ""  # No HTTP endpoint
         else:
             # Default to streamable-http
-            config["endpoint_path"] = "/mcp"  # Default MCP path for FastMCP
+            config["endpoint_path"] = "/mcp/"  # Default MCP path for FastMCP
 
         return config
 
@@ -543,6 +543,9 @@ class CodeGenerator:
         # Create imports section
         imports = [
             "from fastmcp import FastMCP",
+            "from fastmcp.tools import Tool",
+            "from fastmcp.resources import Resource",
+            "from fastmcp.prompts import Prompt",
             "import os",
             "import sys",
             "from dotenv import load_dotenv",
@@ -551,6 +554,9 @@ class CodeGenerator:
             "# Suppress FastMCP INFO logs",
             "logging.getLogger('fastmcp').setLevel(logging.WARNING)",
             "logging.getLogger('mcp').setLevel(logging.WARNING)",
+            "",
+            "# Golf utilities for MCP features (available for tool functions)",
+            "# from golf.utilities import elicit, sample, get_current_context",
             "",
         ]
 
@@ -687,23 +693,27 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\nmcp.add_tool(_wrapped_func, name="{component.name}", '
-                            f'description="{component.docstring or ""}"'
+                            f'\n_tool = Tool.from_function(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += f", annotations={component.annotations}"
-                        registration += ")"
+                            registration += (
+                                f".with_annotations({component.annotations})"
+                            )
+                        registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
                         registration += (
-                            f"\nmcp.add_resource_fn(_wrapped_func, "
+                            f"\n_resource = Resource.from_function(_wrapped_func, "
                             f'uri="{component.uri_template}", name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f'description="{component.docstring or ""}")\n'
+                            f"mcp.add_resource(_resource)"
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f'\n_prompt = Prompt.from_function(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")\n'
+                            f"mcp.add_prompt(_prompt)"
                         )
                 elif self.settings.metrics_enabled:
                     # Use metrics instrumentation
@@ -725,23 +735,27 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\nmcp.add_tool(_wrapped_func, name="{component.name}", '
-                            f'description="{component.docstring or ""}"'
+                            f'\n_tool = Tool.from_function(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += f", annotations={component.annotations}"
-                        registration += ")"
+                            registration += (
+                                f".with_annotations({component.annotations})"
+                            )
+                        registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
                         registration += (
-                            f"\nmcp.add_resource_fn(_wrapped_func, "
+                            f"\n_resource = Resource.from_function(_wrapped_func, "
                             f'uri="{component.uri_template}", name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f'description="{component.docstring or ""}")\n'
+                            f"mcp.add_resource(_resource)"
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f'\n_prompt = Prompt.from_function(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")\n'
+                            f"mcp.add_prompt(_prompt)"
                         )
                 else:
                     # Standard registration without telemetry
@@ -753,9 +767,9 @@ class CodeGenerator:
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f"\nmcp.add_tool({full_module_path}.{component.entry_function}"
+                            registration += f"\n_tool = Tool.from_function({full_module_path}.{component.entry_function}"
                         else:
-                            registration += f"\nmcp.add_tool({full_module_path}.export"
+                            registration += f"\n_tool = Tool.from_function({full_module_path}.export"
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -766,11 +780,13 @@ class CodeGenerator:
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
 
+                        registration += ")"
+
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += f", annotations={component.annotations}"
+                            registration += f"\n_tool = _tool.with_annotations({component.annotations})"
 
-                        registration += ")"
+                        registration += "\nmcp.add_tool(_tool)"
 
                     elif component_type == ComponentType.RESOURCE:
                         registration = f"# Register the resource '{component.name}' from {full_module_path}"
@@ -780,9 +796,9 @@ class CodeGenerator:
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f'\nmcp.add_resource_fn({full_module_path}.{component.entry_function}, uri="{component.uri_template}"'
+                            registration += f'\n_resource = Resource.from_function({full_module_path}.{component.entry_function}, uri="{component.uri_template}"'
                         else:
-                            registration += f'\nmcp.add_resource_fn({full_module_path}.export, uri="{component.uri_template}"'
+                            registration += f'\n_resource = Resource.from_function({full_module_path}.export, uri="{component.uri_template}"'
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -793,7 +809,7 @@ class CodeGenerator:
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
 
-                        registration += ")"
+                        registration += ")\nmcp.add_resource(_resource)"
 
                     else:  # PROMPT
                         registration = f"# Register the prompt '{component.name}' from {full_module_path}"
@@ -803,11 +819,9 @@ class CodeGenerator:
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f"\nmcp.add_prompt({full_module_path}.{component.entry_function}"
+                            registration += f"\n_prompt = Prompt.from_function({full_module_path}.{component.entry_function}"
                         else:
-                            registration += (
-                                f"\nmcp.add_prompt({full_module_path}.export"
-                            )
+                            registration += f"\n_prompt = Prompt.from_function({full_module_path}.export"
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -818,7 +832,7 @@ class CodeGenerator:
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
 
-                        registration += ")"
+                        registration += ")\nmcp.add_prompt(_prompt)"
 
                 component_registrations.append(registration)
 
@@ -948,14 +962,14 @@ class CodeGenerator:
                 main_code.extend(
                     [
                         "    # Run SSE server with middleware using FastMCP's run method",
-                        '    mcp.run(transport="sse", host=host, port=port, log_level="info", middleware=middleware)',
+                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware)',
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run SSE server using FastMCP's run method",
-                        '    mcp.run(transport="sse", host=host, port=port, log_level="info")',
+                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info")',
                     ]
                 )
 
@@ -995,14 +1009,14 @@ class CodeGenerator:
                 main_code.extend(
                     [
                         "    # Run HTTP server with middleware using FastMCP's run method",
-                        '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info", middleware=middleware)',
+                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware)',
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run HTTP server using FastMCP's run method",
-                        '    mcp.run(transport="streamable-http", host=host, port=port, log_level="info")',
+                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info")',
                     ]
                 )
         else:
@@ -1131,7 +1145,12 @@ def build_project(
             exec(code, {})
 
             # Check if auth was configured by the script
-            provider, scopes = get_auth_config()
+            auth_config_result = get_auth_config()
+            if auth_config_result:
+                provider, scopes = auth_config_result
+            else:
+                # No auth configuration found
+                pass
 
         except Exception as e:
             console.print(f"[red]Error executing {config_path.name}: {str(e)}[/red]")

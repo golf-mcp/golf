@@ -721,9 +721,9 @@ export = annotated_tool
         # Read the generated server code
         server_code = server_file.read_text()
 
-        # Should contain the tool registration with annotations
+        # Should contain the tool registration with annotations using .with_annotations()
         assert "mcp.add_tool(" in server_code
-        assert "annotations=" in server_code
+        assert ".with_annotations(" in server_code
         assert (
             '"readOnlyHint": False' in server_code
             or "'readOnlyHint': False" in server_code
@@ -777,35 +777,40 @@ export = simple_tool
         lines = server_code.split("\n")
 
         # Find the start of the tool registration for simple_tool
-        registration_start = -1
+        # Look for Tool.from_function that references simple_tool
+        tool_creation_start = -1
         for i, line in enumerate(lines):
-            if "mcp.add_tool(" in line:
+            if "Tool.from_function(" in line:
                 # Look ahead for the tool name to make sure it's the right registration
                 for j in range(i, min(i + 10, len(lines))):
                     if "simple_tool" in lines[j]:
-                        registration_start = i
+                        tool_creation_start = i
                         break
-                if registration_start != -1:
+                if tool_creation_start != -1:
                     break
 
-        assert registration_start != -1, (
-            "Could not find mcp.add_tool registration for simple_tool"
-        )
+        assert (
+            tool_creation_start != -1
+        ), "Could not find Tool.from_function registration for simple_tool"
 
-        # Get the registration block (until the closing parenthesis)
-        registration_end = registration_start
-        paren_count = 0
-        for i in range(registration_start, len(lines)):
-            line = lines[i]
-            paren_count += line.count("(") - line.count(")")
-            if paren_count == 0 and ")" in line:
-                registration_end = i
+        # Now find the corresponding mcp.add_tool(_tool) call
+        registration_start = -1
+        for i in range(tool_creation_start, len(lines)):
+            if "mcp.add_tool(_tool)" in lines[i]:
+                registration_start = i
                 break
 
-        registration_block = "\n".join(lines[registration_start : registration_end + 1])
+        assert (
+            registration_start != -1
+        ), "Could not find mcp.add_tool(_tool) call after simple_tool registration"
+
+        # Get the registration block from tool creation to add_tool call
+        registration_block = "\n".join(
+            lines[tool_creation_start : registration_start + 1]
+        )
 
         # This tool should not have annotations since it doesn't define any
-        assert "annotations=" not in registration_block
+        assert "with_annotations(" not in registration_block
 
 
 class TestAnnotationEdgeCases:
@@ -1512,9 +1517,9 @@ export = test_tool
 
         assert early_init_line != -1, "Early telemetry initialization not found"
         assert component_reg_line != -1, "Component registration not found"
-        assert early_init_line < component_reg_line, (
-            "Telemetry init should come before component registration"
-        )
+        assert (
+            early_init_line < component_reg_line
+        ), "Telemetry init should come before component registration"
 
     def test_no_telemetry_when_disabled(self, sample_project: Path, temp_dir: Path):
         """Test that telemetry code is not included when OpenTelemetry is disabled."""

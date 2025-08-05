@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "golf-mcp"
-version = "0.1.20"
+version = "0.2.0"
 description = "Framework for building MCP servers"
 authors = [
     {name = "Antoni Gmitruk", email = "antoni@golf.dev"}
@@ -122,7 +122,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "C4", "C90", "UP", "N", "ANN", "SIM", "TID"]
-ignore = ["ANN401"]
+ignore = [
+    "ANN401",  # Disallow Any (too strict for dynamic code)
+    "B008",    # Function call in defaults (common in CLI frameworks like Typer)
+]
 
 [tool.ruff.format]
 # Use Black-compatible formatting

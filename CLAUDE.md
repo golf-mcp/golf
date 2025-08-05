@@ -32,33 +32,22 @@ Golf 0.2.x introduces breaking changes to align with FastMCP 2.11.x:
 ```bash
 # Run all tests with coverage
 make test
+# OR directly:
+python -m pytest tests/ -v --cov=golf --cov-report=term-missing --cov-report=html
 
 # Run tests without coverage (faster)
 make test-fast
-
-# Run specific test file
-make test-file FILE=tests/core/test_parser.py
-
-# Run tests matching pattern
-make test-match MATCH=test_parser
-
-# Run only unit tests (exclude slow/integration)
-make test-unit
-
-# Run integration tests
-make test-integration
+# OR directly:
+python -m pytest tests/ -v
 ```
 
 ### Code Quality
 ```bash
-# Run linting (ruff + mypy)
-make lint
+# Run linting (ruff)
+python -m ruff check src/
 
-# Format code (black + ruff)
-make format
-
-# Run all checks (lint + test)
-make check
+# Format code (ruff format only)
+python -m ruff format src/ tests/
 ```
 
 ### Installation
