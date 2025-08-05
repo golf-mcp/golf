@@ -805,7 +805,9 @@ export = simple_tool
         )
 
         # Get the registration block from tool creation to add_tool call
-        registration_block = "\n".join(lines[tool_creation_start : registration_start + 1])
+        registration_block = "\n".join(
+            lines[tool_creation_start : registration_start + 1]
+        )
 
         # This tool should not have annotations since it doesn't define any
         assert "with_annotations(" not in registration_block

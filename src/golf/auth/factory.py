@@ -88,7 +88,9 @@ def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
     try:
         from fastmcp.server.auth import JWTVerifier
     except ImportError as e:
-        raise ImportError("JWTVerifier not available. Please install fastmcp>=2.11.0") from e
+        raise ImportError(
+            "JWTVerifier not available. Please install fastmcp>=2.11.0"
+        ) from e
 
     return JWTVerifier(
         public_key=public_key,
