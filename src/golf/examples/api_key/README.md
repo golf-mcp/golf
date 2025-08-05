@@ -1,6 +1,6 @@
-# Golf MCP Project Template (Basic)
+# Golf MCP Project Template (API Key Authentication)
 
-This is a basic template for creating MCP servers with Golf. It includes development authentication for easy testing. Use `golf init <project-name>` to bootstrap new projects from this template.
+This template demonstrates how to create MCP servers with API key authentication using Golf. Use `golf init <project-name> --template=api_key` to bootstrap new projects from this template.
 
 ## About Golf
 
@@ -15,8 +15,8 @@ After initializing your project:
    cd your-project-name
    ```
 
-2. **Configure authentication (optional):**
-   This template includes development authentication in `auth.py` with sample tokens. Edit the file to set up JWT, OAuth, or API key authentication for production use.
+2. **Configure authentication:**
+   This template includes API key authentication configured in `auth.py`. Set your API key environment variables as needed.
 
 3. **Build and run your server:**
    ```bash
