@@ -42,24 +42,14 @@ async def hello(
     # If personalized greeting is requested, elicit additional info
     if personalized:
         try:
-            # Ask for user's favorite activity
-            favorite_activity = await elicit(
-                "What's your favorite activity or hobby?",
-                str
-            )
-            
-            # Ask for their mood
+            # Ask for user's mood
             mood = await elicit(
                 "How are you feeling today?",
                 ["happy", "excited", "calm", "focused", "creative"]
             )
             
             # Create personalized message
-            personalized_message = (
-                f"{greeting}, {name}! "
-                f"Hope you're having a {mood} day. "
-                f"Maybe later you can enjoy some {favorite_activity}!"
-            )
+            personalized_message = f"{greeting}, {name}! Hope you're having a {mood} day!"
             
             return Output(message=personalized_message)
             
