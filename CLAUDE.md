@@ -107,3 +107,48 @@ project/
 ```
 
 Component IDs are derived from file paths: `tools/payments/charge.py` becomes `charge_payments`.
+
+## Authentication in Golf 0.2.x
+
+Golf 0.2.x uses FastMCP's built-in authentication providers:
+
+### JWT Authentication (Production)
+```python
+# In pre_build.py
+from golf.auth import configure_jwt_auth
+
+configure_jwt_auth(
+    jwks_uri_env_var="JWKS_URI",  # JWKS endpoint
+    issuer_env_var="JWT_ISSUER",
+    audience_env_var="JWT_AUDIENCE", 
+    required_scopes=["read:user"],
+)
+```
+
+### Development Authentication
+```python
+# In pre_build.py
+from golf.auth import configure_dev_auth
+
+configure_dev_auth(
+    tokens={
+        "dev-token-123": {
+            "client_id": "dev-client",
+            "scopes": ["read", "write"],
+        }
+    },
+    required_scopes=["read"],
+)
+```
+
+### API Key Authentication
+```python
+# In pre_build.py  
+from golf.auth import configure_api_key
+
+configure_api_key(
+    header_name="Authorization",
+    header_prefix="Bearer ",
+    required=True,
+)
+```
