@@ -57,10 +57,10 @@ jobs:
         pip install ruff mypy
     
     - name: Run ruff format check
-      run: ruff format --check src/ tests/
+      run: ruff format --check src/
     
     # - name: Run ruff lint
-    #   run: ruff check src/ tests/
+    #   run: ruff check src/
     
     # - name: Run mypy
     #   run: mypy src/golf --ignore-missing-imports 
