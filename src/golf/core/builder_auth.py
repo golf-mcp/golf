@@ -47,7 +47,7 @@ def generate_auth_code(
             f"Invalid auth configuration type: {type(auth_config).__name__}. "
             "Golf 0.2.x requires modern auth configurations (JWTAuthConfig, "
             "StaticTokenConfig, OAuthServerConfig, or RemoteAuthConfig). "
-            "Please update your pre_build.py file."
+            "Please update your auth.py file."
         )
 
     # Generate modern auth components
@@ -113,7 +113,7 @@ def generate_api_key_auth_components(
     ]
 
     setup_code_lines = [
-        "# Recreate API key configuration from pre_build.py",
+        "# Recreate API key configuration from auth.py",
         "configure_api_key(",
         f"    header_name={repr(api_key_config.header_name)},",
         f"    header_prefix={repr(api_key_config.header_prefix)},",
