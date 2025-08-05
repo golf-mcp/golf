@@ -26,7 +26,6 @@ from .api_key import configure_api_key, get_api_key_config, is_api_key_configure
 from .helpers import (
     debug_api_key_context,
     extract_token_from_header,
-    get_access_token,
     get_api_key,
     get_provider_token,
     set_api_key,
@@ -56,7 +55,6 @@ __all__ = [
     # Helper functions
     "debug_api_key_context",
     "extract_token_from_header",
-    "get_access_token",
     "get_api_key",
     "get_provider_token",
     "set_api_key",
