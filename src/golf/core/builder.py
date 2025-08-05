@@ -543,6 +543,9 @@ class CodeGenerator:
         # Create imports section
         imports = [
             "from fastmcp import FastMCP",
+            "from fastmcp.tools import Tool",
+            "from fastmcp.resources import Resource",
+            "from fastmcp.prompts import Prompt",
             "import os",
             "import sys",
             "from dotenv import load_dotenv",
@@ -687,23 +690,25 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\nmcp.add_tool(_wrapped_func, name="{component.name}", '
-                            f'description="{component.docstring or ""}"'
+                            f'\n_tool = Tool.from_function(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += f", annotations={component.annotations}"
-                        registration += ")"
+                            registration += f".with_annotations({component.annotations})"
+                        registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
                         registration += (
-                            f"\nmcp.add_resource_fn(_wrapped_func, "
+                            f'\n_resource = Resource.from_function(_wrapped_func, '
                             f'uri="{component.uri_template}", name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f'description="{component.docstring or ""}")\n'
+                            f'mcp.add_resource(_resource)'
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f'\n_prompt = Prompt.from_function(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")\n'
+                            f'mcp.add_prompt(_prompt)'
                         )
                 elif self.settings.metrics_enabled:
                     # Use metrics instrumentation
@@ -725,23 +730,25 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\nmcp.add_tool(_wrapped_func, name="{component.name}", '
-                            f'description="{component.docstring or ""}"'
+                            f'\n_tool = Tool.from_function(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")'
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += f", annotations={component.annotations}"
-                        registration += ")"
+                            registration += f".with_annotations({component.annotations})"
+                        registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
                         registration += (
-                            f"\nmcp.add_resource_fn(_wrapped_func, "
+                            f'\n_resource = Resource.from_function(_wrapped_func, '
                             f'uri="{component.uri_template}", name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f'description="{component.docstring or ""}")\n'
+                            f'mcp.add_resource(_resource)'
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\nmcp.add_prompt(_wrapped_func, name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f'\n_prompt = Prompt.from_function(_wrapped_func, name="{component.name}", '
+                            f'description="{component.docstring or ""}")\n'
+                            f'mcp.add_prompt(_prompt)'
                         )
                 else:
                     # Standard registration without telemetry
@@ -753,9 +760,9 @@ class CodeGenerator:
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f"\nmcp.add_tool({full_module_path}.{component.entry_function}"
+                            registration += f"\n_tool = Tool.from_function({full_module_path}.{component.entry_function}"
                         else:
-                            registration += f"\nmcp.add_tool({full_module_path}.export"
+                            registration += f"\n_tool = Tool.from_function({full_module_path}.export"
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -766,11 +773,13 @@ class CodeGenerator:
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
 
+                        registration += ")"
+
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += f", annotations={component.annotations}"
+                            registration += f"\n_tool = _tool.with_annotations({component.annotations})"
 
-                        registration += ")"
+                        registration += "\nmcp.add_tool(_tool)"
 
                     elif component_type == ComponentType.RESOURCE:
                         registration = f"# Register the resource '{component.name}' from {full_module_path}"
@@ -780,9 +789,9 @@ class CodeGenerator:
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f'\nmcp.add_resource_fn({full_module_path}.{component.entry_function}, uri="{component.uri_template}"'
+                            registration += f'\n_resource = Resource.from_function({full_module_path}.{component.entry_function}, uri="{component.uri_template}"'
                         else:
-                            registration += f'\nmcp.add_resource_fn({full_module_path}.export, uri="{component.uri_template}"'
+                            registration += f'\n_resource = Resource.from_function({full_module_path}.export, uri="{component.uri_template}"'
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -793,7 +802,7 @@ class CodeGenerator:
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
 
-                        registration += ")"
+                        registration += ")\nmcp.add_resource(_resource)"
 
                     else:  # PROMPT
                         registration = f"# Register the prompt '{component.name}' from {full_module_path}"
@@ -803,10 +812,10 @@ class CodeGenerator:
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f"\nmcp.add_prompt({full_module_path}.{component.entry_function}"
+                            registration += f"\n_prompt = Prompt.from_function({full_module_path}.{component.entry_function}"
                         else:
                             registration += (
-                                f"\nmcp.add_prompt({full_module_path}.export"
+                                f"\n_prompt = Prompt.from_function({full_module_path}.export"
                             )
 
                         # Add the name parameter
@@ -818,7 +827,7 @@ class CodeGenerator:
                             escaped_docstring = component.docstring.replace('"', '\\"')
                             registration += f', description="{escaped_docstring}"'
 
-                        registration += ")"
+                        registration += ")\nmcp.add_prompt(_prompt)"
 
                 component_registrations.append(registration)
 
