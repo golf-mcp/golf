@@ -85,7 +85,7 @@ A Golf project initialized with `golf init` will have a structure similar to thi
 │   └─ welcome.py     # Example prompt
 │
 ├─ .env               # Environment variables (e.g., API keys, server port)
-└─ pre_build.py       # (Optional) Script for pre-build hooks (e.g., auth setup)
+└─ auth.py            # Authentication configuration (JWT, OAuth, API keys)
 ```
 
 -   **`golf.json`**: Configures server name, port, transport, telemetry, and other build settings.
