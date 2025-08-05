@@ -14,6 +14,8 @@ Golf 0.2.x introduces breaking changes to align with FastMCP 2.11.x:
 - **Legacy OAuth Removed**: Custom OAuth implementation replaced with standards-compliant FastMCP providers  
 - **Configuration Changes**: `pre_build.py` auth configuration must be updated to use new auth configs
 - **Dependency Updates**: Requires FastMCP >=2.11.0
+- **Removed Files**: Legacy `oauth.py` and `provider.py` files removed from auth module
+- **Deprecated Functions**: `get_provider_token()` and OAuth-related helpers return None (legacy compatibility)
 
 ## Key Architecture
 
