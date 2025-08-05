@@ -1,7 +1,8 @@
-"""Pre-build configuration for the basic example.
+"""Authentication configuration for the basic Golf MCP server example.
 
-This file is executed before the build process starts.
-It configures modern JWT authentication for the example using FastMCP 2.11+ providers.
+This example shows different authentication options available in Golf 0.2.x:
+- JWT authentication with static keys or JWKS endpoints (production)
+- Development authentication with static tokens (development/testing)
 """
 
 # Example 1: JWT authentication with a static public key
