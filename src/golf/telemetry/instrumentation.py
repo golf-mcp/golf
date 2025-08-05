@@ -7,7 +7,8 @@ import sys
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, TypeVar
+from typing import Any, TypeVar
+from collections.abc import AsyncGenerator
 from collections import OrderedDict
 
 from opentelemetry import baggage, trace
@@ -18,7 +19,6 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 from opentelemetry.trace import Status, StatusCode
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
 
 T = TypeVar("T")
 

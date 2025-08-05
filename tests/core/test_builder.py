@@ -789,9 +789,9 @@ export = simple_tool
                 if tool_creation_start != -1:
                     break
 
-        assert tool_creation_start != -1, (
-            "Could not find Tool.from_function registration for simple_tool"
-        )
+        assert (
+            tool_creation_start != -1
+        ), "Could not find Tool.from_function registration for simple_tool"
 
         # Now find the corresponding mcp.add_tool(_tool) call
         registration_start = -1
@@ -800,9 +800,9 @@ export = simple_tool
                 registration_start = i
                 break
 
-        assert registration_start != -1, (
-            "Could not find mcp.add_tool(_tool) call after simple_tool registration"
-        )
+        assert (
+            registration_start != -1
+        ), "Could not find mcp.add_tool(_tool) call after simple_tool registration"
 
         # Get the registration block from tool creation to add_tool call
         registration_block = "\n".join(
@@ -1517,9 +1517,9 @@ export = test_tool
 
         assert early_init_line != -1, "Early telemetry initialization not found"
         assert component_reg_line != -1, "Component registration not found"
-        assert early_init_line < component_reg_line, (
-            "Telemetry init should come before component registration"
-        )
+        assert (
+            early_init_line < component_reg_line
+        ), "Telemetry init should come before component registration"
 
     def test_no_telemetry_when_disabled(self, sample_project: Path, temp_dir: Path):
         """Test that telemetry code is not included when OpenTelemetry is disabled."""
