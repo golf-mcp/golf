@@ -174,7 +174,8 @@ class MetricsCollector:
 
         Args:
             component_type: Type of component ('tool', 'resource', 'prompt', 'http')
-            error_type: Type of error ('timeout', 'auth_error', 'validation_error', etc.)
+            error_type: Type of error ('timeout', 'auth_error',
+                'validation_error', etc.)
         """
         if not self.enabled or "errors" not in self._metrics:
             return
