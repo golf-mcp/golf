@@ -18,7 +18,8 @@ async def calculate(
     expression: Annotated[
         str,
         Field(
-            description="Mathematical expression to evaluate (e.g., '2 + 3', '10 * 5', '100 / 4')",
+            description="Mathematical expression to evaluate (e.g., '2 + 3', "
+            "'10 * 5', '100 / 4')",
             examples=["2 + 3", "10 * 5.5", "(8 - 3) * 2"],
         ),
     ],
@@ -61,8 +62,10 @@ async def calculate(
         if explain:
             try:
                 explanation = await sample(
-                    f"Explain this mathematical expression step by step: {expression} = {result}",
-                    system_prompt="You are a helpful math tutor. Provide clear, step-by-step explanations.",
+                    f"Explain this mathematical expression step by step: "
+                    f"{expression} = {result}",
+                    system_prompt="You are a helpful math tutor. Provide clear, "
+                    "step-by-step explanations.",
                     max_tokens=200,
                 )
                 result_expression = f"{expression}\n\nExplanation: {explanation}"

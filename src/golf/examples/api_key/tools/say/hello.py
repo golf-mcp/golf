@@ -20,7 +20,8 @@ async def hello(
     personalized: Annotated[
         bool,
         Field(
-            description="Whether to ask for additional personal details to create a personalized greeting",
+            description="Whether to ask for additional personal details to "
+            "create a personalized greeting",
             default=False,
         ),
     ] = False,

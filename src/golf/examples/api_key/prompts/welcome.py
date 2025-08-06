@@ -12,7 +12,8 @@ async def welcome() -> list[dict]:
             "role": "system",
             "content": (
                 "You are an assistant for the {{project_name}} application. "
-                "You help users understand how to interact with this system and its capabilities."
+                "You help users understand how to interact with this system and "
+                "its capabilities."
             ),
         },
         {

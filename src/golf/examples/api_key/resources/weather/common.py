@@ -5,6 +5,7 @@ sharing functionality across multiple resources in a directory.
 """
 
 import os
+from typing import Any
 
 # Read configuration from environment variables
 WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "mock_key")
@@ -22,11 +23,12 @@ class WeatherApiClient:
         self.api_url = api_url
         self.unit = TEMPERATURE_UNIT
 
-    async def get_forecast(self, city: str, days: int = 3):
+    async def get_forecast(self, city: str, days: int = 3) -> dict[str, Any]:
         """Get weather forecast for a city (mock implementation)."""
         # This would make an API call in a real implementation
         print(
-            f"Would call {self.api_url}/forecast/{city} with API key {self.api_key[:4]}..."
+            f"Would call {self.api_url}/forecast/{city} with API key "
+            f"{self.api_key[:4]}..."
         )
         return {
             "city": city,
@@ -34,10 +36,11 @@ class WeatherApiClient:
             "forecast": [{"day": i, "temp": 70 + i} for i in range(days)],
         }
 
-    async def get_current(self, city: str):
+    async def get_current(self, city: str) -> dict[str, Any]:
         """Get current weather for a city (mock implementation)."""
         print(
-            f"Would call {self.api_url}/current/{city} with API key {self.api_key[:4]}..."
+            f"Would call {self.api_url}/current/{city} with API key "
+            f"{self.api_key[:4]}..."
         )
         return {
             "city": city,
