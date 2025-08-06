@@ -3,6 +3,8 @@
 from contextvars import ContextVar
 from typing import Any
 
+from starlette.requests import Request
+
 # Re-export get_access_token from the MCP SDK
 
 # Context variable to store the current request's API key
@@ -123,7 +125,7 @@ def get_api_key() -> str | None:
     return None
 
 
-def get_api_key_from_request(request) -> str | None:
+def get_api_key_from_request(request: Request) -> str | None:
     """Get the API key from a specific request object.
 
     This is useful when you have direct access to the request object.

@@ -37,7 +37,8 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
     # Check for Golf platform integration first
     golf_api_key = os.environ.get("GOLF_API_KEY")
     if golf_api_key:
-        # Auto-configure for Golf platform - always use OTLP when Golf API key is present
+        # Auto-configure for Golf platform - always use OTLP when Golf API
+        # key is present
         os.environ["OTEL_TRACES_EXPORTER"] = "otlp_http"
 
         # Only set endpoint if not already configured (allow user override)
@@ -130,7 +131,8 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         processor = BatchSpanProcessor(
             exporter,
             max_queue_size=2048,
-            schedule_delay_millis=1000,  # Export every 1 second instead of default 5 seconds
+            schedule_delay_millis=1000,  # Export every 1 second instead of
+            # default 5 seconds
             max_export_batch_size=512,
             export_timeout_millis=5000,
         )
@@ -185,7 +187,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     tracer = get_tracer()
 
     @functools.wraps(func)
-    async def async_wrapper(*args, **kwargs):
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Record metrics timing
         import time
 
@@ -315,7 +317,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 raise
 
     @functools.wraps(func)
-    def sync_wrapper(*args, **kwargs):
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Record metrics timing
         import time
 
@@ -465,7 +467,7 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
     is_template = "{" in resource_uri
 
     @functools.wraps(func)
-    async def async_wrapper(*args, **kwargs):
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Create a more descriptive span name
         span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
@@ -550,7 +552,7 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
                 raise
 
     @functools.wraps(func)
-    def sync_wrapper(*args, **kwargs):
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Create a more descriptive span name
         span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
@@ -651,7 +653,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
     tracer = get_tracer()
 
     @functools.wraps(func)
-    async def async_wrapper(*args, **kwargs):
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Create a more descriptive span name
         span_name = f"mcp.prompt.{prompt_name}.generate"
         with tracer.start_as_current_span(span_name) as span:
@@ -745,7 +747,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
                 raise
 
     @functools.wraps(func)
-    def sync_wrapper(*args, **kwargs):
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Create a more descriptive span name
         span_name = f"mcp.prompt.{prompt_name}.generate"
         with tracer.start_as_current_span(span_name) as span:
@@ -900,7 +902,7 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
             max_sessions=1000, session_ttl=3600
         )
 
-    async def dispatch(self, request: Any, call_next: Callable) -> Any:
+    async def dispatch(self, request: Any, call_next: Callable[..., Any]) -> Any:
         # Record HTTP request timing
         import time
 
@@ -930,7 +932,8 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
                     from golf.metrics import get_metrics_collector
 
                     metrics_collector = get_metrics_collector()
-                    # Use a default duration since we don't track exact start times anymore
+                    # Use a default duration since we don't track exact start
+                    # times anymore
                     # This is less precise but memory-safe
                     metrics_collector.record_session_duration(300.0)  # 5 min default
                 except ImportError:
