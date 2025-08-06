@@ -278,7 +278,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 if result is not None:
                     span.set_attribute("mcp.tool.result.type", type(result).__name__)
 
-                    if isinstance(result, (list, dict)) and hasattr(result, "__len__"):
+                    if isinstance(result, list | dict) and hasattr(result, "__len__"):
                         span.set_attribute("mcp.tool.result.size", len(result))
                     elif isinstance(result, str):
                         span.set_attribute("mcp.tool.result.length", len(result))
@@ -388,7 +388,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 if result is not None:
                     span.set_attribute("mcp.tool.result.type", type(result).__name__)
 
-                    if isinstance(result, (list, dict)) and hasattr(result, "__len__"):
+                    if isinstance(result, list | dict) and hasattr(result, "__len__"):
                         span.set_attribute("mcp.tool.result.size", len(result))
                     elif isinstance(result, str):
                         span.set_attribute("mcp.tool.result.length", len(result))
