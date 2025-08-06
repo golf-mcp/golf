@@ -183,6 +183,11 @@ def load_settings(project_path: str | Path) -> Settings:
         return _load_toml_settings(toml_config_path, settings)
 
     # No config file found, use defaults
+    # Auto-enable OpenTelemetry if GOLF_API_KEY is present
+    import os
+    if os.environ.get("GOLF_API_KEY"):
+        settings.opentelemetry_enabled = True
+    
     return settings
 
 
@@ -198,6 +203,11 @@ def _load_json_settings(path: Path, settings: Settings) -> Settings:
         for key, value in config_data.items():
             if hasattr(settings, key):
                 setattr(settings, key, value)
+
+        # Auto-enable OpenTelemetry if GOLF_API_KEY is present and telemetry wasn't explicitly configured
+        import os
+        if os.environ.get("GOLF_API_KEY") and "opentelemetry_enabled" not in config_data:
+            settings.opentelemetry_enabled = True
 
         return settings
     except Exception as e:
