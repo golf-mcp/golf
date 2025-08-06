@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     # OpenTelemetry config
     opentelemetry_enabled: bool = Field(False, description="Enable OpenTelemetry tracing")
     opentelemetry_default_exporter: str = Field("console", description="Default OpenTelemetry exporter type")
+    detailed_tracing: bool = Field(False, description="Enable detailed tracing with input/output capture (may contain sensitive data)")
 
     # Health check configuration
     health_check_enabled: bool = Field(False, description="Enable health check endpoint")
