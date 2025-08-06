@@ -6,9 +6,9 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 
 from golf import __version__
+from golf.cli.branding import create_welcome_banner, create_command_header
 from golf.core.config import find_project_root, load_settings
 from golf.core.telemetry import (
     is_telemetry_enabled,
@@ -35,7 +35,7 @@ atexit.register(shutdown)
 def _version_callback(value: bool) -> None:
     """Print version and exit if --version flag is used."""
     if value:
-        console.print(f"GolfMCP v{__version__}")
+        create_welcome_banner(__version__, console)
         raise typer.Exit()
 
 
@@ -89,6 +89,11 @@ def init(
     Creates a new directory with the project scaffold, including
     examples for tools, resources, and prompts.
     """
+    # Show the Golf logo for project initialization
+    create_welcome_banner(__version__, console)
+    console.print()
+    create_command_header("Initialize Project", f"Creating {project_name} with {template} template", console)
+
     # Import here to avoid circular imports
     from golf.commands.init import initialize_project
 
@@ -363,13 +368,7 @@ def telemetry(
 
 if __name__ == "__main__":
     # Show welcome banner when run directly
-    console.print(
-        Panel.fit(
-            f"[bold green]GolfMCP[/bold green] v{__version__}\n"
-            "[dim]A Pythonic framework for building MCP servers[/dim]",
-            border_style="green",
-        )
-    )
+    create_welcome_banner(__version__, console)
 
     # Add telemetry notice if enabled
     if is_telemetry_enabled():
