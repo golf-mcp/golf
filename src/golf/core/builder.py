@@ -864,24 +864,6 @@ class CodeGenerator:
             "",
         ]
 
-        # Add startup message
-        if self.settings.transport != "stdio":
-            main_code.append(
-                f"    console.print(Panel.fit("
-                f'f"[bold green]{{mcp.name}}[/bold green]\\n'
-                f"[dim]Running on http://{{host}}:{{port}}{endpoint_path} "
-                f'with transport \\"{{transport_to_run}}\\" '
-                f'(environment: {self.build_env})[/dim]", '
-                f'border_style="green"))'
-            )
-        else:
-            main_code.append(
-                f"    console.print(Panel.fit("
-                f'f"[bold green]{{mcp.name}}[/bold green]\\n'
-                f'[dim]Running with transport \\"{{transport_to_run}}\\" '
-                f'(environment: {self.build_env})[/dim]", '
-                f'border_style="green"))'
-            )
 
         main_code.append("")
 
