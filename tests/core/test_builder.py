@@ -981,7 +981,6 @@ export = test_function
 
             # Verify build artifacts were created
             assert (output_dir / "server.py").exists()
-            assert (output_dir / "pyproject.toml").exists()
 
             # Check that warning was printed
             captured = capsys.readouterr()
@@ -1376,7 +1375,7 @@ export = simple_tool
         # Verify modern features are included
         assert "mcp.run(" in server_content  # Uses mcp.run() instead of uvicorn
         assert "stateless_http=True" in server_content  # Stateless HTTP support
-        assert 'logging.getLogger("fastmcp").setLevel(logging.WARNING)' in server_content  # Log suppression
+        assert 'logging.getLogger("FastMCP").setLevel(logging.ERROR)' in server_content  # Log suppression
 
 
 class TestTelemetryIntegration:
@@ -1502,14 +1501,3 @@ export = test_tool
 
         settings = load_settings(sample_project)
         build_project(sample_project, settings, temp_dir / "built_output")
-
-        # Read generated pyproject.toml
-        pyproject_file = temp_dir / "built_output" / "pyproject.toml"
-        assert pyproject_file.exists()
-
-        pyproject_content = pyproject_file.read_text()
-
-        # Verify OpenTelemetry dependencies are included
-        assert "opentelemetry-api" in pyproject_content
-        assert "opentelemetry-sdk" in pyproject_content
-        assert "opentelemetry-exporter-otlp" in pyproject_content

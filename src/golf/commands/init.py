@@ -171,13 +171,6 @@ def _copy_template(source_dir: Path, target_dir: Path, project_name: str) -> Non
             # Binary file, just copy
             shutil.copy2(source_path, target_path)
 
-    # Create .env file
-    env_file = target_dir / ".env"
-    with open(env_file, "w", encoding="utf-8") as f:
-        f.write(f"GOLF_NAME={project_name}\n")
-        f.write("GOLF_HOST=127.0.0.1\n")
-        f.write("GOLF_PORT=3000\n")
-
     # Create a .gitignore if it doesn't exist
     gitignore_file = target_dir / ".gitignore"
     if not gitignore_file.exists():

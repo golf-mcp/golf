@@ -11,3 +11,4 @@ dist/
 Makefile
 htmlcov/
 .ruff_cache/
+new/

@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     # OpenTelemetry config
     opentelemetry_enabled: bool = Field(False, description="Enable OpenTelemetry tracing")
     opentelemetry_default_exporter: str = Field("console", description="Default OpenTelemetry exporter type")
+    detailed_tracing: bool = Field(
+        False, description="Enable detailed tracing with input/output capture (may contain sensitive data)"
+    )
 
     # Health check configuration
     health_check_enabled: bool = Field(False, description="Enable health check endpoint")
@@ -169,20 +172,24 @@ def load_settings(project_path: str | Path) -> Settings:
     if env_file.exists():
         settings = Settings(_env_file=env_file)
 
+        # Auto-enable OpenTelemetry if GOLF_API_KEY is present (from .env file)
+        import os
+
+        if os.environ.get("GOLF_API_KEY"):
+            settings.opentelemetry_enabled = True
+
     # Try to load JSON config file first
     json_config_path = project_path / "golf.json"
     if json_config_path.exists():
         return _load_json_settings(json_config_path, settings)
 
-    # Fall back to TOML config file if JSON not found
-    toml_config_path = project_path / "golf.toml"
-    if toml_config_path.exists():
-        console.print(
-            "[yellow]Warning: Using .toml configuration is deprecated. Please migrate to .json format.[/yellow]"
-        )
-        return _load_toml_settings(toml_config_path, settings)
-
     # No config file found, use defaults
+    # Auto-enable OpenTelemetry if GOLF_API_KEY is present
+    import os
+
+    if os.environ.get("GOLF_API_KEY"):
+        settings.opentelemetry_enabled = True
+
     return settings
 
 
@@ -199,13 +206,13 @@ def _load_json_settings(path: Path, settings: Settings) -> Settings:
             if hasattr(settings, key):
                 setattr(settings, key, value)
 
+        # Auto-enable OpenTelemetry if GOLF_API_KEY is present and telemetry wasn't explicitly configured
+        import os
+
+        if os.environ.get("GOLF_API_KEY") and "opentelemetry_enabled" not in config_data:
+            settings.opentelemetry_enabled = True
+
         return settings
     except Exception as e:
         console.print(f"[bold red]Error loading JSON config from {path}: {e}[/bold red]")
         return settings
-
-
-def _load_toml_settings(path: Path, settings: Settings) -> Settings:
-    """Load settings from a TOML file."""
-
-    return settings

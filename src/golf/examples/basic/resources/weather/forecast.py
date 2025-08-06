@@ -6,19 +6,19 @@ from typing import Any
 from .common import weather_client
 
 # The URI that clients will use to access this resource
-resource_uri = "weather://forecast/{city}"
+resource_uri = "weather://forecast"
 
 
-async def forecast_weather(city: str) -> dict[str, Any]:
-    """Provide a weather forecast for the specified city.
+async def forecast_weather() -> dict[str, Any]:
+    """Provide a weather forecast for a default city.
 
     This example demonstrates:
     1. Nested resource organization (resources/weather/forecast.py)
-    2. Dynamic URI parameters (city in this case)
+    2. Resource without URI parameters
     3. Using shared client from the common.py file
     """
     # Use the shared weather client from common.py
-    forecast_data = await weather_client.get_forecast(city, days=5)
+    forecast_data = await weather_client.get_forecast("New York", days=5)
 
     # Add some additional data
     forecast_data.update(
