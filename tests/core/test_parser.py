@@ -709,9 +709,7 @@ export = run
         assert component.annotations["readOnlyHint"] is True
         assert component.annotations["validKey"] == "validValue"
 
-    def test_extract_dict_handles_complex_expressions(
-        self, sample_project: Path
-    ) -> None:
+    def test_extract_dict_handles_complex_expressions(self, sample_project: Path) -> None:
         """Test that complex expressions in dict values are handled gracefully."""
         tool_file = sample_project / "tools" / "complex_test.py"
         tool_file.write_text(

@@ -190,10 +190,7 @@ class TestHealthCheckIntegration:
             if transport_config["transport"] != "stdio":
                 # HTTP-based transports should have health check
                 assert '@mcp.custom_route("/health", methods=["GET"])' in server_code
-                assert (
-                    f'return PlainTextResponse("Transport {transport_config["transport"]} OK")'
-                    in server_code
-                )
+                assert f'return PlainTextResponse("Transport {transport_config["transport"]} OK")' in server_code
             else:
                 # stdio transport should still include health check code, even if not usable
                 assert '@mcp.custom_route("/health", methods=["GET"])' in server_code
@@ -243,9 +240,7 @@ class TestHealthCheckValidation:
 
             assert f'@mcp.custom_route("{path}", methods=["GET"])' in server_code
 
-    def test_health_check_with_special_characters_in_response(
-        self, temp_dir: Path
-    ) -> None:
+    def test_health_check_with_special_characters_in_response(self, temp_dir: Path) -> None:
         """Test health check with special characters in response text."""
         project_dir = temp_dir / "special_chars_project"
 

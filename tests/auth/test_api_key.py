@@ -38,9 +38,7 @@ class TestAPIKeyConfiguration:
         api_key._api_key_config = None
 
         # Configure with custom settings
-        configure_api_key(
-            header_name="Authorization", header_prefix="Bearer ", required=False
-        )
+        configure_api_key(header_name="Authorization", header_prefix="Bearer ", required=False)
 
         assert is_api_key_configured()
         config = get_api_key_config()
