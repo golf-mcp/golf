@@ -59,6 +59,12 @@ def run_server(
     server_content.append(f"http://{server_host}:{server_port}", style=f"bold {GOLF_GREEN}")
     server_content.append(" 🚀", style=f"bold {GOLF_ORANGE}")
     server_content.append("\n")
+    
+    # Add telemetry status indicator
+    if settings.opentelemetry_enabled:
+        server_content.append("📊 Golf telemetry enabled", style=f"dim {GOLF_BLUE}")
+        server_content.append("\n")
+    
     server_content.append("⚡ Press Ctrl+C to stop ⚡", style=f"dim {GOLF_ORANGE}")
 
     console.print(
