@@ -24,7 +24,8 @@ def run_server(
     Args:
         project_path: Path to the project root
         settings: Project settings
-        dist_dir: Path to the directory containing the built server (defaults to project_path/dist)
+        dist_dir: Path to the directory containing the built server
+            (defaults to project_path/dist)
         host: Host to bind the server to (overrides settings)
         port: Port to bind the server to (overrides settings)
 

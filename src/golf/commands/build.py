@@ -37,7 +37,8 @@ def build_project(
     )
 
 
-# Add a main section to run the build_project function when this module is executed directly
+# Add a main section to run the build_project function when this module is
+# executed directly
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Build a standalone FastMCP application"

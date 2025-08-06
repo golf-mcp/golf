@@ -47,7 +47,8 @@ def initialize_project(
         if output_dir.exists():
             if not output_dir.is_dir():
                 console.print(
-                    f"[bold red]Error:[/bold red] '{output_dir}' exists but is not a directory."
+                    f"[bold red]Error:[/bold red] '{output_dir}' exists but is not "
+                    "a directory."
                 )
                 track_command(
                     "init",
@@ -219,7 +220,8 @@ def _prompt_for_telemetry_consent() -> None:
     """Prompt user for telemetry consent and save their preference."""
     import os
 
-    # Skip prompt in test mode, when telemetry is explicitly disabled, or if preference already exists
+    # Skip prompt in test mode, when telemetry is explicitly disabled, or if
+    # preference already exists
     if os.environ.get("GOLF_TEST_MODE", "").lower() in ("1", "true", "yes", "on"):
         return
 
@@ -236,7 +238,8 @@ def _prompt_for_telemetry_consent() -> None:
     console.rule("[bold blue]Anonymous usage analytics[/bold blue]", style="blue")
     console.print()
     console.print(
-        "Golf can collect [bold]anonymous usage analytics[/bold] to help improve the tool."
+        "Golf can collect [bold]anonymous usage analytics[/bold] to help improve "
+        "the tool."
     )
     console.print()
     console.print("[dim]What we collect:[/dim]")

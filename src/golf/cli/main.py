@@ -78,7 +78,8 @@ def callback(
     if no_telemetry:
         set_telemetry_enabled(False, persist=True)
         console.print(
-            "[dim]Telemetry has been disabled. You can re-enable it with: golf telemetry enable[/dim]"
+            "[dim]Telemetry has been disabled. You can re-enable it with: "
+            "golf telemetry enable[/dim]"
         )
 
 
@@ -131,7 +132,8 @@ def build_dev(
 
     if not project_root:
         console.print(
-            "[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]"
+            "[bold red]Error: No GolfMCP project found in the current "
+            "directory or any parent directory.[/bold red]"
         )
         console.print("Run 'golf init <project_name>' to create a new project.")
         track_event(
@@ -190,7 +192,8 @@ def build_prod(
 
     if not project_root:
         console.print(
-            "[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]"
+            "[bold red]Error: No GolfMCP project found in the current "
+            "directory or any parent directory.[/bold red]"
         )
         console.print("Run 'golf init <project_name>' to create a new project.")
         track_event(
@@ -255,7 +258,8 @@ def run(
 
     if not project_root:
         console.print(
-            "[bold red]Error: No GolfMCP project found in the current directory or any parent directory.[/bold red]"
+            "[bold red]Error: No GolfMCP project found in the current "
+            "directory or any parent directory.[/bold red]"
         )
         console.print("Run 'golf init <project_name>' to create a new project.")
         track_event(
@@ -278,7 +282,8 @@ def run(
     if not dist_dir.exists():
         if build_first:
             console.print(
-                f"[yellow]Dist directory {dist_dir} not found. Building first...[/yellow]"
+                f"[yellow]Dist directory {dist_dir} not found. "
+                "Building first...[/yellow]"
             )
             try:
                 # Build the project
@@ -355,7 +360,9 @@ def run(
                 {
                     "success": False,
                     "error_type": "UnexpectedExit",
-                    "error_message": f"Server process exited unexpectedly with code {return_code}",
+                    "error_message": (
+                        f"Server process exited unexpectedly with code {return_code}"
+                    ),
                     "exit_code": return_code,
                     "operation": "server_process_execution",
                     "context": "Server process terminated with unexpected exit code",
@@ -390,7 +397,8 @@ def telemetry(
     elif action.lower() == "disable":
         set_telemetry_enabled(False, persist=True)
         console.print(
-            "[yellow]Telemetry disabled.[/yellow] You can re-enable it anytime with: golf telemetry enable"
+            "[yellow]Telemetry disabled.[/yellow] You can re-enable it anytime "
+            "with: golf telemetry enable"
         )
     else:
         console.print(
