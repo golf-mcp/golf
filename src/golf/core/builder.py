@@ -110,7 +110,8 @@ class ManifestBuilder:
         for component in self.components[ComponentType.RESOURCE]:
             if not component.uri_template:
                 console.print(
-                    f"[yellow]Warning: Resource {component.name} has no URI template[/yellow]"
+                    f"[yellow]Warning: Resource {component.name} has no URI "
+                    f"template[/yellow]"
                 )
                 continue
 
@@ -127,7 +128,8 @@ class ManifestBuilder:
     def _process_prompts(self) -> None:
         """Process all prompt components and add them to the manifest."""
         for component in self.components[ComponentType.PROMPT]:
-            # For prompts, the handler will have to load the module and execute the run function
+            # For prompts, the handler will have to load the module and execute
+            # the run function
             # to get the actual messages, so we just register it by name
             prompt_schema = {
                 "name": component.name,
@@ -366,7 +368,8 @@ class CodeGenerator:
 
         # Show success message with output directory
         console.print(
-            f"[bold green]✓[/bold green] Build completed successfully in [bold]{output_dir_display}[/bold]"
+            f"[bold green]✓[/bold green] Build completed successfully in "
+            f"[bold]{output_dir_display}[/bold]"
         )
 
     def _create_directory_structure(self) -> None:
@@ -386,7 +389,8 @@ class CodeGenerator:
         self._process_common_files()
 
     def _process_common_files(self) -> None:
-        """Process and transform common.py files in the components directory structure."""
+        """Process and transform common.py files in the components directory
+        structure."""
         # Reuse the already fetched common_files instead of calling the function again
         for dir_path_str, common_file in self.common_files.items():
             # Convert string path to Path object
@@ -432,7 +436,8 @@ class CodeGenerator:
             rel_path = Path(tool.file_path).relative_to(self.project_path)
             if not rel_path.is_relative_to(Path(self.settings.tools_dir)):
                 console.print(
-                    f"[yellow]Warning: Tool {tool.name} is not in the tools directory[/yellow]"
+                    f"[yellow]Warning: Tool {tool.name} is not in the tools "
+                    f"directory[/yellow]"
                 )
                 continue
 
@@ -458,7 +463,8 @@ class CodeGenerator:
             rel_path = Path(resource.file_path).relative_to(self.project_path)
             if not rel_path.is_relative_to(Path(self.settings.resources_dir)):
                 console.print(
-                    f"[yellow]Warning: Resource {resource.name} is not in the resources directory[/yellow]"
+                    f"[yellow]Warning: Resource {resource.name} is not in the "
+                    f"resources directory[/yellow]"
                 )
                 continue
 
@@ -486,7 +492,8 @@ class CodeGenerator:
             rel_path = Path(prompt.file_path).relative_to(self.project_path)
             if not rel_path.is_relative_to(Path(self.settings.prompts_dir)):
                 console.print(
-                    f"[yellow]Warning: Prompt {prompt.name} is not in the prompts directory[/yellow]"
+                    f"[yellow]Warning: Prompt {prompt.name} is not in the "
+                    f"prompts directory[/yellow]"
                 )
                 continue
 
@@ -693,7 +700,8 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\n_tool = Tool.from_function(_wrapped_func, name="{component.name}", '
+                            f'\n_tool = Tool.from_function(_wrapped_func, '
+                            f'name="{component.name}", '
                             f'description="{component.docstring or ""}")'
                         )
                         # Add annotations if present
@@ -711,7 +719,8 @@ class CodeGenerator:
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\n_prompt = Prompt.from_function(_wrapped_func, name="{component.name}", '
+                            f'\n_prompt = Prompt.from_function(_wrapped_func, '
+                            f'name="{component.name}", '
                             f'description="{component.docstring or ""}")\n'
                             f"mcp.add_prompt(_prompt)"
                         )
@@ -735,7 +744,8 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\n_tool = Tool.from_function(_wrapped_func, name="{component.name}", '
+                            f'\n_tool = Tool.from_function(_wrapped_func, '
+                            f'name="{component.name}", '
                             f'description="{component.docstring or ""}")'
                         )
                         # Add annotations if present
@@ -753,23 +763,34 @@ class CodeGenerator:
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\n_prompt = Prompt.from_function(_wrapped_func, name="{component.name}", '
+                            f'\n_prompt = Prompt.from_function(_wrapped_func, '
+                            f'name="{component.name}", '
                             f'description="{component.docstring or ""}")\n'
                             f"mcp.add_prompt(_prompt)"
                         )
                 else:
                     # Standard registration without telemetry
                     if component_type == ComponentType.TOOL:
-                        registration = f"# Register the tool '{component.name}' from {full_module_path}"
+                        registration = (
+                            f"# Register the tool '{component.name}' from "
+                            f"{full_module_path}"
+                        )
 
-                        # Use the entry_function if available, otherwise try the export variable
+                        # Use the entry_function if available, otherwise try the
+                        # export variable
                         if (
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f"\n_tool = Tool.from_function({full_module_path}.{component.entry_function}"
+                            registration += (
+                                f"\n_tool = Tool.from_function("
+                                f"{full_module_path}.{component.entry_function}"
+                            )
                         else:
-                            registration += f"\n_tool = Tool.from_function({full_module_path}.export"
+                            registration += (
+                                f"\n_tool = Tool.from_function("
+                                f"{full_module_path}.export"
+                            )
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -784,21 +805,36 @@ class CodeGenerator:
 
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += f"\n_tool = _tool.with_annotations({component.annotations})"
+                            registration += (
+                                f"\n_tool = _tool.with_annotations("
+                                f"{component.annotations})"
+                            )
 
                         registration += "\nmcp.add_tool(_tool)"
 
                     elif component_type == ComponentType.RESOURCE:
-                        registration = f"# Register the resource '{component.name}' from {full_module_path}"
+                        registration = (
+                            f"# Register the resource '{component.name}' from "
+                            f"{full_module_path}"
+                        )
 
-                        # Use the entry_function if available, otherwise try the export variable
+                        # Use the entry_function if available, otherwise try the
+                        # export variable
                         if (
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f'\n_resource = Resource.from_function({full_module_path}.{component.entry_function}, uri="{component.uri_template}"'
+                            registration += (
+                                f'\n_resource = Resource.from_function('
+                                f'{full_module_path}.{component.entry_function}, '
+                                f'uri="{component.uri_template}"'
+                            )
                         else:
-                            registration += f'\n_resource = Resource.from_function({full_module_path}.export, uri="{component.uri_template}"'
+                            registration += (
+                                f'\n_resource = Resource.from_function('
+                                f'{full_module_path}.export, '
+                                f'uri="{component.uri_template}"'
+                            )
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -812,16 +848,26 @@ class CodeGenerator:
                         registration += ")\nmcp.add_resource(_resource)"
 
                     else:  # PROMPT
-                        registration = f"# Register the prompt '{component.name}' from {full_module_path}"
+                        registration = (
+                            f"# Register the prompt '{component.name}' from "
+                            f"{full_module_path}"
+                        )
 
-                        # Use the entry_function if available, otherwise try the export variable
+                        # Use the entry_function if available, otherwise try the
+                        # export variable
                         if (
                             hasattr(component, "entry_function")
                             and component.entry_function
                         ):
-                            registration += f"\n_prompt = Prompt.from_function({full_module_path}.{component.entry_function}"
+                            registration += (
+                                f"\n_prompt = Prompt.from_function("
+                                f"{full_module_path}.{component.entry_function}"
+                            )
                         else:
-                            registration += f"\n_prompt = Prompt.from_function({full_module_path}.export"
+                            registration += (
+                                f"\n_prompt = Prompt.from_function("
+                                f"{full_module_path}.export"
+                            )
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -844,7 +890,8 @@ class CodeGenerator:
         env_section = [
             "",
             "# Load environment variables from .env file if it exists",
-            "# Note: dotenv will not override existing environment variables by default",
+            "# Note: dotenv will not override existing environment variables by "
+            "default",
             "load_dotenv()",
             "",
         ]
@@ -916,11 +963,20 @@ class CodeGenerator:
         # Add startup message
         if self.settings.transport != "stdio":
             main_code.append(
-                f'    console.print(Panel.fit(f"[bold green]{{mcp.name}}[/bold green]\\n[dim]Running on http://{{host}}:{{port}}{endpoint_path} with transport \\"{{transport_to_run}}\\" (environment: {self.build_env})[/dim]", border_style="green"))'
+                f'    console.print(Panel.fit('
+                f'f"[bold green]{{mcp.name}}[/bold green]\\n'
+                f'[dim]Running on http://{{host}}:{{port}}{endpoint_path} '
+                f'with transport \\"{{transport_to_run}}\\" '
+                f'(environment: {self.build_env})[/dim]", '
+                f'border_style="green"))'
             )
         else:
             main_code.append(
-                f'    console.print(Panel.fit(f"[bold green]{{mcp.name}}[/bold green]\\n[dim]Running with transport \\"{{transport_to_run}}\\" (environment: {self.build_env})[/dim]", border_style="green"))'
+                f'    console.print(Panel.fit('
+                f'f"[bold green]{{mcp.name}}[/bold green]\\n'
+                f'[dim]Running with transport \\"{{transport_to_run}}\\" '
+                f'(environment: {self.build_env})[/dim]", '
+                f'border_style="green"))'
             )
 
         main_code.append("")
@@ -948,7 +1004,8 @@ class CodeGenerator:
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
                 middleware_setup.append(
-                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware"
+                    "    from opentelemetry.instrumentation.asgi import "
+                    "OpenTelemetryMiddleware"
                 )
                 middleware_setup.append(
                     "    from starlette.middleware import Middleware"
@@ -961,15 +1018,20 @@ class CodeGenerator:
                 main_code.append("")
                 main_code.extend(
                     [
-                        "    # Run SSE server with middleware using FastMCP's run method",
-                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware, show_banner=False)',
+                        "    # Run SSE server with middleware using FastMCP's run "
+                        "method",
+                        f'    mcp.run(transport="sse", host=host, port=port, '
+                        f'path="{endpoint_path}", log_level="info", '
+                        f'middleware=middleware, show_banner=False)',
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run SSE server using FastMCP's run method",
-                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", show_banner=False)',
+                        f'    mcp.run(transport="sse", host=host, port=port, '
+                        f'path="{endpoint_path}", log_level="info", '
+                        f'show_banner=False)',
                     ]
                 )
 
@@ -995,7 +1057,8 @@ class CodeGenerator:
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
                 middleware_setup.append(
-                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware"
+                    "    from opentelemetry.instrumentation.asgi import "
+                    "OpenTelemetryMiddleware"
                 )
                 middleware_setup.append(
                     "    from starlette.middleware import Middleware"
@@ -1008,21 +1071,29 @@ class CodeGenerator:
                 main_code.append("")
                 main_code.extend(
                     [
-                        "    # Run HTTP server with middleware using FastMCP's run method",
-                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware, show_banner=False)',
+                        "    # Run HTTP server with middleware using FastMCP's run "
+                        "method",
+                        f'    mcp.run(transport="streamable-http", host=host, '
+                        f'port=port, path="{endpoint_path}", log_level="info", '
+                        f'middleware=middleware, show_banner=False)',
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run HTTP server using FastMCP's run method",
-                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", show_banner=False)',
+                        f'    mcp.run(transport="streamable-http", host=host, '
+                        f'port=port, path="{endpoint_path}", log_level="info", '
+                        f'show_banner=False)',
                     ]
                 )
         else:
             # For stdio transport, use mcp.run()
             main_code.extend(
-                ["    # Run with stdio transport", '    mcp.run(transport="stdio", show_banner=False)']
+                [
+                    "    # Run with stdio transport",
+                    '    mcp.run(transport="stdio", show_banner=False)'
+                ]
             )
 
         # Add metrics route if enabled
@@ -1042,13 +1113,17 @@ class CodeGenerator:
                 + '\', methods=["GET"])',
                 "async def health_check(request: Request) -> PlainTextResponse:",
                 '    """Health check endpoint for Kubernetes and load balancers."""',
-                f'    return PlainTextResponse("{self.settings.health_check_response}")',
+                (
+                    f'    return PlainTextResponse('
+                    f'"{self.settings.health_check_response}")'
+                ),
                 "",
             ]
 
         # Combine all sections
         # Order: imports, env_section, auth_setup, server_code (mcp init),
-        # early_telemetry_init, early_metrics_init, component_registrations, metrics_route_code, health_check_code, main_code (run block)
+        # early_telemetry_init, early_metrics_init, component_registrations,
+        # metrics_route_code, health_check_code, main_code (run block)
         code = "\n".join(
             imports
             + env_section
@@ -1123,7 +1198,8 @@ def build_project(
         try:
             original_dir = os.getcwd()
         except (FileNotFoundError, OSError):
-            # Current directory might have been deleted by previous operations, use project_path as fallback
+            # Current directory might have been deleted by previous operations,
+            # use project_path as fallback
             original_dir = str(project_path)
             os.chdir(original_dir)
         original_path = sys.path.copy()
@@ -1205,11 +1281,14 @@ def build_project(
                 env_vars_to_write.update(dotenv_values(project_env_file))
             except ImportError:
                 console.print(
-                    "[yellow]Warning: python-dotenv is not installed. Cannot read existing .env file for rich merging. Copying directly.[/yellow]"
+                    "[yellow]Warning: python-dotenv is not installed. "
+                    "Cannot read existing .env file for rich merging. "
+                    "Copying directly.[/yellow]"
                 )
                 try:
                     shutil.copy(project_env_file, env_file_path)
-                    # If direct copy happens, re-read for step 2 & 3 to respect its content
+                    # If direct copy happens, re-read for step 2 & 3 to respect
+                    # its content
                     if env_file_path.exists():
                         from dotenv import dotenv_values
 
@@ -1218,25 +1297,30 @@ def build_project(
                         )  # Read what was copied
                 except Exception as e:
                     console.print(
-                        f"[yellow]Warning: Could not copy project .env file: {e}[/yellow]"
+                        f"[yellow]Warning: Could not copy project .env file: "
+                        f"{e}[/yellow]"
                     )
             except Exception as e:
                 console.print(
-                    f"[yellow]Warning: Error reading project .env file content: {e}[/yellow]"
+                    f"[yellow]Warning: Error reading project .env file "
+                    f"content: {e}[/yellow]"
                 )
 
-    # 2. Apply Golf's OTel default exporter setting if OTEL_TRACES_EXPORTER is not already set
-    if settings.opentelemetry_enabled and settings.opentelemetry_default_exporter:
-        if "OTEL_TRACES_EXPORTER" not in env_vars_to_write:
-            env_vars_to_write["OTEL_TRACES_EXPORTER"] = (
-                settings.opentelemetry_default_exporter
-            )
+    # 2. Apply Golf's OTel default exporter setting if OTEL_TRACES_EXPORTER
+    # is not already set
+    if (settings.opentelemetry_enabled and 
+            settings.opentelemetry_default_exporter and 
+            "OTEL_TRACES_EXPORTER" not in env_vars_to_write):
+        env_vars_to_write["OTEL_TRACES_EXPORTER"] = (
+            settings.opentelemetry_default_exporter
+        )
 
     # 3. Apply Golf's project name as OTEL_SERVICE_NAME if not already set
     # (Ensures service name defaults to project name if not specified in user's .env)
-    if settings.opentelemetry_enabled and settings.name:
-        if "OTEL_SERVICE_NAME" not in env_vars_to_write:
-            env_vars_to_write["OTEL_SERVICE_NAME"] = settings.name
+    if (settings.opentelemetry_enabled and 
+            settings.name and 
+            "OTEL_SERVICE_NAME" not in env_vars_to_write):
+        env_vars_to_write["OTEL_SERVICE_NAME"] = settings.name
 
     # 4. (Re-)Write the .env file in the output directory if there's anything to write
     if env_vars_to_write:

@@ -144,7 +144,8 @@ def get_anonymous_id() -> str:
     if id_file.exists():
         try:
             _anonymous_id = id_file.read_text().strip()
-            # Check if ID is in the old format (no hyphen between hash and random component)
+            # Check if ID is in the old format (no hyphen between hash and
+            # random component)
             # Old format: golf-[8 chars hash][8 chars random]
             # New format: golf-[8 chars hash]-[8 chars random]
             if (
@@ -264,7 +265,10 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
                 "$set": {
                     "golf_version": __version__,
                     "os": platform.system(),
-                    "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
+                    "python_version": (
+                        f"{platform.python_version_tuple()[0]}."
+                        f"{platform.python_version_tuple()[1]}"
+                    ),
                 }
             }
 
@@ -284,7 +288,10 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         # Only include minimal, non-identifying properties
         safe_properties = {
             "golf_version": __version__,
-            "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
+            "python_version": (
+                f"{platform.python_version_tuple()[0]}."
+                f"{platform.python_version_tuple()[1]}"
+            ),
             "os": platform.system(),
             # Explicitly disable IP tracking and GeoIP enrichment
             "$ip": "0",  # Override IP to prevent collection
@@ -331,7 +338,8 @@ def track_command(
     Args:
         command: The command being executed (e.g., "init", "build", "run")
         success: Whether the command was successful
-        error_type: Type of error if command failed (e.g., "ValueError", "FileNotFoundError")
+        error_type: Type of error if command failed (e.g., "ValueError",
+            "FileNotFoundError")
         error_message: Sanitized error message (no sensitive data)
     """
     properties = {"success": success}

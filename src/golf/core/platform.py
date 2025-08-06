@@ -39,7 +39,8 @@ async def register_project_with_platform(
     server_id = os.getenv("GOLF_SERVER_ID")
     if not server_id:
         console.print(
-            "[yellow]Warning: Platform registration skipped - GOLF_SERVER_ID environment variable required[/yellow]"
+            "[yellow]Warning: Platform registration skipped - "
+            "GOLF_SERVER_ID environment variable required[/yellow]"
         )
         return True  # Skip registration but don't fail build
 
@@ -84,7 +85,8 @@ async def register_project_with_platform(
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 401:
             console.print(
-                "[yellow]Warning: Platform registration failed - invalid API key[/yellow]"
+                "[yellow]Warning: Platform registration failed - "
+                "invalid API key[/yellow]"
             )
         elif e.response.status_code == 403:
             console.print(
@@ -92,7 +94,8 @@ async def register_project_with_platform(
             )
         else:
             console.print(
-                f"[yellow]Warning: Platform registration failed - HTTP {e.response.status_code}[/yellow]"
+                f"[yellow]Warning: Platform registration failed - "
+                f"HTTP {e.response.status_code}[/yellow]"
             )
         return False
     except Exception as e:

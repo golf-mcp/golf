@@ -123,10 +123,9 @@ class AstParser:
         for node in tree.body:
             if isinstance(node, ast.Assign):
                 for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == "export":
-                        if isinstance(node.value, ast.Name):
-                            export_target = node.value.id
-                            break
+                    if (isinstance(target, ast.Name) and target.id == "export" and isinstance(node.value, ast.Name)):
+                        export_target = node.value.id
+                        break
 
         # Find all top-level functions
         functions = []
@@ -146,7 +145,8 @@ class AstParser:
         # If we have an export but didn't find the target function, warn
         if export_target and not entry_function:
             console.print(
-                f"[yellow]Warning: Export target '{export_target}' not found in {file_path}[/yellow]"
+                f"[yellow]Warning: Export target '{export_target}' not found "
+                f"in {file_path}[/yellow]"
             )
 
         # Use the export target function if found, otherwise fall back to run
@@ -202,7 +202,8 @@ class AstParser:
         # Check for return annotation - STRICT requirement
         if func_node.returns is None:
             raise ValueError(
-                f"Missing return annotation for {func_node.name} function in {file_path}"
+                f"Missing return annotation for {func_node.name} function "
+                f"in {file_path}"
             )
 
         # Extract parameter names for basic info
@@ -220,14 +221,16 @@ class AstParser:
             self._extract_schemas_at_runtime(component, file_path)
         except Exception as e:
             console.print(
-                f"[yellow]Warning: Could not extract schemas from {file_path}: {e}[/yellow]"
+                f"[yellow]Warning: Could not extract schemas from {file_path}: "
+                f"{e}[/yellow]"
             )
             # Continue without schemas - better than failing the build
 
     def _extract_schemas_at_runtime(
         self, component: ParsedComponent, file_path: Path
     ) -> None:
-        """Extract input/output schemas by importing and inspecting the actual function."""
+        """Extract input/output schemas by importing and inspecting the 
+        actual function."""
         import importlib.util
         import sys
 
@@ -404,7 +407,8 @@ class AstParser:
 
         except Exception as e:
             console.print(
-                f"[yellow]Warning: Could not extract Pydantic model schema: {e}[/yellow]"
+                f"[yellow]Warning: Could not extract Pydantic model schema: "
+                f"{e}[/yellow]"
             )
             return {"type": "object"}
 
@@ -602,16 +606,15 @@ class AstParser:
         for node in tree.body:
             if isinstance(node, ast.Assign):
                 for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == "resource_uri":
-                        if isinstance(node.value, ast.Constant):
-                            uri_template = node.value.value
-                            component.uri_template = uri_template
+                    if (isinstance(target, ast.Name) and target.id == "resource_uri" and isinstance(node.value, ast.Constant)):
+                        uri_template = node.value.value
+                        component.uri_template = uri_template
 
-                            # Extract URI parameters (parts in {})
-                            uri_params = re.findall(r"{([^}]+)}", uri_template)
-                            if uri_params:
-                                component.parameters = uri_params
-                            break
+                        # Extract URI parameters (parts in {})
+                        uri_params = re.findall(r"{([^}]+)}", uri_template)
+                        if uri_params:
+                            component.parameters = uri_params
+                        break
 
     def _process_prompt(self, component: ParsedComponent, tree: ast.Module) -> None:
         """Process a prompt component (no special processing needed)."""
@@ -724,7 +727,8 @@ class AstParser:
                                 if isinstance(keyword.value, ast.Constant):
                                     prop["title"] = keyword.value.value
 
-                        # Check for position default argument (Field(..., "description"))
+                        # Check for position default argument 
+                        # (Field(..., "description"))
                         if node.value.args:
                             for i, arg in enumerate(node.value.args):
                                 if (
@@ -749,7 +753,8 @@ class AstParser:
                         and isinstance(node.value.func, ast.Name)
                         and node.value.func.id == "Field"
                     ):
-                        # Field has default if it doesn't use ... or if it has a default keyword
+                        # Field has default if it doesn't use ... or if it has a
+                        # default keyword
                         has_ellipsis = False
                         has_default = False
 
@@ -953,7 +958,8 @@ class AstParser:
         args_with_defaults = len(defaults)
         first_default_position = total_args - args_with_defaults
 
-        # If this parameter's position is before the first default position, it's required
+        # If this parameter's position is before the first default position,
+        # it's required
         return position < first_default_position
 
     def _extract_return_type_schema(

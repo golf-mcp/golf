@@ -112,7 +112,8 @@ class Settings(BaseSettings):
     # HTTP session behaviour
     stateless_http: bool = Field(
         False,
-        description="Make Streamable-HTTP transport stateless (new session per request)",
+        description="Make Streamable-HTTP transport stateless (new session "
+        "per request)",
     )
 
     # Metrics configuration
@@ -166,7 +167,8 @@ def find_project_root(
         start_path: Path to start searching from (defaults to current directory)
 
     Returns:
-        Tuple of (project_root, config_path) if a project is found, or (None, None) if not
+        Tuple of (project_root, config_path) if a project is found, or 
+        (None, None) if not
     """
     config_path = find_config_path(start_path)
     if config_path:
@@ -204,7 +206,8 @@ def load_settings(project_path: str | Path) -> Settings:
     toml_config_path = project_path / "golf.toml"
     if toml_config_path.exists():
         console.print(
-            "[yellow]Warning: Using .toml configuration is deprecated. Please migrate to .json format.[/yellow]"
+            "[yellow]Warning: Using .toml configuration is deprecated. Please "
+            "migrate to .json format.[/yellow]"
         )
         return _load_toml_settings(toml_config_path, settings)
 
