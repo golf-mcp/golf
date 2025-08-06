@@ -78,7 +78,9 @@ class Settings(BaseSettings):
     # OpenTelemetry config
     opentelemetry_enabled: bool = Field(False, description="Enable OpenTelemetry tracing")
     opentelemetry_default_exporter: str = Field("console", description="Default OpenTelemetry exporter type")
-    detailed_tracing: bool = Field(False, description="Enable detailed tracing with input/output capture (may contain sensitive data)")
+    detailed_tracing: bool = Field(
+        False, description="Enable detailed tracing with input/output capture (may contain sensitive data)"
+    )
 
     # Health check configuration
     health_check_enabled: bool = Field(False, description="Enable health check endpoint")
@@ -169,9 +171,10 @@ def load_settings(project_path: str | Path) -> Settings:
     env_file = project_path / ".env"
     if env_file.exists():
         settings = Settings(_env_file=env_file)
-        
+
         # Auto-enable OpenTelemetry if GOLF_API_KEY is present (from .env file)
         import os
+
         if os.environ.get("GOLF_API_KEY"):
             settings.opentelemetry_enabled = True
 
@@ -183,9 +186,10 @@ def load_settings(project_path: str | Path) -> Settings:
     # No config file found, use defaults
     # Auto-enable OpenTelemetry if GOLF_API_KEY is present
     import os
+
     if os.environ.get("GOLF_API_KEY"):
         settings.opentelemetry_enabled = True
-    
+
     return settings
 
 
@@ -204,6 +208,7 @@ def _load_json_settings(path: Path, settings: Settings) -> Settings:
 
         # Auto-enable OpenTelemetry if GOLF_API_KEY is present and telemetry wasn't explicitly configured
         import os
+
         if os.environ.get("GOLF_API_KEY") and "opentelemetry_enabled" not in config_data:
             settings.opentelemetry_enabled = True
 

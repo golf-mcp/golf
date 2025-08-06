@@ -1376,7 +1376,7 @@ export = simple_tool
         # Verify modern features are included
         assert "mcp.run(" in server_content  # Uses mcp.run() instead of uvicorn
         assert "stateless_http=True" in server_content  # Stateless HTTP support
-        assert 'logging.getLogger("fastmcp").setLevel(logging.WARNING)' in server_content  # Log suppression
+        assert 'logging.getLogger("FastMCP").setLevel(logging.ERROR)' in server_content  # Log suppression
 
 
 class TestTelemetryIntegration:

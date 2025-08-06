@@ -171,7 +171,6 @@ def _copy_template(source_dir: Path, target_dir: Path, project_name: str) -> Non
             # Binary file, just copy
             shutil.copy2(source_path, target_path)
 
-
     # Create a .gitignore if it doesn't exist
     gitignore_file = target_dir / ".gitignore"
     if not gitignore_file.exists():

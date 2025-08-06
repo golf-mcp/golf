@@ -36,7 +36,7 @@ def _safe_serialize(data: Any, max_length: int = 1000) -> str | None:
             serialized = data
         else:
             serialized = json.dumps(data, default=str, ensure_ascii=False)
-        
+
         if len(serialized) > max_length:
             return serialized[:max_length] + "..." + f" (truncated from {len(serialized)} chars)"
         return serialized
@@ -84,7 +84,6 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
                 os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"{existing_headers},{golf_header}"
         else:
             os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = golf_header
-
 
     # Check for required environment variables based on exporter type
     exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "console").lower()
@@ -223,7 +222,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Add minimal execution context
             if args or kwargs:
                 span.set_attribute("mcp.execution.has_params", True)
-            
+
             # Capture inputs if detailed tracing is enabled
             if _detailed_tracing_enabled and (args or kwargs):
                 input_data = {"args": args, "kwargs": kwargs} if args or kwargs else None
@@ -278,12 +277,12 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 # Capture result metadata
                 if result is not None:
                     span.set_attribute("mcp.tool.result.type", type(result).__name__)
-                    
+
                     if isinstance(result, (list, dict)) and hasattr(result, "__len__"):
                         span.set_attribute("mcp.tool.result.size", len(result))
                     elif isinstance(result, str):
                         span.set_attribute("mcp.tool.result.length", len(result))
-                    
+
                     # Capture full output if detailed tracing is enabled
                     if _detailed_tracing_enabled:
                         output_str = _safe_serialize(result)
@@ -388,12 +387,12 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 # Capture result metadata
                 if result is not None:
                     span.set_attribute("mcp.tool.result.type", type(result).__name__)
-                    
+
                     if isinstance(result, (list, dict)) and hasattr(result, "__len__"):
                         span.set_attribute("mcp.tool.result.size", len(result))
                     elif isinstance(result, str):
                         span.set_attribute("mcp.tool.result.length", len(result))
-                    
+
                     # Capture full output if detailed tracing is enabled
                     if _detailed_tracing_enabled:
                         output_str = _safe_serialize(result)
@@ -453,7 +452,7 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
         # Create a more descriptive span name
         span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
-            # Add essential attributes only  
+            # Add essential attributes only
             span.set_attribute("mcp.component.type", "resource")
             span.set_attribute("mcp.resource.uri", resource_uri)
             span.set_attribute("mcp.resource.is_template", is_template)
@@ -533,7 +532,7 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
         # Create a more descriptive span name
         span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
-            # Add essential attributes only  
+            # Add essential attributes only
             span.set_attribute("mcp.component.type", "resource")
             span.set_attribute("mcp.resource.uri", resource_uri)
             span.set_attribute("mcp.resource.is_template", is_template)
