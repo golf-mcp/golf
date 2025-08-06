@@ -9,7 +9,6 @@ from typing import Any
 
 import black
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from golf.auth import get_auth_config, is_auth_configured
 from golf.auth.api_key import get_api_key_config
@@ -18,6 +17,7 @@ from golf.core.builder_telemetry import (
     generate_telemetry_imports,
     get_otel_dependencies,
 )
+from golf.cli.branding import create_build_header, get_status_text, STATUS_ICONS, GOLF_GREEN, GOLF_BLUE, GOLF_ORANGE
 from golf.core.config import Settings
 from golf.core.parser import (
     ComponentType,
@@ -324,22 +324,16 @@ class CodeGenerator:
             self._create_directory_structure()
 
         # Generate code for all components
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold green]Generating {task.description}"),
-            console=console,
-        ) as progress:
-            tasks = [
-                ("tools", self._generate_tools),
-                ("resources", self._generate_resources),
-                ("prompts", self._generate_prompts),
-                ("server entry point", self._generate_server),
-            ]
+        tasks = [
+            ("Generating tools", self._generate_tools),
+            ("Generating resources", self._generate_resources),
+            ("Generating prompts", self._generate_prompts),
+            ("Generating server entry point", self._generate_server),
+        ]
 
-            for description, func in tasks:
-                task = progress.add_task(description, total=1)
-                func()
-                progress.update(task, completed=1)
+        for description, func in tasks:
+            console.print(get_status_text("generating", description))
+            func()
 
         # Get relative path for display
         try:
@@ -350,7 +344,8 @@ class CodeGenerator:
             output_dir_display = self.output_dir
 
         # Show success message with output directory
-        console.print(f"[bold green]✓[/bold green] Build completed successfully in [bold]{output_dir_display}[/bold]")
+        console.print()
+        console.print(get_status_text("success", f"Build completed successfully in {output_dir_display}"))
 
     def _create_directory_structure(self) -> None:
         """Create the output directory structure"""
@@ -1209,7 +1204,7 @@ def build_project(
     # --- END Enhanced .env handling ---
 
     # Show what we're building, with environment info
-    console.print(f"[bold]Building [green]{settings.name}[/green] ({build_env} environment)[/bold]")
+    create_build_header(settings.name, build_env, console)
 
     # Generate the code
     generator = CodeGenerator(project_path, settings, output_dir, build_env=build_env, copy_env=copy_env)
@@ -1217,30 +1212,31 @@ def build_project(
 
     # Platform registration (only for prod builds)
     if build_env == "prod":
-        console.print("[dim]Registering with Golf platform and updating resources...[/dim]")
-        import asyncio
+        console.print()
+        with console.status(f"[{GOLF_BLUE}]{STATUS_ICONS['platform']} Registering with Golf platform and updating resources...[/{GOLF_BLUE}]"):
+            import asyncio
 
-        try:
-            from golf.core.platform import register_project_with_platform
+            try:
+                from golf.core.platform import register_project_with_platform
 
-            success = asyncio.run(
-                register_project_with_platform(
-                    project_path=project_path,
-                    settings=settings,
-                    components=generator.components,
+                success = asyncio.run(
+                    register_project_with_platform(
+                        project_path=project_path,
+                        settings=settings,
+                        components=generator.components,
+                    )
                 )
-            )
 
-            if success:
-                console.print("[green]✓ Platform registration completed[/green]")
-            # If success is False, the platform module already printed appropriate warnings
-        except ImportError:
-            console.print("[yellow]Warning: Platform registration module not available[/yellow]")
-        except Exception as e:
-            console.print(f"[yellow]Warning: Platform registration failed: {e}[/yellow]")
-            console.print(
-                "[yellow]Tip: Ensure GOLF_API_KEY and GOLF_SERVER_ID are available in your .env file[/yellow]"
-            )
+                if success:
+                    console.print(get_status_text("success", "Platform registration completed"))
+                # If success is False, the platform module already printed appropriate warnings
+            except ImportError:
+                console.print(get_status_text("warning", "Platform registration module not available"))
+            except Exception as e:
+                console.print(get_status_text("warning", f"Platform registration failed: {e}"))
+                console.print(
+                    f"[dim]Tip: Ensure GOLF_API_KEY and GOLF_SERVER_ID are available in your .env file[/dim]"
+                )
 
     # Create a simple README
     readme_content = f"""# {settings.name}
