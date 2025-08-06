@@ -6,7 +6,11 @@ import sys
 from pathlib import Path
 
 from rich.console import Console
+from rich.panel import Panel
+from rich.align import Align
+from rich.text import Text
 
+from golf.cli.branding import create_command_header, get_status_text, STATUS_ICONS, GOLF_BLUE, GOLF_GREEN, GOLF_ORANGE
 from golf.core.config import Settings
 
 console = Console()
@@ -39,8 +43,32 @@ def run_server(
     # Check if server file exists
     server_path = dist_dir / "server.py"
     if not server_path.exists():
-        console.print(f"[bold red]Error: Server file {server_path} not found.[/bold red]")
+        console.print(get_status_text("error", f"Server file {server_path} not found"))
         return 1
+
+    # Display server startup header
+    create_command_header("Starting Server", f"{settings.name}", console)
+    
+    # Show server info with flashy styling
+    server_host = host or settings.host or "127.0.0.1"
+    server_port = port or settings.port or 3000
+    
+    server_content = Text()
+    server_content.append("🚀 ", style=f"bold {GOLF_ORANGE}")
+    server_content.append(f"{STATUS_ICONS['server']} Server starting on ", style=f"bold {GOLF_BLUE}")
+    server_content.append(f"http://{server_host}:{server_port}", style=f"bold {GOLF_GREEN}")
+    server_content.append(" 🚀", style=f"bold {GOLF_ORANGE}")
+    server_content.append("\n")
+    server_content.append("⚡ Press Ctrl+C to stop ⚡", style=f"dim {GOLF_ORANGE}")
+    
+    console.print(Panel(
+        Align.center(server_content),
+        border_style=GOLF_BLUE,
+        padding=(1, 2),
+        title="[bold]🌐 SERVER READY 🌐[/bold]",
+        title_align="center"
+    ))
+    console.print()
 
     # Prepare environment variables
     env = os.environ.copy()
@@ -64,23 +92,26 @@ def run_server(
         )
 
         # Provide more context about the exit
+        console.print()
         if process.returncode == 0:
-            console.print("[green]Server stopped successfully[/green]")
+            console.print(get_status_text("success", "Server stopped successfully"))
         elif process.returncode == 130:
-            console.print("[yellow]Server stopped by user interrupt (Ctrl+C)[/yellow]")
+            console.print(get_status_text("info", "Server stopped by user interrupt (Ctrl+C)"))
         elif process.returncode == 143:
-            console.print("[yellow]Server stopped by SIGTERM (graceful shutdown)[/yellow]")
+            console.print(get_status_text("info", "Server stopped by SIGTERM (graceful shutdown)"))
         elif process.returncode == 137:
-            console.print("[yellow]Server stopped by SIGKILL (forced shutdown)[/yellow]")
+            console.print(get_status_text("warning", "Server stopped by SIGKILL (forced shutdown)"))
         elif process.returncode in [1, 2]:
-            console.print(f"[red]Server exited with error code {process.returncode}[/red]")
+            console.print(get_status_text("error", f"Server exited with error code {process.returncode}"))
         else:
-            console.print(f"[orange]Server exited with code {process.returncode}[/orange]")
+            console.print(get_status_text("warning", f"Server exited with code {process.returncode}"))
 
         return process.returncode
     except KeyboardInterrupt:
-        console.print("\n[yellow]Server stopped by user (Ctrl+C)[/yellow]")
+        console.print()
+        console.print(get_status_text("info", "Server stopped by user (Ctrl+C)"))
         return 130  # Standard exit code for SIGINT
     except Exception as e:
-        console.print(f"\n[bold red]Error running server:[/bold red] {e}")
+        console.print()
+        console.print(get_status_text("error", f"Error running server: {e}"))
         return 1
