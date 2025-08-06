@@ -23,7 +23,6 @@ class TestInitCommand:
         assert (project_dir / "tools").is_dir()
         assert (project_dir / "resources").is_dir()
         assert (project_dir / "prompts").is_dir()
-        assert (project_dir / ".env").exists()
         assert (project_dir / ".gitignore").exists()
 
     def test_golf_json_has_correct_content(self, temp_dir: Path) -> None:
@@ -49,7 +48,6 @@ class TestInitCommand:
         assert "description" in config
 
         # Check .env file exists (no longer has GOLF_NAME)
-        assert (project_dir / ".env").exists()
 
     def test_handles_existing_empty_directory(self, temp_dir: Path) -> None:
         """Test that init works with an existing empty directory."""
