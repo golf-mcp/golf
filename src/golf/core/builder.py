@@ -838,8 +838,9 @@ class CodeGenerator:
             early_telemetry_init.extend(
                 [
                     "# Initialize telemetry early to ensure instrumentation works",
-                    "from golf.telemetry.instrumentation import init_telemetry",
+                    "from golf.telemetry.instrumentation import init_telemetry, set_detailed_tracing",
                     f'init_telemetry("{self.settings.name}")',
+                    f"set_detailed_tracing({self.settings.detailed_tracing})",
                     "",
                 ]
             )
