@@ -185,20 +185,17 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
         # start_as_current_span automatically uses the current context and manages it
         with tracer.start_as_current_span(span_name) as span:
-            # Add comprehensive attributes
+            # Add essential attributes only
             span.set_attribute("mcp.component.type", "tool")
-            span.set_attribute("mcp.component.name", tool_name)
             span.set_attribute("mcp.tool.name", tool_name)
-            span.set_attribute("mcp.tool.function", func.__name__)
             span.set_attribute(
                 "mcp.tool.module",
                 func.__module__ if hasattr(func, "__module__") else "unknown",
             )
 
-            # Add execution context
-            span.set_attribute("mcp.execution.args_count", len(args))
-            span.set_attribute("mcp.execution.kwargs_count", len(kwargs))
-            span.set_attribute("mcp.execution.async", True)
+            # Add minimal execution context
+            if args or kwargs:
+                span.set_attribute("mcp.execution.has_params", True)
 
             # Extract Context parameter if present
             ctx = kwargs.get("ctx")
@@ -306,11 +303,9 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
         # start_as_current_span automatically uses the current context and manages it
         with tracer.start_as_current_span(span_name) as span:
-            # Add comprehensive attributes
+            # Add essential attributes only
             span.set_attribute("mcp.component.type", "tool")
-            span.set_attribute("mcp.component.name", tool_name)
             span.set_attribute("mcp.tool.name", tool_name)
-            span.set_attribute("mcp.tool.function", func.__name__)
             span.set_attribute(
                 "mcp.tool.module",
                 func.__module__ if hasattr(func, "__module__") else "unknown",
@@ -319,7 +314,6 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Add execution context
             span.set_attribute("mcp.execution.args_count", len(args))
             span.set_attribute("mcp.execution.kwargs_count", len(kwargs))
-            span.set_attribute("mcp.execution.async", False)
 
             # Extract Context parameter if present
             ctx = kwargs.get("ctx")
@@ -440,17 +434,14 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
         # Create a more descriptive span name
         span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
-            # Add comprehensive attributes
+            # Add essential attributes only  
             span.set_attribute("mcp.component.type", "resource")
-            span.set_attribute("mcp.component.name", resource_uri)
             span.set_attribute("mcp.resource.uri", resource_uri)
             span.set_attribute("mcp.resource.is_template", is_template)
-            span.set_attribute("mcp.resource.function", func.__name__)
             span.set_attribute(
                 "mcp.resource.module",
                 func.__module__ if hasattr(func, "__module__") else "unknown",
             )
-            span.set_attribute("mcp.execution.async", True)
 
             # Extract Context parameter if present
             ctx = kwargs.get("ctx")
@@ -523,17 +514,14 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
         # Create a more descriptive span name
         span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
-            # Add comprehensive attributes
+            # Add essential attributes only  
             span.set_attribute("mcp.component.type", "resource")
-            span.set_attribute("mcp.component.name", resource_uri)
             span.set_attribute("mcp.resource.uri", resource_uri)
             span.set_attribute("mcp.resource.is_template", is_template)
-            span.set_attribute("mcp.resource.function", func.__name__)
             span.set_attribute(
                 "mcp.resource.module",
                 func.__module__ if hasattr(func, "__module__") else "unknown",
             )
-            span.set_attribute("mcp.execution.async", False)
 
             # Extract Context parameter if present
             ctx = kwargs.get("ctx")
@@ -622,16 +610,13 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
         # Create a more descriptive span name
         span_name = f"mcp.prompt.{prompt_name}.generate"
         with tracer.start_as_current_span(span_name) as span:
-            # Add comprehensive attributes
+            # Add essential attributes only
             span.set_attribute("mcp.component.type", "prompt")
-            span.set_attribute("mcp.component.name", prompt_name)
             span.set_attribute("mcp.prompt.name", prompt_name)
-            span.set_attribute("mcp.prompt.function", func.__name__)
             span.set_attribute(
                 "mcp.prompt.module",
                 func.__module__ if hasattr(func, "__module__") else "unknown",
             )
-            span.set_attribute("mcp.execution.async", True)
 
             # Extract Context parameter if present
             ctx = kwargs.get("ctx")
@@ -712,16 +697,13 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
         # Create a more descriptive span name
         span_name = f"mcp.prompt.{prompt_name}.generate"
         with tracer.start_as_current_span(span_name) as span:
-            # Add comprehensive attributes
+            # Add essential attributes only
             span.set_attribute("mcp.component.type", "prompt")
-            span.set_attribute("mcp.component.name", prompt_name)
             span.set_attribute("mcp.prompt.name", prompt_name)
-            span.set_attribute("mcp.prompt.function", func.__name__)
             span.set_attribute(
                 "mcp.prompt.module",
                 func.__module__ if hasattr(func, "__module__") else "unknown",
             )
-            span.set_attribute("mcp.execution.async", False)
 
             # Extract Context parameter if present
             ctx = kwargs.get("ctx")
@@ -907,13 +889,10 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
 
         tracer = get_tracer()
         with tracer.start_as_current_span(span_name) as span:
-            # Add comprehensive HTTP attributes
+            # Add essential HTTP attributes
             span.set_attribute("http.method", method)
-            span.set_attribute("http.url", str(request.url))
-            span.set_attribute("http.scheme", request.url.scheme)
-            span.set_attribute("http.host", request.url.hostname or "unknown")
             span.set_attribute("http.target", path)
-            span.set_attribute("http.user_agent", request.headers.get("user-agent", "unknown"))
+            span.set_attribute("http.host", request.url.hostname or "unknown")
 
             # Add session tracking
             if session_id:
@@ -943,7 +922,6 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
 
                 # Add response attributes
                 span.set_attribute("http.status_code", response.status_code)
-                span.set_attribute("http.status_class", f"{response.status_code // 100}xx")
 
                 # Set span status based on HTTP status
                 if response.status_code >= 400:
