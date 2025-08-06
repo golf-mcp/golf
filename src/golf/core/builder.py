@@ -17,7 +17,7 @@ from golf.core.builder_telemetry import (
     generate_telemetry_imports,
     get_otel_dependencies,
 )
-from golf.cli.branding import create_build_header, get_status_text, STATUS_ICONS, GOLF_GREEN, GOLF_BLUE, GOLF_ORANGE
+from golf.cli.branding import create_build_header, get_status_text, STATUS_ICONS, GOLF_BLUE
 from golf.core.config import Settings
 from golf.core.parser import (
     ComponentType,
@@ -1213,7 +1213,8 @@ def build_project(
     # Platform registration (only for prod builds)
     if build_env == "prod":
         console.print()
-        with console.status(f"[{GOLF_BLUE}]{STATUS_ICONS['platform']} Registering with Golf platform and updating resources...[/{GOLF_BLUE}]"):
+        status_msg = f"[{GOLF_BLUE}]{STATUS_ICONS['platform']} Registering with Golf platform and updating resources...[/{GOLF_BLUE}]"
+        with console.status(status_msg):
             import asyncio
 
             try:
@@ -1234,9 +1235,7 @@ def build_project(
                 console.print(get_status_text("warning", "Platform registration module not available"))
             except Exception as e:
                 console.print(get_status_text("warning", f"Platform registration failed: {e}"))
-                console.print(
-                    f"[dim]Tip: Ensure GOLF_API_KEY and GOLF_SERVER_ID are available in your .env file[/dim]"
-                )
+                console.print("[dim]Tip: Ensure GOLF_API_KEY and GOLF_SERVER_ID are available in your .env file[/dim]")
 
     # Create a simple README
     readme_content = f"""# {settings.name}

@@ -6,10 +6,9 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 
 from golf import __version__
-from golf.cli.branding import create_welcome_banner, create_command_header, create_success_message
+from golf.cli.branding import create_welcome_banner, create_command_header
 from golf.core.config import find_project_root, load_settings
 from golf.core.telemetry import (
     is_telemetry_enabled,
@@ -94,7 +93,7 @@ def init(
     create_welcome_banner(__version__, console)
     console.print()
     create_command_header("Initialize Project", f"Creating {project_name} with {template} template", console)
-    
+
     # Import here to avoid circular imports
     from golf.commands.init import initialize_project
 
@@ -370,7 +369,7 @@ def telemetry(
 if __name__ == "__main__":
     # Show welcome banner when run directly
     create_welcome_banner(__version__, console)
-    
+
     # Add telemetry notice if enabled
     if is_telemetry_enabled():
         console.print(

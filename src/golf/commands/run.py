@@ -48,11 +48,11 @@ def run_server(
 
     # Display server startup header
     create_command_header("Starting Server", f"{settings.name}", console)
-    
+
     # Show server info with flashy styling
     server_host = host or settings.host or "127.0.0.1"
     server_port = port or settings.port or 3000
-    
+
     server_content = Text()
     server_content.append("🚀 ", style=f"bold {GOLF_ORANGE}")
     server_content.append(f"{STATUS_ICONS['server']} Server starting on ", style=f"bold {GOLF_BLUE}")
@@ -60,14 +60,16 @@ def run_server(
     server_content.append(" 🚀", style=f"bold {GOLF_ORANGE}")
     server_content.append("\n")
     server_content.append("⚡ Press Ctrl+C to stop ⚡", style=f"dim {GOLF_ORANGE}")
-    
-    console.print(Panel(
-        Align.center(server_content),
-        border_style=GOLF_BLUE,
-        padding=(1, 2),
-        title="[bold]🌐 SERVER READY 🌐[/bold]",
-        title_align="center"
-    ))
+
+    console.print(
+        Panel(
+            Align.center(server_content),
+            border_style=GOLF_BLUE,
+            padding=(1, 2),
+            title="[bold]🌐 SERVER READY 🌐[/bold]",
+            title_align="center",
+        )
+    )
     console.print()
 
     # Prepare environment variables

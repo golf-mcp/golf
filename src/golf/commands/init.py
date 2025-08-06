@@ -7,7 +7,12 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 
-from golf.cli.branding import create_success_message, create_info_panel, get_status_text, STATUS_ICONS, GOLF_BLUE, GOLF_ORANGE
+from golf.cli.branding import (
+    create_success_message,
+    create_info_panel,
+    STATUS_ICONS,
+    GOLF_ORANGE,
+)
 
 from golf.core.telemetry import (
     track_command,
@@ -90,7 +95,9 @@ def initialize_project(
         # Copy template files
         with Progress(
             SpinnerColumn(),
-            TextColumn(f"[bold {GOLF_ORANGE}]{STATUS_ICONS['building']} Creating project structure...[/bold {GOLF_ORANGE}]"),
+            TextColumn(
+                f"[bold {GOLF_ORANGE}]{STATUS_ICONS['building']} Creating project structure...[/bold {GOLF_ORANGE}]"
+            ),
             transient=True,
         ) as progress:
             progress.add_task("copying", total=None)
@@ -104,7 +111,7 @@ def initialize_project(
         # Show success message
         console.print()
         create_success_message("Project initialized successfully!", console)
-        
+
         # Show next steps
         next_steps = f"cd {output_dir.name}\ngolf build dev\ngolf run"
         create_info_panel("Next Steps", next_steps, console)
