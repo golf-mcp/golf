@@ -4,16 +4,13 @@ from datetime import datetime
 from typing import Any
 
 # The URI that clients will use to access this resource
-resource_uri = "system://time/{format}"
+resource_uri = "system://time"
 
 
-async def current_time(format: str = "full") -> dict[str, Any]:
+async def current_time() -> dict[str, Any]:
     """Provide the current time in various formats.
 
-    This is a simple resource example that accepts a format parameter.
-
-    Args:
-        format: The format to return ('full', 'iso', 'unix' or 'rfc')
+    This is a simple resource example that returns time in all formats.
     """
     now = datetime.now()
 
@@ -29,13 +26,8 @@ async def current_time(format: str = "full") -> dict[str, Any]:
         },
     }
 
-    # Return specific format or all formats
-    if format == "full":
-        return all_formats
-    elif format in all_formats:
-        return {format: all_formats[format]}
-    else:
-        return {"error": f"Unknown format: {format}"}
+    # Return all formats
+    return all_formats
 
 
 # Designate the entry point function
