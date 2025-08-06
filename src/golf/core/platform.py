@@ -83,17 +83,11 @@ async def register_project_with_platform(
         return False
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 401:
-            console.print(
-                "[yellow]Warning: Platform registration failed - invalid API key[/yellow]"
-            )
+            console.print("[yellow]Warning: Platform registration failed - invalid API key[/yellow]")
         elif e.response.status_code == 403:
-            console.print(
-                "[yellow]Warning: Platform registration failed - access denied[/yellow]"
-            )
+            console.print("[yellow]Warning: Platform registration failed - access denied[/yellow]")
         else:
-            console.print(
-                f"[yellow]Warning: Platform registration failed - HTTP {e.response.status_code}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Platform registration failed - HTTP {e.response.status_code}[/yellow]")
         return False
     except Exception as e:
         console.print(f"[yellow]Warning: Platform registration failed: {e}[/yellow]")

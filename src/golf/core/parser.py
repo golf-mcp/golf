@@ -58,9 +58,7 @@ class AstParser:
 
         for file_path in directory.glob("**/*.py"):
             # Skip __pycache__ and other hidden directories
-            if "__pycache__" in file_path.parts or any(
-                part.startswith(".") for part in file_path.parts
-            ):
+            if "__pycache__" in file_path.parts or any(part.startswith(".") for part in file_path.parts):
                 continue
 
             try:
@@ -68,9 +66,7 @@ class AstParser:
                 components.extend(file_components)
             except Exception as e:
                 relative_path = file_path.relative_to(self.project_root)
-                console.print(
-                    f"[bold red]Error parsing {relative_path}:[/bold red] {e}"
-                )
+                console.print(f"[bold red]Error parsing {relative_path}:[/bold red] {e}")
 
         return components
 
@@ -123,10 +119,9 @@ class AstParser:
         for node in tree.body:
             if isinstance(node, ast.Assign):
                 for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == "export":
-                        if isinstance(node.value, ast.Name):
-                            export_target = node.value.id
-                            break
+                    if isinstance(target, ast.Name) and target.id == "export" and isinstance(node.value, ast.Name):
+                        export_target = node.value.id
+                        break
 
         # Find all top-level functions
         functions = []
@@ -145,9 +140,7 @@ class AstParser:
 
         # If we have an export but didn't find the target function, warn
         if export_target and not entry_function:
-            console.print(
-                f"[yellow]Warning: Export target '{export_target}' not found in {file_path}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Export target '{export_target}' not found in {file_path}[/yellow]")
 
         # Use the export target function if found, otherwise fall back to run
         entry_function = entry_function or run_function
@@ -163,8 +156,7 @@ class AstParser:
             file_path=file_path,
             module_path=file_path.relative_to(self.project_root).as_posix(),
             docstring=module_docstring,
-            entry_function=export_target
-            or "run",  # Store the name of the entry function
+            entry_function=export_target or "run",  # Store the name of the entry function
         )
 
         # Process the entry function
@@ -183,9 +175,7 @@ class AstParser:
 
         # Set parent module if it's in a nested structure
         if len(rel_path.parts) > 2:  # More than just "tools/file.py"
-            parent_parts = rel_path.parts[
-                1:-1
-            ]  # Skip the root category and the file itself
+            parent_parts = rel_path.parts[1:-1]  # Skip the root category and the file itself
             if parent_parts:
                 component.parent_module = ".".join(parent_parts)
 
@@ -201,9 +191,7 @@ class AstParser:
         """Process the entry function to extract parameters and return type."""
         # Check for return annotation - STRICT requirement
         if func_node.returns is None:
-            raise ValueError(
-                f"Missing return annotation for {func_node.name} function in {file_path}"
-            )
+            raise ValueError(f"Missing return annotation for {func_node.name} function in {file_path}")
 
         # Extract parameter names for basic info
         parameters = []
@@ -219,15 +207,12 @@ class AstParser:
         try:
             self._extract_schemas_at_runtime(component, file_path)
         except Exception as e:
-            console.print(
-                f"[yellow]Warning: Could not extract schemas from {file_path}: {e}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Could not extract schemas from {file_path}: {e}[/yellow]")
             # Continue without schemas - better than failing the build
 
-    def _extract_schemas_at_runtime(
-        self, component: ParsedComponent, file_path: Path
-    ) -> None:
-        """Extract input/output schemas by importing and inspecting the actual function."""
+    def _extract_schemas_at_runtime(self, component: ParsedComponent, file_path: Path) -> None:
+        """Extract input/output schemas by importing and inspecting the
+        actual function."""
         import importlib.util
         import sys
 
@@ -293,9 +278,7 @@ class AstParser:
                 type_hint = type_hints[param_name]
 
                 # Extract schema for this parameter
-                param_schema = self._extract_param_schema_from_hint(
-                    type_hint, param_name
-                )
+                param_schema = self._extract_param_schema_from_hint(type_hint, param_name)
                 if param_schema:
                     # Clean the schema to remove problematic objects
                     cleaned_schema = self._clean_schema(param_schema)
@@ -314,9 +297,7 @@ class AstParser:
                 }
 
         except Exception as e:
-            console.print(
-                f"[yellow]Warning: Could not extract input schema: {e}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Could not extract input schema: {e}[/yellow]")
 
         return None
 
@@ -339,9 +320,7 @@ class AstParser:
             return self._type_to_schema(return_type)
 
         except Exception as e:
-            console.print(
-                f"[yellow]Warning: Could not extract output schema: {e}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Could not extract output schema: {e}[/yellow]")
 
         return None
 
@@ -353,29 +332,19 @@ class AstParser:
             if hasattr(model_class, "model_fields"):
                 for field_name, field_info in model_class.model_fields.items():
                     # Extract field type
-                    field_type = (
-                        field_info.annotation
-                        if hasattr(field_info, "annotation")
-                        else None
-                    )
+                    field_type = field_info.annotation if hasattr(field_info, "annotation") else None
                     if field_type:
                         field_schema = self._type_to_schema(field_type)
 
                         # Add description if available
-                        if (
-                            hasattr(field_info, "description")
-                            and field_info.description
-                        ):
+                        if hasattr(field_info, "description") and field_info.description:
                             field_schema["description"] = field_info.description
 
                         # Add title
                         field_schema["title"] = field_name.replace("_", " ").title()
 
                         # Add default if available
-                        if (
-                            hasattr(field_info, "default")
-                            and field_info.default is not None
-                        ):
+                        if hasattr(field_info, "default") and field_info.default is not None:
                             try:
                                 # Only add if it's JSON serializable
                                 import json
@@ -388,24 +357,16 @@ class AstParser:
                         schema["properties"][field_name] = field_schema
 
                         # Check if required
-                        if (
-                            hasattr(field_info, "is_required")
-                            and field_info.is_required()
-                        ):
+                        if hasattr(field_info, "is_required") and field_info.is_required():
                             schema["required"].append(field_name)
-                        elif (
-                            not hasattr(field_info, "default")
-                            or field_info.default is None
-                        ):
+                        elif not hasattr(field_info, "default") or field_info.default is None:
                             # Assume required if no default
                             schema["required"].append(field_name)
 
             return schema
 
         except Exception as e:
-            console.print(
-                f"[yellow]Warning: Could not extract Pydantic model schema: {e}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Could not extract Pydantic model schema: {e}[/yellow]")
             return {"type": "object"}
 
     def _clean_schema(self, schema: Any) -> dict[str, Any]:
@@ -455,9 +416,7 @@ class AstParser:
         cleaned = clean_object(schema)
         return cleaned if cleaned else {"type": "object"}
 
-    def _extract_param_schema_from_hint(
-        self, type_hint: Any, param_name: str
-    ) -> dict[str, Any] | None:
+    def _extract_param_schema_from_hint(self, type_hint: Any, param_name: str) -> dict[str, Any] | None:
         """Extract parameter schema from type hint (including Annotated types)."""
         from typing import get_args, get_origin
 
@@ -467,11 +426,7 @@ class AstParser:
             args = get_args(type_hint)
 
             # Check for Annotated[Type, Field(...)]
-            if (
-                hasattr(origin, "__name__")
-                and origin.__name__ == "Annotated"
-                and len(args) >= 2
-            ):
+            if hasattr(origin, "__name__") and origin.__name__ == "Annotated" and len(args) >= 2:
                 base_type = args[0]
                 metadata = args[1:]
 
@@ -577,9 +532,7 @@ class AstParser:
             # Check if it inherits from BaseModel
             for base in input_class.bases:
                 if isinstance(base, ast.Name) and base.id == "BaseModel":
-                    component.input_schema = self._extract_pydantic_schema_from_ast(
-                        input_class
-                    )
+                    component.input_schema = self._extract_pydantic_schema_from_ast(input_class)
                     break
 
         # Process Output class if found
@@ -587,9 +540,7 @@ class AstParser:
             # Check if it inherits from BaseModel
             for base in output_class.bases:
                 if isinstance(base, ast.Name) and base.id == "BaseModel":
-                    component.output_schema = self._extract_pydantic_schema_from_ast(
-                        output_class
-                    )
+                    component.output_schema = self._extract_pydantic_schema_from_ast(output_class)
                     break
 
         # Store annotations if found
@@ -602,24 +553,25 @@ class AstParser:
         for node in tree.body:
             if isinstance(node, ast.Assign):
                 for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == "resource_uri":
-                        if isinstance(node.value, ast.Constant):
-                            uri_template = node.value.value
-                            component.uri_template = uri_template
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == "resource_uri"
+                        and isinstance(node.value, ast.Constant)
+                    ):
+                        uri_template = node.value.value
+                        component.uri_template = uri_template
 
-                            # Extract URI parameters (parts in {})
-                            uri_params = re.findall(r"{([^}]+)}", uri_template)
-                            if uri_params:
-                                component.parameters = uri_params
-                            break
+                        # Extract URI parameters (parts in {})
+                        uri_params = re.findall(r"{([^}]+)}", uri_template)
+                        if uri_params:
+                            component.parameters = uri_params
+                        break
 
     def _process_prompt(self, component: ParsedComponent, tree: ast.Module) -> None:
         """Process a prompt component (no special processing needed)."""
         pass
 
-    def _derive_component_name(
-        self, file_path: Path, component_type: ComponentType
-    ) -> str:
+    def _derive_component_name(self, file_path: Path, component_type: ComponentType) -> str:
         """Derive a component name from its file path according to the spec.
 
         Following the spec: <filename> + ("_" + "_".join(PathRev) if PathRev else "")
@@ -652,9 +604,7 @@ class AstParser:
         else:
             return filename
 
-    def _extract_pydantic_schema_from_ast(
-        self, class_node: ast.ClassDef
-    ) -> dict[str, Any]:
+    def _extract_pydantic_schema_from_ast(self, class_node: ast.ClassDef) -> dict[str, Any]:
         """Extract a JSON schema from an AST class definition.
 
         This is a simplified version that extracts basic field information.
@@ -711,10 +661,7 @@ class AstParser:
                     ):
                         # Field object - extract its parameters
                         for keyword in node.value.keywords:
-                            if (
-                                keyword.arg == "default"
-                                or keyword.arg == "default_factory"
-                            ):
+                            if keyword.arg == "default" or keyword.arg == "default_factory":
                                 if isinstance(keyword.value, ast.Constant):
                                     prop["default"] = keyword.value.value
                             elif keyword.arg == "description":
@@ -724,14 +671,11 @@ class AstParser:
                                 if isinstance(keyword.value, ast.Constant):
                                     prop["title"] = keyword.value.value
 
-                        # Check for position default argument (Field(..., "description"))
+                        # Check for position default argument
+                        # (Field(..., "description"))
                         if node.value.args:
                             for i, arg in enumerate(node.value.args):
-                                if (
-                                    i == 0
-                                    and isinstance(arg, ast.Constant)
-                                    and arg.value != Ellipsis
-                                ):
+                                if i == 0 and isinstance(arg, ast.Constant) and arg.value != Ellipsis:
                                     prop["default"] = arg.value
                                 elif i == 1 and isinstance(arg, ast.Constant):
                                     prop["description"] = arg.value
@@ -749,20 +693,16 @@ class AstParser:
                         and isinstance(node.value.func, ast.Name)
                         and node.value.func.id == "Field"
                     ):
-                        # Field has default if it doesn't use ... or if it has a default keyword
+                        # Field has default if it doesn't use ... or if it has a
+                        # default keyword
                         has_ellipsis = False
                         has_default = False
 
-                        if node.value.args and isinstance(
-                            node.value.args[0], ast.Constant
-                        ):
+                        if node.value.args and isinstance(node.value.args[0], ast.Constant):
                             has_ellipsis = node.value.args[0].value is Ellipsis
 
                         for keyword in node.value.keywords:
-                            if (
-                                keyword.arg == "default"
-                                or keyword.arg == "default_factory"
-                            ):
+                            if keyword.arg == "default" or keyword.arg == "default_factory":
                                 has_default = True
 
                         is_required = has_ellipsis and not has_default
@@ -863,16 +803,12 @@ class AstParser:
                 result[key_str] = value.s
             elif isinstance(value, ast.Num):  # For older Python versions
                 result[key_str] = value.n
-            elif isinstance(
-                value, ast.NameConstant
-            ):  # For older Python versions (True/False/None)
+            elif isinstance(value, ast.NameConstant):  # For older Python versions (True/False/None)
                 result[key_str] = value.value
             elif isinstance(value, ast.Name):
                 # Handle True/False/None as names
                 if value.id in ("True", "False", "None"):
-                    result[key_str] = {"True": True, "False": False, "None": None}[
-                        value.id
-                    ]
+                    result[key_str] = {"True": True, "False": False, "None": None}[value.id]
             # We could add more complex value handling here if needed
 
         return result
@@ -937,9 +873,7 @@ class AstParser:
             type_str = ast.unparse(subscript.slice)
             return {"type": self._type_hint_to_json_type(type_str)}
 
-    def _is_parameter_required(
-        self, position: int, defaults: list, total_args: int
-    ) -> bool:
+    def _is_parameter_required(self, position: int, defaults: list, total_args: int) -> bool:
         """Check if a function parameter is required (has no default value)."""
         if position >= total_args or position < 0:
             return True  # Default to required if position is out of range
@@ -953,12 +887,11 @@ class AstParser:
         args_with_defaults = len(defaults)
         first_default_position = total_args - args_with_defaults
 
-        # If this parameter's position is before the first default position, it's required
+        # If this parameter's position is before the first default position,
+        # it's required
         return position < first_default_position
 
-    def _extract_return_type_schema(
-        self, return_annotation: ast.AST, tree: ast.Module
-    ) -> dict[str, Any] | None:
+    def _extract_return_type_schema(self, return_annotation: ast.AST, tree: ast.Module) -> dict[str, Any] | None:
         """Extract schema from function return type annotation."""
         if isinstance(return_annotation, ast.Name):
             # Simple type like str, int, or a class name
@@ -977,9 +910,7 @@ class AstParser:
             type_str = ast.unparse(return_annotation)
             return {"type": self._type_hint_to_json_type(type_str)}
 
-    def _find_class_schema(
-        self, class_name: str, tree: ast.Module
-    ) -> dict[str, Any] | None:
+    def _find_class_schema(self, class_name: str, tree: ast.Module) -> dict[str, Any] | None:
         """Find a class definition in the module and extract its schema."""
         for node in tree.body:
             if isinstance(node, ast.ClassDef) and node.name == class_name:
@@ -1010,18 +941,14 @@ def parse_project(project_path: Path) -> dict[ComponentType, list[ParsedComponen
         dir_path = project_path / dir_name
         if dir_path.exists() and dir_path.is_dir():
             dir_components = parser.parse_directory(dir_path)
-            components[comp_type].extend(
-                [c for c in dir_components if c.type == comp_type]
-            )
+            components[comp_type].extend([c for c in dir_components if c.type == comp_type])
 
     # Check for ID collisions
     all_ids = []
     for comp_type, comps in components.items():
         for comp in comps:
             if comp.name in all_ids:
-                raise ValueError(
-                    f"ID collision detected: {comp.name} is used by multiple components"
-                )
+                raise ValueError(f"ID collision detected: {comp.name} is used by multiple components")
             all_ids.append(comp.name)
 
     return components
@@ -1047,9 +974,7 @@ def parse_common_files(project_path: Path) -> dict[str, Path]:
         # Find all common.py files (recursively)
         for common_file in base_dir.glob("**/common.py"):
             # Skip files in __pycache__ or other hidden directories
-            if "__pycache__" in common_file.parts or any(
-                part.startswith(".") for part in common_file.parts
-            ):
+            if "__pycache__" in common_file.parts or any(part.startswith(".") for part in common_file.parts):
                 continue
 
             # Get the parent directory as the module path

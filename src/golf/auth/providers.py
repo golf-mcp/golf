@@ -19,36 +19,20 @@ class JWTAuthConfig(BaseModel):
     provider_type: Literal["jwt"] = "jwt"
 
     # JWT verification settings
-    public_key: str | None = Field(
-        None, description="PEM-encoded public key for JWT verification"
-    )
-    jwks_uri: str | None = Field(
-        None, description="URI to fetch JSON Web Key Set for verification"
-    )
+    public_key: str | None = Field(None, description="PEM-encoded public key for JWT verification")
+    jwks_uri: str | None = Field(None, description="URI to fetch JSON Web Key Set for verification")
     issuer: str | None = Field(None, description="Expected JWT issuer claim")
-    audience: str | list[str] | None = Field(
-        None, description="Expected JWT audience claim(s)"
-    )
+    audience: str | list[str] | None = Field(None, description="Expected JWT audience claim(s)")
     algorithm: str = Field("RS256", description="JWT signing algorithm")
 
     # Scope and access control
-    required_scopes: list[str] = Field(
-        default_factory=list, description="Scopes required for all requests"
-    )
+    required_scopes: list[str] = Field(default_factory=list, description="Scopes required for all requests")
 
     # Environment variable names for runtime configuration
-    public_key_env_var: str | None = Field(
-        None, description="Environment variable name for public key"
-    )
-    jwks_uri_env_var: str | None = Field(
-        None, description="Environment variable name for JWKS URI"
-    )
-    issuer_env_var: str | None = Field(
-        None, description="Environment variable name for issuer"
-    )
-    audience_env_var: str | None = Field(
-        None, description="Environment variable name for audience"
-    )
+    public_key_env_var: str | None = Field(None, description="Environment variable name for public key")
+    jwks_uri_env_var: str | None = Field(None, description="Environment variable name for JWKS URI")
+    issuer_env_var: str | None = Field(None, description="Environment variable name for issuer")
+    audience_env_var: str | None = Field(None, description="Environment variable name for audience")
 
 
 class StaticTokenConfig(BaseModel):
@@ -69,9 +53,7 @@ class StaticTokenConfig(BaseModel):
     )
 
     # Scope and access control
-    required_scopes: list[str] = Field(
-        default_factory=list, description="Scopes required for all requests"
-    )
+    required_scopes: list[str] = Field(default_factory=list, description="Scopes required for all requests")
 
 
 class OAuthServerConfig(BaseModel):
@@ -85,36 +67,22 @@ class OAuthServerConfig(BaseModel):
 
     # OAuth server URLs
     base_url: str = Field(..., description="Public URL of this Golf server")
-    issuer_url: str | None = Field(
-        None, description="OAuth issuer URL (defaults to base_url)"
-    )
-    service_documentation_url: str | None = Field(
-        None, description="URL of service documentation"
-    )
+    issuer_url: str | None = Field(None, description="OAuth issuer URL (defaults to base_url)")
+    service_documentation_url: str | None = Field(None, description="URL of service documentation")
 
     # Client registration settings
-    allow_client_registration: bool = Field(
-        True, description="Allow dynamic client registration"
-    )
-    valid_scopes: list[str] = Field(
-        default_factory=list, description="Valid scopes for client registration"
-    )
-    default_scopes: list[str] = Field(
-        default_factory=list, description="Default scopes for new clients"
-    )
+    allow_client_registration: bool = Field(True, description="Allow dynamic client registration")
+    valid_scopes: list[str] = Field(default_factory=list, description="Valid scopes for client registration")
+    default_scopes: list[str] = Field(default_factory=list, description="Default scopes for new clients")
 
     # Token revocation settings
     allow_token_revocation: bool = Field(True, description="Allow token revocation")
 
     # Access control
-    required_scopes: list[str] = Field(
-        default_factory=list, description="Scopes required for all requests"
-    )
+    required_scopes: list[str] = Field(default_factory=list, description="Scopes required for all requests")
 
     # Environment variable names for runtime configuration
-    base_url_env_var: str | None = Field(
-        None, description="Environment variable name for base URL"
-    )
+    base_url_env_var: str | None = Field(None, description="Environment variable name for base URL")
 
 
 class RemoteAuthConfig(BaseModel):

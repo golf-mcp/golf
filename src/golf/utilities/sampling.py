@@ -128,7 +128,8 @@ async def sample_structured(
         async def extract_entities(text: str):
             entities = await sample_structured(
                 f"Extract entities from: {text}",
-                format_instructions="Return as JSON with keys: persons, organizations, locations",
+                format_instructions="Return as JSON with keys: persons, "
+                "organizations, locations",
                 system_prompt="You are an expert at named entity recognition"
             )
             return entities
@@ -152,7 +153,7 @@ async def sample_with_context(
     messages: str | list[str],
     context_data: dict[str, Any],
     system_prompt: str | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> str:
     """Request an LLM completion with additional context data.
 

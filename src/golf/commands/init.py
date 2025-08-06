@@ -46,9 +46,7 @@ def initialize_project(
         # Check if directory exists
         if output_dir.exists():
             if not output_dir.is_dir():
-                console.print(
-                    f"[bold red]Error:[/bold red] '{output_dir}' exists but is not a directory."
-                )
+                console.print(f"[bold red]Error:[/bold red] '{output_dir}' exists but is not a directory.")
                 track_command(
                     "init",
                     success=False,
@@ -78,9 +76,7 @@ def initialize_project(
         template_dir = package_init_file.parent / "examples" / template
 
         if not template_dir.exists():
-            console.print(
-                f"[bold red]Error:[/bold red] Could not find template '{template}'"
-            )
+            console.print(f"[bold red]Error:[/bold red] Could not find template '{template}'")
             track_command(
                 "init",
                 success=False,
@@ -116,12 +112,8 @@ def initialize_project(
         error_type = type(e).__name__
         error_message = str(e)
 
-        console.print(
-            f"[bold red]Error during initialization:[/bold red] {error_message}"
-        )
-        track_command(
-            "init", success=False, error_type=error_type, error_message=error_message
-        )
+        console.print(f"[bold red]Error during initialization:[/bold red] {error_message}")
+        track_command("init", success=False, error_type=error_type, error_message=error_message)
 
         # Re-raise to maintain existing behavior
         raise
@@ -160,9 +152,7 @@ def _copy_template(source_dir: Path, target_dir: Path, project_name: str) -> Non
 
             # Replace template variables
             content = content.replace("{{project_name}}", project_name)
-            content = content.replace(
-                "{{project_name_lowercase}}", project_name.lower()
-            )
+            content = content.replace("{{project_name_lowercase}}", project_name.lower())
 
             with open(target_path, "w", encoding="utf-8") as f:
                 f.write(content)
@@ -219,7 +209,8 @@ def _prompt_for_telemetry_consent() -> None:
     """Prompt user for telemetry consent and save their preference."""
     import os
 
-    # Skip prompt in test mode, when telemetry is explicitly disabled, or if preference already exists
+    # Skip prompt in test mode, when telemetry is explicitly disabled, or if
+    # preference already exists
     if os.environ.get("GOLF_TEST_MODE", "").lower() in ("1", "true", "yes", "on"):
         return
 
@@ -235,9 +226,7 @@ def _prompt_for_telemetry_consent() -> None:
     console.print()
     console.rule("[bold blue]Anonymous usage analytics[/bold blue]", style="blue")
     console.print()
-    console.print(
-        "Golf can collect [bold]anonymous usage analytics[/bold] to help improve the tool."
-    )
+    console.print("Golf can collect [bold]anonymous usage analytics[/bold] to help improve the tool.")
     console.print()
     console.print("[dim]What we collect:[/dim]")
     console.print("  • Command usage (init, build, run)")
@@ -251,14 +240,10 @@ def _prompt_for_telemetry_consent() -> None:
     console.print("  • Personal information")
     console.print("  • IP addresses")
     console.print()
-    console.print(
-        "You can change this anytime by setting GOLF_TELEMETRY=0 in your environment."
-    )
+    console.print("You can change this anytime by setting GOLF_TELEMETRY=0 in your environment.")
     console.print()
 
-    enable_telemetry = Confirm.ask(
-        "[bold]Enable anonymous usage analytics?[/bold]", default=False
-    )
+    enable_telemetry = Confirm.ask("[bold]Enable anonymous usage analytics?[/bold]", default=False)
 
     set_telemetry_enabled(enable_telemetry, persist=True)
 

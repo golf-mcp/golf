@@ -144,11 +144,7 @@ def transform_component(
             continue
 
         # Skip the original docstring
-        if (
-            isinstance(node, ast.Expr)
-            and isinstance(node.value, ast.Constant)
-            and isinstance(node.value.value, str)
-        ):
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
             continue
 
         remaining_nodes.append(node)

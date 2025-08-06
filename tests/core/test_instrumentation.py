@@ -21,9 +21,7 @@ class TestTelemetryInitialization:
     def test_init_telemetry_with_otlp_http_endpoint(self, monkeypatch):
         """Test telemetry initialization with OTLP HTTP exporter."""
         monkeypatch.setenv("OTEL_TRACES_EXPORTER", "otlp_http")
-        monkeypatch.setenv(
-            "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces"
-        )
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces")
         monkeypatch.setenv("OTEL_SERVICE_NAME", "test-service")
 
         with patch("golf.telemetry.instrumentation.trace.set_tracer_provider"):
@@ -63,12 +61,8 @@ class TestTelemetryInitialization:
     def test_init_telemetry_with_headers(self, monkeypatch):
         """Test telemetry initialization with custom headers."""
         monkeypatch.setenv("OTEL_TRACES_EXPORTER", "otlp_http")
-        monkeypatch.setenv(
-            "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces"
-        )
-        monkeypatch.setenv(
-            "OTEL_EXPORTER_OTLP_HEADERS", "x-api-key=secret,x-custom=value"
-        )
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_HEADERS", "x-api-key=secret,x-custom=value")
 
         with patch("golf.telemetry.instrumentation.trace.set_tracer_provider"):
             provider = init_telemetry("test-service")
@@ -88,9 +82,7 @@ class TestToolInstrumentation:
         mock_context_manager.__exit__ = Mock(return_value=None)
         mock_tracer.start_as_current_span.return_value = mock_context_manager
 
-        with patch(
-            "golf.telemetry.instrumentation.get_tracer", return_value=mock_tracer
-        ):
+        with patch("golf.telemetry.instrumentation.get_tracer", return_value=mock_tracer):
             yield mock_tracer, mock_span
 
     def test_instrument_tool_with_telemetry_enabled(self, mock_tracer):
@@ -110,9 +102,7 @@ class TestToolInstrumentation:
             assert result == {"result": "processed test_input with 100"}
 
             # Verify span was created with correct name
-            tracer.start_as_current_span.assert_called_once_with(
-                "mcp.tool.test-tool.execute"
-            )
+            tracer.start_as_current_span.assert_called_once_with("mcp.tool.test-tool.execute")
 
             # Verify span attributes were set
             span.set_attribute.assert_any_call("mcp.component.type", "tool")
@@ -148,9 +138,7 @@ class TestToolInstrumentation:
             result = await instrumented_tool("test")
 
             assert result == "async_result_test"
-            tracer.start_as_current_span.assert_called_once_with(
-                "mcp.tool.async-tool.execute"
-            )
+            tracer.start_as_current_span.assert_called_once_with("mcp.tool.async-tool.execute")
 
     def test_instrument_tool_handles_exceptions(self, mock_tracer):
         """Test tool instrumentation handles exceptions properly."""
@@ -184,9 +172,7 @@ class TestResourceInstrumentation:
         mock_context_manager.__exit__ = Mock(return_value=None)
         mock_tracer.start_as_current_span.return_value = mock_context_manager
 
-        with patch(
-            "golf.telemetry.instrumentation.get_tracer", return_value=mock_tracer
-        ):
+        with patch("golf.telemetry.instrumentation.get_tracer", return_value=mock_tracer):
             yield mock_tracer, mock_span
 
     def test_instrument_static_resource(self, mock_tracer):
@@ -198,15 +184,11 @@ class TestResourceInstrumentation:
             def static_resource() -> str:
                 return "static content"
 
-            instrumented_resource = instrument_resource(
-                static_resource, "file://static.txt"
-            )
+            instrumented_resource = instrument_resource(static_resource, "file://static.txt")
             result = instrumented_resource()
 
             assert result == "static content"
-            tracer.start_as_current_span.assert_called_once_with(
-                "mcp.resource.static.read"
-            )
+            tracer.start_as_current_span.assert_called_once_with("mcp.resource.static.read")
             span.set_attribute.assert_any_call("mcp.component.type", "resource")
             span.set_attribute.assert_any_call("mcp.resource.uri", "file://static.txt")
             span.set_attribute.assert_any_call("mcp.resource.is_template", False)
@@ -220,15 +202,11 @@ class TestResourceInstrumentation:
             def template_resource(file_id: str) -> str:
                 return f"content for {file_id}"
 
-            instrumented_resource = instrument_resource(
-                template_resource, "file://files/{file_id}"
-            )
+            instrumented_resource = instrument_resource(template_resource, "file://files/{file_id}")
             result = instrumented_resource("123")
 
             assert result == "content for 123"
-            tracer.start_as_current_span.assert_called_once_with(
-                "mcp.resource.template.read"
-            )
+            tracer.start_as_current_span.assert_called_once_with("mcp.resource.template.read")
             span.set_attribute.assert_any_call("mcp.resource.is_template", True)
 
     def test_instrument_resource_with_telemetry_disabled(self):
@@ -238,9 +216,7 @@ class TestResourceInstrumentation:
             def sample_resource() -> str:
                 return "resource content"
 
-            instrumented_resource = instrument_resource(
-                sample_resource, "file://test.txt"
-            )
+            instrumented_resource = instrument_resource(sample_resource, "file://test.txt")
             result = instrumented_resource()
 
             assert result == "resource content"
@@ -260,9 +236,7 @@ class TestPromptInstrumentation:
         mock_context_manager.__exit__ = Mock(return_value=None)
         mock_tracer.start_as_current_span.return_value = mock_context_manager
 
-        with patch(
-            "golf.telemetry.instrumentation.get_tracer", return_value=mock_tracer
-        ):
+        with patch("golf.telemetry.instrumentation.get_tracer", return_value=mock_tracer):
             yield mock_tracer, mock_span
 
     def test_instrument_prompt(self, mock_tracer):
@@ -284,9 +258,7 @@ class TestPromptInstrumentation:
             assert result[0]["role"] == "system"
             assert result[1]["content"] == "Hello"
 
-            tracer.start_as_current_span.assert_called_once_with(
-                "mcp.prompt.test-prompt.generate"
-            )
+            tracer.start_as_current_span.assert_called_once_with("mcp.prompt.test-prompt.generate")
             span.set_attribute.assert_any_call("mcp.component.type", "prompt")
             span.set_attribute.assert_any_call("mcp.prompt.name", "test-prompt")
 
@@ -310,22 +282,16 @@ class TestGetTracer:
     def test_get_tracer_with_provider_enabled(self):
         """Test getting tracer when provider is enabled."""
         with patch("golf.telemetry.instrumentation._provider", Mock()):
-            with patch(
-                "golf.telemetry.instrumentation.trace.get_tracer"
-            ) as mock_get_tracer:
+            with patch("golf.telemetry.instrumentation.trace.get_tracer") as mock_get_tracer:
                 tracer = get_tracer()
                 mock_get_tracer.assert_called_once_with("golf.mcp.components", "1.0.0")
 
     def test_get_tracer_with_provider_disabled(self):
         """Test getting tracer when provider is disabled."""
         with patch("golf.telemetry.instrumentation._provider", None):
-            with patch(
-                "golf.telemetry.instrumentation.trace.get_tracer"
-            ) as mock_get_tracer:
+            with patch("golf.telemetry.instrumentation.trace.get_tracer") as mock_get_tracer:
                 tracer = get_tracer()
-                mock_get_tracer.assert_called_once_with(
-                    "golf.mcp.components.noop", "1.0.0"
-                )
+                mock_get_tracer.assert_called_once_with("golf.mcp.components.noop", "1.0.0")
 
 
 class TestIntegrationScenarios:
@@ -373,9 +339,7 @@ class TestIntegrationScenarios:
             os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
             == "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/v1/otel"
         )
-        assert "X-Golf-Key=golf_test_key_123" in os.environ.get(
-            "OTEL_EXPORTER_OTLP_HEADERS", ""
-        )
+        assert "X-Golf-Key=golf_test_key_123" in os.environ.get("OTEL_EXPORTER_OTLP_HEADERS", "")
 
     def test_mixed_component_instrumentation(self):
         """Test instrumenting multiple component types together."""
@@ -395,9 +359,7 @@ class TestIntegrationScenarios:
                     return "prompt"
 
                 instrumented_tool = instrument_tool(tool_func, "test-tool")
-                instrumented_resource = instrument_resource(
-                    resource_func, "test://resource"
-                )
+                instrumented_resource = instrument_resource(resource_func, "test://resource")
                 instrumented_prompt = instrument_prompt(prompt_func, "test-prompt")
 
                 # All should use the same tracer instance

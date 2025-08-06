@@ -19,9 +19,7 @@ class TestPlatformRegistration:
     """Test platform registration functionality."""
 
     @pytest.mark.asyncio
-    async def test_successful_registration(
-        self, sample_project: Path, monkeypatch
-    ) -> None:
+    async def test_successful_registration(self, sample_project: Path, monkeypatch) -> None:
         """Test successful platform registration with API key and server ID."""
         # Set environment variables
         monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
@@ -62,19 +60,14 @@ export = test_function
             components = parse_project(sample_project)
 
             # Test registration
-            result = await register_project_with_platform(
-                sample_project, settings, components
-            )
+            result = await register_project_with_platform(sample_project, settings, components)
 
             assert result is True
 
             # Verify the HTTP request was made correctly
             mock_context.post.assert_called_once()
             call_args = mock_context.post.call_args
-            assert (
-                call_args.args[0]
-                == "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/resources"
-            )
+            assert call_args.args[0] == "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/resources"
 
             # Verify request headers
             headers = call_args.kwargs["headers"]
@@ -91,9 +84,7 @@ export = test_function
             assert "component_counts" in payload
 
     @pytest.mark.asyncio
-    async def test_skips_registration_without_api_key(
-        self, sample_project: Path, monkeypatch
-    ) -> None:
+    async def test_skips_registration_without_api_key(self, sample_project: Path, monkeypatch) -> None:
         """Test that registration is skipped when no API key is provided."""
         # Ensure no API key is set
         monkeypatch.delenv("GOLF_API_KEY", raising=False)
@@ -102,17 +93,13 @@ export = test_function
         settings = load_settings(sample_project)
         components = parse_project(sample_project)
 
-        result = await register_project_with_platform(
-            sample_project, settings, components
-        )
+        result = await register_project_with_platform(sample_project, settings, components)
 
         # Should return True (success) but skip registration
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_skips_registration_without_server_id(
-        self, sample_project: Path, monkeypatch, capsys
-    ) -> None:
+    async def test_skips_registration_without_server_id(self, sample_project: Path, monkeypatch, capsys) -> None:
         """Test that registration is skipped when no server ID is provided."""
         monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         # Ensure no server ID is set
@@ -121,23 +108,17 @@ export = test_function
         settings = load_settings(sample_project)
         components = parse_project(sample_project)
 
-        result = await register_project_with_platform(
-            sample_project, settings, components
-        )
+        result = await register_project_with_platform(sample_project, settings, components)
 
         # Should return True (success) but skip registration
         assert result is True
 
         # Check that warning message was printed (handle multiline output)
         captured = capsys.readouterr()
-        assert "GOLF_SERVER_ID environment variable required" in captured.out.replace(
-            "\n", " "
-        ).replace("  ", " ")
+        assert "GOLF_SERVER_ID environment variable required" in captured.out.replace("\n", " ").replace("  ", " ")
 
     @pytest.mark.asyncio
-    async def test_handles_http_timeout(
-        self, sample_project: Path, monkeypatch, capsys
-    ) -> None:
+    async def test_handles_http_timeout(self, sample_project: Path, monkeypatch, capsys) -> None:
         """Test handling of HTTP timeout errors."""
         monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
@@ -151,18 +132,14 @@ export = test_function
             mock_client.return_value.__aenter__.return_value = mock_context
             mock_context.post.side_effect = httpx.TimeoutException("Request timed out")
 
-            result = await register_project_with_platform(
-                sample_project, settings, components
-            )
+            result = await register_project_with_platform(sample_project, settings, components)
 
         assert result is False
         captured = capsys.readouterr()
         assert "Platform registration timed out" in captured.out
 
     @pytest.mark.asyncio
-    async def test_handles_auth_errors(
-        self, sample_project: Path, monkeypatch, capsys
-    ) -> None:
+    async def test_handles_auth_errors(self, sample_project: Path, monkeypatch, capsys) -> None:
         """Test handling of authentication errors."""
         monkeypatch.setenv("GOLF_API_KEY", "invalid-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
@@ -182,18 +159,14 @@ export = test_function
             mock_client.return_value.__aenter__.return_value = mock_context
             mock_context.post.return_value = mock_response
 
-            result = await register_project_with_platform(
-                sample_project, settings, components
-            )
+            result = await register_project_with_platform(sample_project, settings, components)
 
         assert result is False
         captured = capsys.readouterr()
         assert "invalid API key" in captured.out
 
     @pytest.mark.asyncio
-    async def test_handles_forbidden_errors(
-        self, sample_project: Path, monkeypatch, capsys
-    ) -> None:
+    async def test_handles_forbidden_errors(self, sample_project: Path, monkeypatch, capsys) -> None:
         """Test handling of forbidden access errors."""
         monkeypatch.setenv("GOLF_API_KEY", "valid-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
@@ -213,18 +186,14 @@ export = test_function
             mock_client.return_value.__aenter__.return_value = mock_context
             mock_context.post.return_value = mock_response
 
-            result = await register_project_with_platform(
-                sample_project, settings, components
-            )
+            result = await register_project_with_platform(sample_project, settings, components)
 
         assert result is False
         captured = capsys.readouterr()
         assert "access denied" in captured.out
 
     @pytest.mark.asyncio
-    async def test_handles_server_errors(
-        self, sample_project: Path, monkeypatch, capsys
-    ) -> None:
+    async def test_handles_server_errors(self, sample_project: Path, monkeypatch, capsys) -> None:
         """Test handling of server errors."""
         monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
@@ -244,18 +213,14 @@ export = test_function
             mock_client.return_value.__aenter__.return_value = mock_context
             mock_context.post.return_value = mock_response
 
-            result = await register_project_with_platform(
-                sample_project, settings, components
-            )
+            result = await register_project_with_platform(sample_project, settings, components)
 
         assert result is False
         captured = capsys.readouterr()
         assert "HTTP 500" in captured.out
 
     @pytest.mark.asyncio
-    async def test_handles_network_errors(
-        self, sample_project: Path, monkeypatch, capsys
-    ) -> None:
+    async def test_handles_network_errors(self, sample_project: Path, monkeypatch, capsys) -> None:
         """Test handling of network errors."""
         monkeypatch.setenv("GOLF_API_KEY", "test-api-key")
         monkeypatch.setenv("GOLF_SERVER_ID", "test-server-prod")
@@ -269,9 +234,7 @@ export = test_function
             mock_client.return_value.__aenter__.return_value = mock_context
             mock_context.post.side_effect = httpx.NetworkError("Connection failed")
 
-            result = await register_project_with_platform(
-                sample_project, settings, components
-            )
+            result = await register_project_with_platform(sample_project, settings, components)
 
         assert result is False
         captured = capsys.readouterr()
@@ -410,9 +373,7 @@ class TestComponentListBuilder:
 
         # Check that all file paths are relative
         for comp in component_list:
-            assert not comp["file_path"].startswith(
-                "/"
-            )  # Should be relative, not absolute
+            assert not comp["file_path"].startswith("/")  # Should be relative, not absolute
 
 
 class TestComponentCounts:

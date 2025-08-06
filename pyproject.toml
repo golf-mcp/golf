@@ -114,10 +114,10 @@ mypy = "^1.6.0"
 pytest-cov = "^4.1.0"
 
 [tool.black]
-line-length = 88
+line-length = 120
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]

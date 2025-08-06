@@ -144,14 +144,11 @@ def get_anonymous_id() -> str:
     if id_file.exists():
         try:
             _anonymous_id = id_file.read_text().strip()
-            # Check if ID is in the old format (no hyphen between hash and random component)
+            # Check if ID is in the old format (no hyphen between hash and
+            # random component)
             # Old format: golf-[8 chars hash][8 chars random]
             # New format: golf-[8 chars hash]-[8 chars random]
-            if (
-                _anonymous_id
-                and _anonymous_id.startswith("golf-")
-                and len(_anonymous_id) == 21
-            ):
+            if _anonymous_id and _anonymous_id.startswith("golf-") and len(_anonymous_id) == 21:
                 # This is likely the old format, regenerate
                 _anonymous_id = None
             elif _anonymous_id:
@@ -163,9 +160,7 @@ def get_anonymous_id() -> str:
     # Use only non-identifying system information
 
     # Combine non-identifying factors for uniqueness
-    machine_data = (
-        f"{platform.machine()}-{platform.system()}-{platform.python_version()}"
-    )
+    machine_data = f"{platform.machine()}-{platform.system()}-{platform.python_version()}"
     machine_hash = hashlib.sha256(machine_data.encode()).hexdigest()[:8]
 
     # Add a random component to ensure uniqueness
@@ -264,7 +259,7 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
                 "$set": {
                     "golf_version": __version__,
                     "os": platform.system(),
-                    "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
+                    "python_version": (f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}"),
                 }
             }
 
@@ -284,7 +279,7 @@ def track_event(event_name: str, properties: dict[str, Any] | None = None) -> No
         # Only include minimal, non-identifying properties
         safe_properties = {
             "golf_version": __version__,
-            "python_version": f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}",
+            "python_version": (f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}"),
             "os": platform.system(),
             # Explicitly disable IP tracking and GeoIP enrichment
             "$ip": "0",  # Override IP to prevent collection
@@ -331,7 +326,8 @@ def track_command(
     Args:
         command: The command being executed (e.g., "init", "build", "run")
         success: Whether the command was successful
-        error_type: Type of error if command failed (e.g., "ValueError", "FileNotFoundError")
+        error_type: Type of error if command failed (e.g., "ValueError",
+            "FileNotFoundError")
         error_message: Sanitized error message (no sensitive data)
     """
     properties = {"success": success}
@@ -409,9 +405,7 @@ def track_detailed_error(
 
     # Add system context for debugging
     try:
-        properties["python_executable"] = _sanitize_error_message(
-            platform.python_implementation()
-        )
+        properties["python_executable"] = _sanitize_error_message(platform.python_implementation())
         properties["platform_detail"] = platform.platform()[:50]  # Limit length
     except Exception:
         pass
@@ -459,9 +453,7 @@ def _sanitize_error_message(message: str) -> str:
     message = re.sub(r"Bearer\s+[a-zA-Z0-9_.-]+", "Bearer [REDACTED]", message)
 
     # Remove email addresses
-    message = re.sub(
-        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL]", message
-    )
+    message = re.sub(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL]", message)
 
     # Remove IP addresses
     message = re.sub(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", "[IP]", message)

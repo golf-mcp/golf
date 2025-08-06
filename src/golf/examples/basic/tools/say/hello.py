@@ -13,9 +13,7 @@ class Output(BaseModel):
 
 
 async def hello(
-    name: Annotated[
-        str, Field(description="The name of the person to greet")
-    ] = "World",
+    name: Annotated[str, Field(description="The name of the person to greet")] = "World",
     greeting: Annotated[str, Field(description="The greeting phrase to use")] = "Hello",
     personalized: Annotated[
         bool,
@@ -49,9 +47,7 @@ async def hello(
             )
 
             # Create personalized message
-            personalized_message = (
-                f"{greeting}, {name}! Hope you're having a {mood} day!"
-            )
+            personalized_message = f"{greeting}, {name}! Hope you're having a {mood} day!"
 
             return Output(message=personalized_message)
 

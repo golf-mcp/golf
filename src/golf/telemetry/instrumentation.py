@@ -37,7 +37,8 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
     # Check for Golf platform integration first
     golf_api_key = os.environ.get("GOLF_API_KEY")
     if golf_api_key:
-        # Auto-configure for Golf platform - always use OTLP when Golf API key is present
+        # Auto-configure for Golf platform - always use OTLP when Golf API
+        # key is present
         os.environ["OTEL_TRACES_EXPORTER"] = "otlp_http"
 
         # Only set endpoint if not already configured (allow user override)
@@ -53,9 +54,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         if existing_headers:
             # Check if Golf key is already in headers
             if "X-Golf-Key=" not in existing_headers:
-                os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = (
-                    f"{existing_headers},{golf_header}"
-                )
+                os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"{existing_headers},{golf_header}"
         else:
             os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = golf_header
 
@@ -96,9 +95,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
     # Configure exporter based on type
     try:
         if exporter_type == "otlp_http":
-            endpoint = os.environ.get(
-                "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces"
-            )
+            endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces")
             headers = os.environ.get("OTEL_EXPORTER_OTLP_HEADERS", "")
 
             # Parse headers if provided
@@ -109,9 +106,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
                         key, value = header.split("=", 1)
                         header_dict[key.strip()] = value.strip()
 
-            exporter = OTLPSpanExporter(
-                endpoint=endpoint, headers=header_dict if header_dict else None
-            )
+            exporter = OTLPSpanExporter(endpoint=endpoint, headers=header_dict if header_dict else None)
 
             # Log successful configuration for Golf platform
             if golf_api_key:
@@ -130,7 +125,8 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         processor = BatchSpanProcessor(
             exporter,
             max_queue_size=2048,
-            schedule_delay_millis=1000,  # Export every 1 second instead of default 5 seconds
+            schedule_delay_millis=1000,  # Export every 1 second instead of
+            # default 5 seconds
             max_export_batch_size=512,
             export_timeout_millis=5000,
         )
@@ -145,10 +141,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
     try:
         # Check if a provider is already set to avoid the warning
         existing_provider = trace.get_tracer_provider()
-        if (
-            existing_provider is None
-            or str(type(existing_provider).__name__) == "ProxyTracerProvider"
-        ):
+        if existing_provider is None or str(type(existing_provider).__name__) == "ProxyTracerProvider":
             # Only set if no provider exists or it's the default proxy provider
             trace.set_tracer_provider(provider)
         _provider = provider
@@ -185,7 +178,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
     tracer = get_tracer()
 
     @functools.wraps(func)
-    async def async_wrapper(*args, **kwargs):
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Record metrics timing
         import time
 
@@ -249,9 +242,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_tool_execution(tool_name, "success")
-                    metrics_collector.record_tool_duration(
-                        tool_name, time.time() - start_time
-                    )
+                    metrics_collector.record_tool_duration(tool_name, time.time() - start_time)
                 except ImportError:
                     # Metrics not available, continue without metrics
                     pass
@@ -260,9 +251,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 if result is not None:
                     if isinstance(result, str | int | float | bool):
                         span.set_attribute("mcp.tool.result.value", str(result))
-                        span.set_attribute(
-                            "mcp.tool.result.type", type(result).__name__
-                        )
+                        span.set_attribute("mcp.tool.result.type", type(result).__name__)
                     elif isinstance(result, list):
                         span.set_attribute("mcp.tool.result.count", len(result))
                         span.set_attribute("mcp.tool.result.type", "array")
@@ -273,13 +262,8 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                         if len(result) > 0 and len(result) <= 5:
                             keys_list = list(result.keys())[:5]
                             # Limit key length and join
-                            truncated_keys = [
-                                str(k)[:20] + "..." if len(str(k)) > 20 else str(k)
-                                for k in keys_list
-                            ]
-                            span.set_attribute(
-                                "mcp.tool.result.sample_keys", ",".join(truncated_keys)
-                            )
+                            truncated_keys = [str(k)[:20] + "..." if len(str(k)) > 20 else str(k) for k in keys_list]
+                            span.set_attribute("mcp.tool.result.sample_keys", ",".join(truncated_keys))
                     elif hasattr(result, "__len__"):
                         span.set_attribute("mcp.tool.result.length", len(result))
 
@@ -315,7 +299,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 raise
 
     @functools.wraps(func)
-    def sync_wrapper(*args, **kwargs):
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Record metrics timing
         import time
 
@@ -379,9 +363,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
 
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_tool_execution(tool_name, "success")
-                    metrics_collector.record_tool_duration(
-                        tool_name, time.time() - start_time
-                    )
+                    metrics_collector.record_tool_duration(tool_name, time.time() - start_time)
                 except ImportError:
                     # Metrics not available, continue without metrics
                     pass
@@ -390,9 +372,7 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                 if result is not None:
                     if isinstance(result, str | int | float | bool):
                         span.set_attribute("mcp.tool.result.value", str(result))
-                        span.set_attribute(
-                            "mcp.tool.result.type", type(result).__name__
-                        )
+                        span.set_attribute("mcp.tool.result.type", type(result).__name__)
                     elif isinstance(result, list):
                         span.set_attribute("mcp.tool.result.count", len(result))
                         span.set_attribute("mcp.tool.result.type", "array")
@@ -403,13 +383,8 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                         if len(result) > 0 and len(result) <= 5:
                             keys_list = list(result.keys())[:5]
                             # Limit key length and join
-                            truncated_keys = [
-                                str(k)[:20] + "..." if len(str(k)) > 20 else str(k)
-                                for k in keys_list
-                            ]
-                            span.set_attribute(
-                                "mcp.tool.result.sample_keys", ",".join(truncated_keys)
-                            )
+                            truncated_keys = [str(k)[:20] + "..." if len(str(k)) > 20 else str(k) for k in keys_list]
+                            span.set_attribute("mcp.tool.result.sample_keys", ",".join(truncated_keys))
                     elif hasattr(result, "__len__"):
                         span.set_attribute("mcp.tool.result.length", len(result))
 
@@ -465,7 +440,7 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
     is_template = "{" in resource_uri
 
     @functools.wraps(func)
-    async def async_wrapper(*args, **kwargs):
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Create a more descriptive span name
         span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
@@ -511,9 +486,7 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
                 span.set_status(Status(StatusCode.OK))
 
                 # Add event for successful read
-                span.add_event(
-                    "resource.read.completed", {"resource.uri": resource_uri}
-                )
+                span.add_event("resource.read.completed", {"resource.uri": resource_uri})
 
                 # Add result metadata
                 if hasattr(result, "__len__"):
@@ -550,7 +523,7 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
                 raise
 
     @functools.wraps(func)
-    def sync_wrapper(*args, **kwargs):
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Create a more descriptive span name
         span_name = f"mcp.resource.{'template' if is_template else 'static'}.read"
         with tracer.start_as_current_span(span_name) as span:
@@ -596,9 +569,7 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
                 span.set_status(Status(StatusCode.OK))
 
                 # Add event for successful read
-                span.add_event(
-                    "resource.read.completed", {"resource.uri": resource_uri}
-                )
+                span.add_event("resource.read.completed", {"resource.uri": resource_uri})
 
                 # Add result metadata
                 if hasattr(result, "__len__"):
@@ -651,7 +622,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
     tracer = get_tracer()
 
     @functools.wraps(func)
-    async def async_wrapper(*args, **kwargs):
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Create a more descriptive span name
         span_name = f"mcp.prompt.{prompt_name}.generate"
         with tracer.start_as_current_span(span_name) as span:
@@ -696,9 +667,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
                 span.set_status(Status(StatusCode.OK))
 
                 # Add event for successful generation
-                span.add_event(
-                    "prompt.generation.completed", {"prompt.name": prompt_name}
-                )
+                span.add_event("prompt.generation.completed", {"prompt.name": prompt_name})
 
                 # Add message count and type information
                 if isinstance(result, list):
@@ -715,9 +684,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
 
                     if roles:
                         unique_roles = list(set(roles))
-                        span.set_attribute(
-                            "mcp.prompt.result.roles", ",".join(unique_roles)
-                        )
+                        span.set_attribute("mcp.prompt.result.roles", ",".join(unique_roles))
                         span.set_attribute(
                             "mcp.prompt.result.role_counts",
                             str({role: roles.count(role) for role in unique_roles}),
@@ -745,7 +712,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
                 raise
 
     @functools.wraps(func)
-    def sync_wrapper(*args, **kwargs):
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         # Create a more descriptive span name
         span_name = f"mcp.prompt.{prompt_name}.generate"
         with tracer.start_as_current_span(span_name) as span:
@@ -790,9 +757,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
                 span.set_status(Status(StatusCode.OK))
 
                 # Add event for successful generation
-                span.add_event(
-                    "prompt.generation.completed", {"prompt.name": prompt_name}
-                )
+                span.add_event("prompt.generation.completed", {"prompt.name": prompt_name})
 
                 # Add message count and type information
                 if isinstance(result, list):
@@ -809,9 +774,7 @@ def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[...,
 
                     if roles:
                         unique_roles = list(set(roles))
-                        span.set_attribute(
-                            "mcp.prompt.result.roles", ",".join(unique_roles)
-                        )
+                        span.set_attribute("mcp.prompt.result.roles", ",".join(unique_roles))
                         span.set_attribute(
                             "mcp.prompt.result.role_counts",
                             str({role: roles.count(role) for role in unique_roles}),
@@ -880,11 +843,7 @@ class BoundedSessionTracker:
 
     def _cleanup_expired(self, current_time: float) -> None:
         """Remove expired sessions."""
-        expired = [
-            sid
-            for sid, timestamp in self.sessions.items()
-            if current_time - timestamp > self.session_ttl
-        ]
+        expired = [sid for sid, timestamp in self.sessions.items() if current_time - timestamp > self.session_ttl]
         for sid in expired:
             del self.sessions[sid]
 
@@ -896,11 +855,9 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: Any) -> None:
         super().__init__(app)
         # Use memory-safe session tracker instead of unbounded collections
-        self.session_tracker = BoundedSessionTracker(
-            max_sessions=1000, session_ttl=3600
-        )
+        self.session_tracker = BoundedSessionTracker(max_sessions=1000, session_ttl=3600)
 
-    async def dispatch(self, request: Any, call_next: Callable) -> Any:
+    async def dispatch(self, request: Any, call_next: Callable[..., Any]) -> Any:
         # Record HTTP request timing
         import time
 
@@ -930,7 +887,8 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
                     from golf.metrics import get_metrics_collector
 
                     metrics_collector = get_metrics_collector()
-                    # Use a default duration since we don't track exact start times anymore
+                    # Use a default duration since we don't track exact start
+                    # times anymore
                     # This is less precise but memory-safe
                     metrics_collector.record_session_duration(300.0)  # 5 min default
                 except ImportError:
@@ -959,9 +917,7 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
             span.set_attribute("http.scheme", request.url.scheme)
             span.set_attribute("http.host", request.url.hostname or "unknown")
             span.set_attribute("http.target", path)
-            span.set_attribute(
-                "http.user_agent", request.headers.get("user-agent", "unknown")
-            )
+            span.set_attribute("http.user_agent", request.headers.get("user-agent", "unknown"))
 
             # Add session tracking
             if session_id:
@@ -991,15 +947,11 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
 
                 # Add response attributes
                 span.set_attribute("http.status_code", response.status_code)
-                span.set_attribute(
-                    "http.status_class", f"{response.status_code // 100}xx"
-                )
+                span.set_attribute("http.status_class", f"{response.status_code // 100}xx")
 
                 # Set span status based on HTTP status
                 if response.status_code >= 400:
-                    span.set_status(
-                        Status(StatusCode.ERROR, f"HTTP {response.status_code}")
-                    )
+                    span.set_status(Status(StatusCode.ERROR, f"HTTP {response.status_code}"))
                 else:
                     span.set_status(Status(StatusCode.OK))
 
@@ -1022,16 +974,10 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
                     # Clean up path for metrics (remove query params, normalize)
                     clean_path = path.split("?")[0]  # Remove query parameters
                     if clean_path.startswith("/"):
-                        clean_path = (
-                            clean_path[1:] or "root"
-                        )  # Remove leading slash, handle root
+                        clean_path = clean_path[1:] or "root"  # Remove leading slash, handle root
 
-                    metrics_collector.increment_http_request(
-                        method, response.status_code, clean_path
-                    )
-                    metrics_collector.record_http_duration(
-                        method, clean_path, time.time() - start_time
-                    )
+                    metrics_collector.increment_http_request(method, response.status_code, clean_path)
+                    metrics_collector.record_http_duration(method, clean_path, time.time() - start_time)
                 except ImportError:
                     # Metrics not available, continue without metrics
                     pass
@@ -1063,9 +1009,7 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
                     if clean_path.startswith("/"):
                         clean_path = clean_path[1:] or "root"
 
-                    metrics_collector.increment_http_request(
-                        method, 500, clean_path
-                    )  # Assume 500 for exceptions
+                    metrics_collector.increment_http_request(method, 500, clean_path)  # Assume 500 for exceptions
                     metrics_collector.increment_error("http", type(e).__name__)
                 except ImportError:
                     pass
@@ -1099,9 +1043,7 @@ async def telemetry_lifespan(mcp_instance: Any) -> AsyncGenerator[None, None]:
                 app.add_middleware(SessionTracingMiddleware)
 
         # Also try to instrument FastMCP's internal handlers
-        if hasattr(mcp_instance, "_tool_manager") and hasattr(
-            mcp_instance._tool_manager, "tools"
-        ):
+        if hasattr(mcp_instance, "_tool_manager") and hasattr(mcp_instance._tool_manager, "tools"):
             # The tools should already be instrumented when they were registered
             pass
 

@@ -49,9 +49,7 @@ def callback(
         callback=_version_callback,
         is_eager=True,
     ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Increase verbosity of output."
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Increase verbosity of output."),
     no_telemetry: bool = typer.Option(
         False,
         "--no-telemetry",
@@ -77,20 +75,14 @@ def callback(
     # Set telemetry preference if flag is used (permanent)
     if no_telemetry:
         set_telemetry_enabled(False, persist=True)
-        console.print(
-            "[dim]Telemetry has been disabled. You can re-enable it with: golf telemetry enable[/dim]"
-        )
+        console.print("[dim]Telemetry has been disabled. You can re-enable it with: golf telemetry enable[/dim]")
 
 
 @app.command()
 def init(
     project_name: str = typer.Argument(..., help="Name of the project to create"),
-    output_dir: Path | None = typer.Option(
-        None, "--output-dir", "-o", help="Directory to create the project in"
-    ),
-    template: str = typer.Option(
-        "basic", "--template", "-t", help="Template to use (basic or api_key)"
-    ),
+    output_dir: Path | None = typer.Option(None, "--output-dir", "-o", help="Directory to create the project in"),
+    template: str = typer.Option("basic", "--template", "-t", help="Template to use (basic or api_key)"),
 ) -> None:
     """Initialize a new GolfMCP project.
 
@@ -105,9 +97,7 @@ def init(
         output_dir = Path.cwd() / project_name
 
     # Execute the initialization command (it handles its own tracking)
-    initialize_project(
-        project_name=project_name, output_dir=output_dir, template=template
-    )
+    initialize_project(project_name=project_name, output_dir=output_dir, template=template)
 
 
 # Create a build group with subcommands
@@ -117,9 +107,7 @@ app.add_typer(build_app, name="build")
 
 @build_app.command("dev")
 def build_dev(
-    output_dir: str | None = typer.Option(
-        None, "--output-dir", "-o", help="Directory to output the built project"
-    ),
+    output_dir: str | None = typer.Option(None, "--output-dir", "-o", help="Directory to output the built project"),
 ) -> None:
     """Build a development version with app environment variables copied.
 
@@ -155,9 +143,7 @@ def build_dev(
         # Build the project with environment variables copied
         from golf.commands.build import build_project
 
-        build_project(
-            project_root, settings, output_dir, build_env="dev", copy_env=True
-        )
+        build_project(project_root, settings, output_dir, build_env="dev", copy_env=True)
         # Track successful build with environment
         track_event("cli_build_success", {"success": True, "environment": "dev"})
     except Exception as e:
@@ -173,9 +159,7 @@ def build_dev(
 
 @build_app.command("prod")
 def build_prod(
-    output_dir: str | None = typer.Option(
-        None, "--output-dir", "-o", help="Directory to output the built project"
-    ),
+    output_dir: str | None = typer.Option(None, "--output-dir", "-o", help="Directory to output the built project"),
 ) -> None:
     """Build a production version for deployment.
 
@@ -214,9 +198,7 @@ def build_prod(
         # Build the project without copying environment variables
         from golf.commands.build import build_project
 
-        build_project(
-            project_root, settings, output_dir, build_env="prod", copy_env=False
-        )
+        build_project(project_root, settings, output_dir, build_env="prod", copy_env=False)
         # Track successful build with environment
         track_event("cli_build_success", {"success": True, "environment": "prod"})
     except Exception as e:
@@ -232,18 +214,10 @@ def build_prod(
 
 @app.command()
 def run(
-    dist_dir: str | None = typer.Option(
-        None, "--dist-dir", "-d", help="Directory containing the built server"
-    ),
-    host: str | None = typer.Option(
-        None, "--host", "-h", help="Host to bind to (overrides settings)"
-    ),
-    port: int | None = typer.Option(
-        None, "--port", "-p", help="Port to bind to (overrides settings)"
-    ),
-    build_first: bool = typer.Option(
-        True, "--build/--no-build", help="Build the project before running"
-    ),
+    dist_dir: str | None = typer.Option(None, "--dist-dir", "-d", help="Directory containing the built server"),
+    host: str | None = typer.Option(None, "--host", "-h", help="Host to bind to (overrides settings)"),
+    port: int | None = typer.Option(None, "--port", "-p", help="Port to bind to (overrides settings)"),
+    build_first: bool = typer.Option(True, "--build/--no-build", help="Build the project before running"),
 ) -> None:
     """Run the built FastMCP server.
 
@@ -277,9 +251,7 @@ def run(
     # Check if dist directory exists
     if not dist_dir.exists():
         if build_first:
-            console.print(
-                f"[yellow]Dist directory {dist_dir} not found. Building first...[/yellow]"
-            )
+            console.print(f"[yellow]Dist directory {dist_dir} not found. Building first...[/yellow]")
             try:
                 # Build the project
                 from golf.commands.build import build_project
@@ -296,12 +268,8 @@ def run(
                 )
                 raise
         else:
-            console.print(
-                f"[bold red]Error: Dist directory {dist_dir} not found.[/bold red]"
-            )
-            console.print(
-                "Run 'golf build' first or use --build to build automatically."
-            )
+            console.print(f"[bold red]Error: Dist directory {dist_dir} not found.[/bold red]")
+            console.print("Run 'golf build' first or use --build to build automatically.")
             track_event(
                 "cli_run_failed",
                 {
@@ -355,7 +323,7 @@ def run(
                 {
                     "success": False,
                     "error_type": "UnexpectedExit",
-                    "error_message": f"Server process exited unexpectedly with code {return_code}",
+                    "error_message": (f"Server process exited unexpectedly with code {return_code}"),
                     "exit_code": return_code,
                     "operation": "server_process_execution",
                     "context": "Server process terminated with unexpected exit code",
@@ -384,18 +352,12 @@ def telemetry(
     """Manage telemetry settings."""
     if action.lower() == "enable":
         set_telemetry_enabled(True, persist=True)
-        console.print(
-            "[green]✓[/green] Telemetry enabled. Thank you for helping improve Golf!"
-        )
+        console.print("[green]✓[/green] Telemetry enabled. Thank you for helping improve Golf!")
     elif action.lower() == "disable":
         set_telemetry_enabled(False, persist=True)
-        console.print(
-            "[yellow]Telemetry disabled.[/yellow] You can re-enable it anytime with: golf telemetry enable"
-        )
+        console.print("[yellow]Telemetry disabled.[/yellow] You can re-enable it anytime with: golf telemetry enable")
     else:
-        console.print(
-            f"[red]Unknown action '{action}'. Use 'enable' or 'disable'.[/red]"
-        )
+        console.print(f"[red]Unknown action '{action}'. Use 'enable' or 'disable'.[/red]")
         raise typer.Exit(code=1)
 
 
@@ -412,8 +374,7 @@ if __name__ == "__main__":
     # Add telemetry notice if enabled
     if is_telemetry_enabled():
         console.print(
-            "[dim]📊 Anonymous usage data is collected to improve Golf. "
-            "Disable with: golf telemetry disable[/dim]\n"
+            "[dim]📊 Anonymous usage data is collected to improve Golf. Disable with: golf telemetry disable[/dim]\n"
         )
 
     # Run the CLI app

@@ -18,7 +18,8 @@ def generate_auth_code(
     opentelemetry_enabled: bool = False,
     transport: str = "streamable-http",
 ) -> dict:
-    """Generate authentication components for the FastMCP app using modern auth providers.
+    """Generate authentication components for the FastMCP app using modern
+    auth providers.
 
     Returns a dictionary with:
         - imports: List of import statements
@@ -29,9 +30,7 @@ def generate_auth_code(
     # Check for API key configuration first
     api_key_config = get_api_key_config()
     if api_key_config:
-        return generate_api_key_auth_components(
-            server_name, opentelemetry_enabled, transport
-        )
+        return generate_api_key_auth_components(server_name, opentelemetry_enabled, transport)
 
     # Check for modern auth configuration
     auth_config_tuple = get_auth_config()
@@ -160,7 +159,8 @@ def generate_api_key_auth_components(
         "            # Check if API key is required but missing",
         "            if api_key_config.required and not api_key:",
         "                return JSONResponse(",
-        "                    {'error': 'unauthorized', 'detail': f'Missing required {header_name} header'},",
+        "                    {'error': 'unauthorized', "
+        "'detail': f'Missing required {header_name} header'},"
         "                    status_code=401,",
         "                    headers={'WWW-Authenticate': f'{header_name} realm=\"MCP Server\"'}",
         "                )",

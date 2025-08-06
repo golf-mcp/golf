@@ -109,9 +109,7 @@ class ManifestBuilder:
         """Process all resource components and add them to the manifest."""
         for component in self.components[ComponentType.RESOURCE]:
             if not component.uri_template:
-                console.print(
-                    f"[yellow]Warning: Resource {component.name} has no URI template[/yellow]"
-                )
+                console.print(f"[yellow]Warning: Resource {component.name} has no URI template[/yellow]")
                 continue
 
             resource_schema = {
@@ -127,7 +125,8 @@ class ManifestBuilder:
     def _process_prompts(self) -> None:
         """Process all prompt components and add them to the manifest."""
         for component in self.components[ComponentType.PROMPT]:
-            # For prompts, the handler will have to load the module and execute the run function
+            # For prompts, the handler will have to load the module and execute
+            # the run function
             # to get the actual messages, so we just register it by name
             prompt_schema = {
                 "name": component.name,
@@ -188,9 +187,7 @@ def build_manifest(project_path: Path, settings: Settings) -> dict[str, Any]:
     return builder.build()
 
 
-def compute_manifest_diff(
-    old_manifest: dict[str, Any], new_manifest: dict[str, Any]
-) -> dict[str, Any]:
+def compute_manifest_diff(old_manifest: dict[str, Any], new_manifest: dict[str, Any]) -> dict[str, Any]:
     """Compute the difference between two manifests.
 
     Args:
@@ -221,11 +218,7 @@ def compute_manifest_diff(
         if new_tool["name"] in old_tools:
             # Find the corresponding old tool
             old_tool = next(
-                (
-                    t
-                    for t in old_manifest.get("tools", [])
-                    if t["name"] == new_tool["name"]
-                ),
+                (t for t in old_manifest.get("tools", []) if t["name"] == new_tool["name"]),
                 None,
             )
             if old_tool and json.dumps(old_tool) != json.dumps(new_tool):
@@ -242,11 +235,7 @@ def compute_manifest_diff(
         if new_resource["name"] in old_resources:
             # Find the corresponding old resource
             old_resource = next(
-                (
-                    r
-                    for r in old_manifest.get("resources", [])
-                    if r["name"] == new_resource["name"]
-                ),
+                (r for r in old_manifest.get("resources", []) if r["name"] == new_resource["name"]),
                 None,
             )
             if old_resource and json.dumps(old_resource) != json.dumps(new_resource):
@@ -263,11 +252,7 @@ def compute_manifest_diff(
         if new_prompt["name"] in old_prompts:
             # Find the corresponding old prompt
             old_prompt = next(
-                (
-                    p
-                    for p in old_manifest.get("prompts", [])
-                    if p["name"] == new_prompt["name"]
-                ),
+                (p for p in old_manifest.get("prompts", []) if p["name"] == new_prompt["name"]),
                 None,
             )
             if old_prompt and json.dumps(old_prompt) != json.dumps(new_prompt):
@@ -365,9 +350,7 @@ class CodeGenerator:
             output_dir_display = self.output_dir
 
         # Show success message with output directory
-        console.print(
-            f"[bold green]✓[/bold green] Build completed successfully in [bold]{output_dir_display}[/bold]"
-        )
+        console.print(f"[bold green]✓[/bold green] Build completed successfully in [bold]{output_dir_display}[/bold]")
 
     def _create_directory_structure(self) -> None:
         """Create the output directory structure"""
@@ -386,7 +369,8 @@ class CodeGenerator:
         self._process_common_files()
 
     def _process_common_files(self) -> None:
-        """Process and transform common.py files in the components directory structure."""
+        """Process and transform common.py files in the components directory
+        structure."""
         # Reuse the already fetched common_files instead of calling the function again
         for dir_path_str, common_file in self.common_files.items():
             # Convert string path to Path object
@@ -404,9 +388,7 @@ class CodeGenerator:
 
             # Calculate target directory in components structure
             rel_to_component = dir_path.relative_to(component_type)
-            target_dir = (
-                self.output_dir / "components" / component_type / rel_to_component
-            )
+            target_dir = self.output_dir / "components" / component_type / rel_to_component
 
             # Create directory if it doesn't exist
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -431,9 +413,7 @@ class CodeGenerator:
             # Get the tool directory structure
             rel_path = Path(tool.file_path).relative_to(self.project_path)
             if not rel_path.is_relative_to(Path(self.settings.tools_dir)):
-                console.print(
-                    f"[yellow]Warning: Tool {tool.name} is not in the tools directory[/yellow]"
-                )
+                console.print(f"[yellow]Warning: Tool {tool.name} is not in the tools directory[/yellow]")
                 continue
 
             try:
@@ -457,9 +437,7 @@ class CodeGenerator:
             # Get the resource directory structure
             rel_path = Path(resource.file_path).relative_to(self.project_path)
             if not rel_path.is_relative_to(Path(self.settings.resources_dir)):
-                console.print(
-                    f"[yellow]Warning: Resource {resource.name} is not in the resources directory[/yellow]"
-                )
+                console.print(f"[yellow]Warning: Resource {resource.name} is not in the resources directory[/yellow]")
                 continue
 
             try:
@@ -473,9 +451,7 @@ class CodeGenerator:
 
             # Create the resource file
             output_file = resource_dir / rel_path.name
-            transform_component(
-                resource, output_file, self.project_path, self.import_map
-            )
+            transform_component(resource, output_file, self.project_path, self.import_map)
 
     def _generate_prompts(self) -> None:
         """Generate code for all prompts."""
@@ -485,9 +461,7 @@ class CodeGenerator:
             # Get the prompt directory structure
             rel_path = Path(prompt.file_path).relative_to(self.project_path)
             if not rel_path.is_relative_to(Path(self.settings.prompts_dir)):
-                console.print(
-                    f"[yellow]Warning: Prompt {prompt.name} is not in the prompts directory[/yellow]"
-                )
+                console.print(f"[yellow]Warning: Prompt {prompt.name} is not in the prompts directory[/yellow]")
                 continue
 
             try:
@@ -622,11 +596,7 @@ class CodeGenerator:
                         rel_to_tools = rel_path.relative_to(self.settings.tools_dir)
                         # Handle nested directories properly
                         if rel_to_tools.parent != Path("."):
-                            parent_path = (
-                                str(rel_to_tools.parent)
-                                .replace("\\", ".")
-                                .replace("/", ".")
-                            )
+                            parent_path = str(rel_to_tools.parent).replace("\\", ".").replace("/", ".")
                             import_path = f"components.tools.{parent_path}"
                         else:
                             import_path = "components.tools"
@@ -634,16 +604,10 @@ class CodeGenerator:
                         import_path = "components.tools"
                 elif component_type == ComponentType.RESOURCE:
                     try:
-                        rel_to_resources = rel_path.relative_to(
-                            self.settings.resources_dir
-                        )
+                        rel_to_resources = rel_path.relative_to(self.settings.resources_dir)
                         # Handle nested directories properly
                         if rel_to_resources.parent != Path("."):
-                            parent_path = (
-                                str(rel_to_resources.parent)
-                                .replace("\\", ".")
-                                .replace("/", ".")
-                            )
+                            parent_path = str(rel_to_resources.parent).replace("\\", ".").replace("/", ".")
                             import_path = f"components.resources.{parent_path}"
                         else:
                             import_path = "components.resources"
@@ -654,11 +618,7 @@ class CodeGenerator:
                         rel_to_prompts = rel_path.relative_to(self.settings.prompts_dir)
                         # Handle nested directories properly
                         if rel_to_prompts.parent != Path("."):
-                            parent_path = (
-                                str(rel_to_prompts.parent)
-                                .replace("\\", ".")
-                                .replace("/", ".")
-                            )
+                            parent_path = str(rel_to_prompts.parent).replace("\\", ".").replace("/", ".")
                             import_path = f"components.prompts.{parent_path}"
                         else:
                             import_path = "components.prompts"
@@ -675,14 +635,10 @@ class CodeGenerator:
                 # Add code to register this component
                 if self.settings.opentelemetry_enabled:
                     # Use telemetry instrumentation
-                    registration = (
-                        f"# Register the {component_type.value} "
-                        f"'{component.name}' with telemetry"
-                    )
+                    registration = f"# Register the {component_type.value} '{component.name}' with telemetry"
                     entry_func = (
                         component.entry_function
-                        if hasattr(component, "entry_function")
-                        and component.entry_function
+                        if hasattr(component, "entry_function") and component.entry_function
                         else "export"
                     )
 
@@ -693,14 +649,13 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\n_tool = Tool.from_function(_wrapped_func, name="{component.name}", '
+                            f"\n_tool = Tool.from_function(_wrapped_func, "
+                            f'name="{component.name}", '
                             f'description="{component.docstring or ""}")'
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += (
-                                f".with_annotations({component.annotations})"
-                            )
+                            registration += f".with_annotations({component.annotations})"
                         registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
                         registration += (
@@ -711,20 +666,17 @@ class CodeGenerator:
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\n_prompt = Prompt.from_function(_wrapped_func, name="{component.name}", '
+                            f"\n_prompt = Prompt.from_function(_wrapped_func, "
+                            f'name="{component.name}", '
                             f'description="{component.docstring or ""}")\n'
                             f"mcp.add_prompt(_prompt)"
                         )
                 elif self.settings.metrics_enabled:
                     # Use metrics instrumentation
-                    registration = (
-                        f"# Register the {component_type.value} "
-                        f"'{component.name}' with metrics"
-                    )
+                    registration = f"# Register the {component_type.value} '{component.name}' with metrics"
                     entry_func = (
                         component.entry_function
-                        if hasattr(component, "entry_function")
-                        and component.entry_function
+                        if hasattr(component, "entry_function") and component.entry_function
                         else "export"
                     )
 
@@ -735,14 +687,13 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration += (
-                            f'\n_tool = Tool.from_function(_wrapped_func, name="{component.name}", '
+                            f"\n_tool = Tool.from_function(_wrapped_func, "
+                            f'name="{component.name}", '
                             f'description="{component.docstring or ""}")'
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
-                            registration += (
-                                f".with_annotations({component.annotations})"
-                            )
+                            registration += f".with_annotations({component.annotations})"
                         registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
                         registration += (
@@ -753,7 +704,8 @@ class CodeGenerator:
                         )
                     else:  # PROMPT
                         registration += (
-                            f'\n_prompt = Prompt.from_function(_wrapped_func, name="{component.name}", '
+                            f"\n_prompt = Prompt.from_function(_wrapped_func, "
+                            f'name="{component.name}", '
                             f'description="{component.docstring or ""}")\n'
                             f"mcp.add_prompt(_prompt)"
                         )
@@ -762,12 +714,12 @@ class CodeGenerator:
                     if component_type == ComponentType.TOOL:
                         registration = f"# Register the tool '{component.name}' from {full_module_path}"
 
-                        # Use the entry_function if available, otherwise try the export variable
-                        if (
-                            hasattr(component, "entry_function")
-                            and component.entry_function
-                        ):
-                            registration += f"\n_tool = Tool.from_function({full_module_path}.{component.entry_function}"
+                        # Use the entry_function if available, otherwise try the
+                        # export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += (
+                                f"\n_tool = Tool.from_function({full_module_path}.{component.entry_function}"
+                            )
                         else:
                             registration += f"\n_tool = Tool.from_function({full_module_path}.export"
 
@@ -791,14 +743,20 @@ class CodeGenerator:
                     elif component_type == ComponentType.RESOURCE:
                         registration = f"# Register the resource '{component.name}' from {full_module_path}"
 
-                        # Use the entry_function if available, otherwise try the export variable
-                        if (
-                            hasattr(component, "entry_function")
-                            and component.entry_function
-                        ):
-                            registration += f'\n_resource = Resource.from_function({full_module_path}.{component.entry_function}, uri="{component.uri_template}"'
+                        # Use the entry_function if available, otherwise try the
+                        # export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += (
+                                f"\n_resource = Resource.from_function("
+                                f"{full_module_path}.{component.entry_function}, "
+                                f'uri="{component.uri_template}"'
+                            )
                         else:
-                            registration += f'\n_resource = Resource.from_function({full_module_path}.export, uri="{component.uri_template}"'
+                            registration += (
+                                f"\n_resource = Resource.from_function("
+                                f"{full_module_path}.export, "
+                                f'uri="{component.uri_template}"'
+                            )
 
                         # Add the name parameter
                         registration += f', name="{component.name}"'
@@ -814,12 +772,12 @@ class CodeGenerator:
                     else:  # PROMPT
                         registration = f"# Register the prompt '{component.name}' from {full_module_path}"
 
-                        # Use the entry_function if available, otherwise try the export variable
-                        if (
-                            hasattr(component, "entry_function")
-                            and component.entry_function
-                        ):
-                            registration += f"\n_prompt = Prompt.from_function({full_module_path}.{component.entry_function}"
+                        # Use the entry_function if available, otherwise try the
+                        # export variable
+                        if hasattr(component, "entry_function") and component.entry_function:
+                            registration += (
+                                f"\n_prompt = Prompt.from_function({full_module_path}.{component.entry_function}"
+                            )
                         else:
                             registration += f"\n_prompt = Prompt.from_function({full_module_path}.export"
 
@@ -896,9 +854,7 @@ class CodeGenerator:
         if self.settings.metrics_enabled:
             from golf.core.builder_metrics import generate_metrics_initialization
 
-            early_metrics_init.extend(
-                generate_metrics_initialization(self.settings.name)
-            )
+            early_metrics_init.extend(generate_metrics_initialization(self.settings.name))
 
         # Main entry point with transport-specific app initialization
         main_code = [
@@ -916,11 +872,20 @@ class CodeGenerator:
         # Add startup message
         if self.settings.transport != "stdio":
             main_code.append(
-                f'    console.print(Panel.fit(f"[bold green]{{mcp.name}}[/bold green]\\n[dim]Running on http://{{host}}:{{port}}{endpoint_path} with transport \\"{{transport_to_run}}\\" (environment: {self.build_env})[/dim]", border_style="green"))'
+                f"    console.print(Panel.fit("
+                f'f"[bold green]{{mcp.name}}[/bold green]\\n'
+                f"[dim]Running on http://{{host}}:{{port}}{endpoint_path} "
+                f'with transport \\"{{transport_to_run}}\\" '
+                f'(environment: {self.build_env})[/dim]", '
+                f'border_style="green"))'
             )
         else:
             main_code.append(
-                f'    console.print(Panel.fit(f"[bold green]{{mcp.name}}[/bold green]\\n[dim]Running with transport \\"{{transport_to_run}}\\" (environment: {self.build_env})[/dim]", border_style="green"))'
+                f"    console.print(Panel.fit("
+                f'f"[bold green]{{mcp.name}}[/bold green]\\n'
+                f'[dim]Running with transport \\"{{transport_to_run}}\\" '
+                f'(environment: {self.build_env})[/dim]", '
+                f'border_style="green"))'
             )
 
         main_code.append("")
@@ -933,26 +898,18 @@ class CodeGenerator:
 
             api_key_config = get_api_key_config()
             if auth_components.get("has_auth") and api_key_config:
-                middleware_setup.append(
-                    "    from starlette.middleware import Middleware"
-                )
+                middleware_setup.append("    from starlette.middleware import Middleware")
                 middleware_list.append("Middleware(ApiKeyMiddleware)")
 
             # Add metrics middleware if enabled
             if self.settings.metrics_enabled:
-                middleware_setup.append(
-                    "    from starlette.middleware import Middleware"
-                )
+                middleware_setup.append("    from starlette.middleware import Middleware")
                 middleware_list.append("Middleware(MetricsMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
-                middleware_setup.append(
-                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware"
-                )
-                middleware_setup.append(
-                    "    from starlette.middleware import Middleware"
-                )
+                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
+                middleware_setup.append("    from starlette.middleware import Middleware")
                 middleware_list.append("Middleware(OpenTelemetryMiddleware)")
 
             if middleware_setup:
@@ -962,14 +919,18 @@ class CodeGenerator:
                 main_code.extend(
                     [
                         "    # Run SSE server with middleware using FastMCP's run method",
-                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware, show_banner=False)',
+                        f'    mcp.run(transport="sse", host=host, port=port, '
+                        f'path="{endpoint_path}", log_level="info", '
+                        f"middleware=middleware, show_banner=False)",
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run SSE server using FastMCP's run method",
-                        f'    mcp.run(transport="sse", host=host, port=port, path="{endpoint_path}", log_level="info", show_banner=False)',
+                        f'    mcp.run(transport="sse", host=host, port=port, '
+                        f'path="{endpoint_path}", log_level="info", '
+                        f"show_banner=False)",
                     ]
                 )
 
@@ -980,26 +941,18 @@ class CodeGenerator:
 
             api_key_config = get_api_key_config()
             if auth_components.get("has_auth") and api_key_config:
-                middleware_setup.append(
-                    "    from starlette.middleware import Middleware"
-                )
+                middleware_setup.append("    from starlette.middleware import Middleware")
                 middleware_list.append("Middleware(ApiKeyMiddleware)")
 
             # Add metrics middleware if enabled
             if self.settings.metrics_enabled:
-                middleware_setup.append(
-                    "    from starlette.middleware import Middleware"
-                )
+                middleware_setup.append("    from starlette.middleware import Middleware")
                 middleware_list.append("Middleware(MetricsMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
             if self.settings.opentelemetry_enabled:
-                middleware_setup.append(
-                    "    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware"
-                )
-                middleware_setup.append(
-                    "    from starlette.middleware import Middleware"
-                )
+                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
+                middleware_setup.append("    from starlette.middleware import Middleware")
                 middleware_list.append("Middleware(OpenTelemetryMiddleware)")
 
             if middleware_setup:
@@ -1009,21 +962,23 @@ class CodeGenerator:
                 main_code.extend(
                     [
                         "    # Run HTTP server with middleware using FastMCP's run method",
-                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", middleware=middleware, show_banner=False)',
+                        f'    mcp.run(transport="streamable-http", host=host, '
+                        f'port=port, path="{endpoint_path}", log_level="info", '
+                        f"middleware=middleware, show_banner=False)",
                     ]
                 )
             else:
                 main_code.extend(
                     [
                         "    # Run HTTP server using FastMCP's run method",
-                        f'    mcp.run(transport="streamable-http", host=host, port=port, path="{endpoint_path}", log_level="info", show_banner=False)',
+                        f'    mcp.run(transport="streamable-http", host=host, '
+                        f'port=port, path="{endpoint_path}", log_level="info", '
+                        f"show_banner=False)",
                     ]
                 )
         else:
             # For stdio transport, use mcp.run()
-            main_code.extend(
-                ["    # Run with stdio transport", '    mcp.run(transport="stdio", show_banner=False)']
-            )
+            main_code.extend(["    # Run with stdio transport", '    mcp.run(transport="stdio", show_banner=False)'])
 
         # Add metrics route if enabled
         metrics_route_code = []
@@ -1037,18 +992,17 @@ class CodeGenerator:
         if self.settings.health_check_enabled:
             health_check_code = [
                 "# Add health check route",
-                "@mcp.custom_route('"
-                + self.settings.health_check_path
-                + '\', methods=["GET"])',
+                "@mcp.custom_route('" + self.settings.health_check_path + '\', methods=["GET"])',
                 "async def health_check(request: Request) -> PlainTextResponse:",
                 '    """Health check endpoint for Kubernetes and load balancers."""',
-                f'    return PlainTextResponse("{self.settings.health_check_response}")',
+                (f'    return PlainTextResponse("{self.settings.health_check_response}")'),
                 "",
             ]
 
         # Combine all sections
         # Order: imports, env_section, auth_setup, server_code (mcp init),
-        # early_telemetry_init, early_metrics_init, component_registrations, metrics_route_code, health_check_code, main_code (run block)
+        # early_telemetry_init, early_metrics_init, component_registrations,
+        # metrics_route_code, health_check_code, main_code (run block)
         code = "\n".join(
             imports
             + env_section
@@ -1114,16 +1068,15 @@ def build_project(
         config_path = auth_path
     elif legacy_path.exists():
         config_path = legacy_path
-        console.print(
-            "[yellow]Warning: pre_build.py is deprecated. Rename to auth.py[/yellow]"
-        )
+        console.print("[yellow]Warning: pre_build.py is deprecated. Rename to auth.py[/yellow]")
 
     if config_path:
         # Save the current directory and path - handle case where cwd might be invalid
         try:
             original_dir = os.getcwd()
         except (FileNotFoundError, OSError):
-            # Current directory might have been deleted by previous operations, use project_path as fallback
+            # Current directory might have been deleted by previous operations,
+            # use project_path as fallback
             original_dir = str(project_path)
             os.chdir(original_dir)
         original_path = sys.path.copy()
@@ -1187,9 +1140,7 @@ def build_project(
     # Clear the output directory if it exists
     if output_dir.exists():
         shutil.rmtree(output_dir)
-    output_dir.mkdir(
-        parents=True, exist_ok=True
-    )  # Ensure output_dir exists after clearing
+    output_dir.mkdir(parents=True, exist_ok=True)  # Ensure output_dir exists after clearing
 
     # --- BEGIN Enhanced .env handling ---
     env_vars_to_write = {}
@@ -1205,38 +1156,36 @@ def build_project(
                 env_vars_to_write.update(dotenv_values(project_env_file))
             except ImportError:
                 console.print(
-                    "[yellow]Warning: python-dotenv is not installed. Cannot read existing .env file for rich merging. Copying directly.[/yellow]"
+                    "[yellow]Warning: python-dotenv is not installed. "
+                    "Cannot read existing .env file for rich merging. "
+                    "Copying directly.[/yellow]"
                 )
                 try:
                     shutil.copy(project_env_file, env_file_path)
-                    # If direct copy happens, re-read for step 2 & 3 to respect its content
+                    # If direct copy happens, re-read for step 2 & 3 to respect
+                    # its content
                     if env_file_path.exists():
                         from dotenv import dotenv_values
 
-                        env_vars_to_write.update(
-                            dotenv_values(env_file_path)
-                        )  # Read what was copied
+                        env_vars_to_write.update(dotenv_values(env_file_path))  # Read what was copied
                 except Exception as e:
-                    console.print(
-                        f"[yellow]Warning: Could not copy project .env file: {e}[/yellow]"
-                    )
+                    console.print(f"[yellow]Warning: Could not copy project .env file: {e}[/yellow]")
             except Exception as e:
-                console.print(
-                    f"[yellow]Warning: Error reading project .env file content: {e}[/yellow]"
-                )
+                console.print(f"[yellow]Warning: Error reading project .env file content: {e}[/yellow]")
 
-    # 2. Apply Golf's OTel default exporter setting if OTEL_TRACES_EXPORTER is not already set
-    if settings.opentelemetry_enabled and settings.opentelemetry_default_exporter:
-        if "OTEL_TRACES_EXPORTER" not in env_vars_to_write:
-            env_vars_to_write["OTEL_TRACES_EXPORTER"] = (
-                settings.opentelemetry_default_exporter
-            )
+    # 2. Apply Golf's OTel default exporter setting if OTEL_TRACES_EXPORTER
+    # is not already set
+    if (
+        settings.opentelemetry_enabled
+        and settings.opentelemetry_default_exporter
+        and "OTEL_TRACES_EXPORTER" not in env_vars_to_write
+    ):
+        env_vars_to_write["OTEL_TRACES_EXPORTER"] = settings.opentelemetry_default_exporter
 
     # 3. Apply Golf's project name as OTEL_SERVICE_NAME if not already set
     # (Ensures service name defaults to project name if not specified in user's .env)
-    if settings.opentelemetry_enabled and settings.name:
-        if "OTEL_SERVICE_NAME" not in env_vars_to_write:
-            env_vars_to_write["OTEL_SERVICE_NAME"] = settings.name
+    if settings.opentelemetry_enabled and settings.name and "OTEL_SERVICE_NAME" not in env_vars_to_write:
+        env_vars_to_write["OTEL_SERVICE_NAME"] = settings.name
 
     # 4. (Re-)Write the .env file in the output directory if there's anything to write
     if env_vars_to_write:
@@ -1247,46 +1196,28 @@ def build_project(
                     # and handle existing quotes within the value.
                     if isinstance(value, str):
                         # Replace backslashes first, then double quotes
-                        processed_value = value.replace(
-                            "\\", "\\\\"
-                        )  # Escape backslashes
-                        processed_value = processed_value.replace(
-                            '"', '\\"'
-                        )  # Escape double quotes
-                        if (
-                            " " in value
-                            or "#" in value
-                            or "\n" in value
-                            or '"' in value
-                            or "'" in value
-                        ):
+                        processed_value = value.replace("\\", "\\\\")  # Escape backslashes
+                        processed_value = processed_value.replace('"', '\\"')  # Escape double quotes
+                        if " " in value or "#" in value or "\n" in value or '"' in value or "'" in value:
                             f.write(f'{key}="{processed_value}"\n')
                         else:
                             f.write(f"{key}={processed_value}\n")
                     else:  # For non-string values, write directly
                         f.write(f"{key}={value}\n")
         except Exception as e:
-            console.print(
-                f"[yellow]Warning: Could not write .env file to output directory: {e}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Could not write .env file to output directory: {e}[/yellow]")
     # --- END Enhanced .env handling ---
 
     # Show what we're building, with environment info
-    console.print(
-        f"[bold]Building [green]{settings.name}[/green] ({build_env} environment)[/bold]"
-    )
+    console.print(f"[bold]Building [green]{settings.name}[/green] ({build_env} environment)[/bold]")
 
     # Generate the code
-    generator = CodeGenerator(
-        project_path, settings, output_dir, build_env=build_env, copy_env=copy_env
-    )
+    generator = CodeGenerator(project_path, settings, output_dir, build_env=build_env, copy_env=copy_env)
     generator.generate()
 
     # Platform registration (only for prod builds)
     if build_env == "prod":
-        console.print(
-            "[dim]Registering with Golf platform and updating resources...[/dim]"
-        )
+        console.print("[dim]Registering with Golf platform and updating resources...[/dim]")
         import asyncio
 
         try:
@@ -1304,13 +1235,9 @@ def build_project(
                 console.print("[green]✓ Platform registration completed[/green]")
             # If success is False, the platform module already printed appropriate warnings
         except ImportError:
-            console.print(
-                "[yellow]Warning: Platform registration module not available[/yellow]"
-            )
+            console.print("[yellow]Warning: Platform registration module not available[/yellow]")
         except Exception as e:
-            console.print(
-                f"[yellow]Warning: Platform registration failed: {e}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Platform registration failed: {e}[/yellow]")
             console.print(
                 "[yellow]Tip: Ensure GOLF_API_KEY and GOLF_SERVER_ID are available in your .env file[/yellow]"
             )
@@ -1398,9 +1325,7 @@ from golf.auth.api_key import configure_api_key, get_api_key_config
         if src_file.exists():
             shutil.copy(src_file, dst_file)
         else:
-            console.print(
-                f"[yellow]Warning: Could not find {src_file} to copy[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Could not find {src_file} to copy[/yellow]")
 
     # Copy telemetry module if OpenTelemetry is enabled
     if settings.opentelemetry_enabled:
@@ -1408,27 +1333,18 @@ from golf.auth.api_key import configure_api_key, get_api_key_config
         telemetry_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy telemetry __init__.py
-        src_init = (
-            Path(__file__).parent.parent.parent / "golf" / "telemetry" / "__init__.py"
-        )
+        src_init = Path(__file__).parent.parent.parent / "golf" / "telemetry" / "__init__.py"
         dst_init = telemetry_dir / "__init__.py"
         if src_init.exists():
             shutil.copy(src_init, dst_init)
 
         # Copy instrumentation module
-        src_instrumentation = (
-            Path(__file__).parent.parent.parent
-            / "golf"
-            / "telemetry"
-            / "instrumentation.py"
-        )
+        src_instrumentation = Path(__file__).parent.parent.parent / "golf" / "telemetry" / "instrumentation.py"
         dst_instrumentation = telemetry_dir / "instrumentation.py"
         if src_instrumentation.exists():
             shutil.copy(src_instrumentation, dst_instrumentation)
         else:
-            console.print(
-                "[yellow]Warning: Could not find telemetry instrumentation module[/yellow]"
-            )
+            console.print("[yellow]Warning: Could not find telemetry instrumentation module[/yellow]")
 
     # Check if auth routes need to be added
     if is_auth_configured() or get_api_key_config():
@@ -1444,17 +1360,12 @@ from golf.auth.api_key import configure_api_key, get_api_key_config
             app_pos = server_code_content.find(app_marker)
             if app_pos != -1:
                 modified_code = (
-                    server_code_content[:app_pos]
-                    + auth_routes_code
-                    + "\n\n"
-                    + server_code_content[app_pos:]
+                    server_code_content[:app_pos] + auth_routes_code + "\n\n" + server_code_content[app_pos:]
                 )
 
                 # Format with black before writing
                 try:
-                    final_code_to_write = black.format_str(
-                        modified_code, mode=black.Mode()
-                    )
+                    final_code_to_write = black.format_str(modified_code, mode=black.Mode())
                 except Exception as e:
                     console.print(
                         f"[yellow]Warning: Could not format server.py after auth routes injection: {e}[/yellow]"
@@ -1470,9 +1381,7 @@ from golf.auth.api_key import configure_api_key, get_api_key_config
 
 
 # Renamed function - was find_shared_modules
-def find_common_files(
-    project_path: Path, components: dict[ComponentType, list[ParsedComponent]]
-) -> dict[str, Path]:
+def find_common_files(project_path: Path, components: dict[ComponentType, list[ParsedComponent]]) -> dict[str, Path]:
     """Find all common.py files used by components."""
     # We'll use the parser's functionality to find common files directly
     from golf.core.parser import parse_common_files
@@ -1484,9 +1393,7 @@ def find_common_files(
 
 
 # Updated parameter name from shared_modules to common_files
-def build_import_map(
-    project_path: Path, common_files: dict[str, Path]
-) -> dict[str, str]:
+def build_import_map(project_path: Path, common_files: dict[str, Path]) -> dict[str, str]:
     """Build a mapping of import paths to their new locations in the build output.
 
     This maps from original relative import paths to absolute import paths

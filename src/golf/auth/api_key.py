@@ -11,25 +11,19 @@ from pydantic import BaseModel, Field
 class ApiKeyConfig(BaseModel):
     """Configuration for API key authentication."""
 
-    header_name: str = Field(
-        "X-API-Key", description="Name of the header containing the API key"
-    )
+    header_name: str = Field("X-API-Key", description="Name of the header containing the API key")
     header_prefix: str = Field(
         "",
         description="Optional prefix to strip from the header value (e.g., 'Bearer ')",
     )
-    required: bool = Field(
-        True, description="Whether API key is required for all requests"
-    )
+    required: bool = Field(True, description="Whether API key is required for all requests")
 
 
 # Global configuration storage
 _api_key_config: ApiKeyConfig | None = None
 
 
-def configure_api_key(
-    header_name: str = "X-API-Key", header_prefix: str = "", required: bool = True
-) -> None:
+def configure_api_key(header_name: str = "X-API-Key", header_prefix: str = "", required: bool = True) -> None:
     """Configure API key extraction from request headers.
 
     This function should be called in auth.py to set up API key handling.
@@ -58,9 +52,7 @@ def configure_api_key(
         )
     """
     global _api_key_config
-    _api_key_config = ApiKeyConfig(
-        header_name=header_name, header_prefix=header_prefix, required=required
-    )
+    _api_key_config = ApiKeyConfig(header_name=header_name, header_prefix=header_prefix, required=required)
 
 
 def get_api_key_config() -> ApiKeyConfig | None:
