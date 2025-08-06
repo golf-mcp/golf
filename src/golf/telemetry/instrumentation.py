@@ -58,7 +58,6 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         else:
             os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = golf_header
 
-        print("[INFO] Auto-configured OpenTelemetry for Golf platform ingestion")
 
     # Check for required environment variables based on exporter type
     exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "console").lower()
@@ -108,9 +107,6 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
 
             exporter = OTLPSpanExporter(endpoint=endpoint, headers=header_dict if header_dict else None)
 
-            # Log successful configuration for Golf platform
-            if golf_api_key:
-                print(f"[INFO] OpenTelemetry configured for Golf platform: {endpoint}")
         else:
             # Default to console exporter
             exporter = ConsoleSpanExporter(out=sys.stderr)
