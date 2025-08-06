@@ -5,6 +5,7 @@ import functools
 import os
 import sys
 import time
+import json
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any, TypeVar
@@ -25,6 +26,32 @@ T = TypeVar("T")
 # Global tracer instance
 _tracer: trace.Tracer | None = None
 _provider: TracerProvider | None = None
+_detailed_tracing_enabled: bool = False
+
+
+def _safe_serialize(data: Any, max_length: int = 1000) -> str | None:
+    """Safely serialize data to string with length limit."""
+    try:
+        if isinstance(data, str):
+            serialized = data
+        else:
+            serialized = json.dumps(data, default=str, ensure_ascii=False)
+        
+        if len(serialized) > max_length:
+            return serialized[:max_length] + "..." + f" (truncated from {len(serialized)} chars)"
+        return serialized
+    except (TypeError, ValueError):
+        # Fallback for non-serializable objects
+        try:
+            return str(data)[:max_length] + "..." if len(str(data)) > max_length else str(data)
+        except Exception:
+            return None
+
+
+def set_detailed_tracing(enabled: bool) -> None:
+    """Enable or disable detailed tracing with input/output capture."""
+    global _detailed_tracing_enabled
+    _detailed_tracing_enabled = enabled
 
 
 def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | None:
@@ -196,6 +223,14 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
             # Add minimal execution context
             if args or kwargs:
                 span.set_attribute("mcp.execution.has_params", True)
+            
+            # Capture inputs if detailed tracing is enabled
+            if _detailed_tracing_enabled and (args or kwargs):
+                input_data = {"args": args, "kwargs": kwargs} if args or kwargs else None
+                if input_data:
+                    input_str = _safe_serialize(input_data)
+                    if input_str:
+                        span.set_attribute("mcp.tool.input", input_str)
 
             # Extract Context parameter if present
             ctx = kwargs.get("ctx")
@@ -240,28 +275,20 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                     # Metrics not available, continue without metrics
                     pass
 
-                # Capture result metadata with better structure
+                # Capture result metadata
                 if result is not None:
-                    if isinstance(result, str | int | float | bool):
-                        span.set_attribute("mcp.tool.result.value", str(result))
-                        span.set_attribute("mcp.tool.result.type", type(result).__name__)
-                    elif isinstance(result, list):
-                        span.set_attribute("mcp.tool.result.count", len(result))
-                        span.set_attribute("mcp.tool.result.type", "array")
-                    elif isinstance(result, dict):
-                        span.set_attribute("mcp.tool.result.count", len(result))
-                        span.set_attribute("mcp.tool.result.type", "object")
-                        # Only show first few keys to avoid exceeding attribute limits
-                        if len(result) > 0 and len(result) <= 5:
-                            keys_list = list(result.keys())[:5]
-                            # Limit key length and join
-                            truncated_keys = [str(k)[:20] + "..." if len(str(k)) > 20 else str(k) for k in keys_list]
-                            span.set_attribute("mcp.tool.result.sample_keys", ",".join(truncated_keys))
-                    elif hasattr(result, "__len__"):
+                    span.set_attribute("mcp.tool.result.type", type(result).__name__)
+                    
+                    if isinstance(result, (list, dict)) and hasattr(result, "__len__"):
+                        span.set_attribute("mcp.tool.result.size", len(result))
+                    elif isinstance(result, str):
                         span.set_attribute("mcp.tool.result.length", len(result))
-
-                    # For any result, record its type
-                    span.set_attribute("mcp.tool.result.class", type(result).__name__)
+                    
+                    # Capture full output if detailed tracing is enabled
+                    if _detailed_tracing_enabled:
+                        output_str = _safe_serialize(result)
+                        if output_str:
+                            span.set_attribute("mcp.tool.output", output_str)
 
                 return result
             except Exception as e:
@@ -358,28 +385,20 @@ def instrument_tool(func: Callable[..., T], tool_name: str) -> Callable[..., T]:
                     # Metrics not available, continue without metrics
                     pass
 
-                # Capture result metadata with better structure
+                # Capture result metadata
                 if result is not None:
-                    if isinstance(result, str | int | float | bool):
-                        span.set_attribute("mcp.tool.result.value", str(result))
-                        span.set_attribute("mcp.tool.result.type", type(result).__name__)
-                    elif isinstance(result, list):
-                        span.set_attribute("mcp.tool.result.count", len(result))
-                        span.set_attribute("mcp.tool.result.type", "array")
-                    elif isinstance(result, dict):
-                        span.set_attribute("mcp.tool.result.count", len(result))
-                        span.set_attribute("mcp.tool.result.type", "object")
-                        # Only show first few keys to avoid exceeding attribute limits
-                        if len(result) > 0 and len(result) <= 5:
-                            keys_list = list(result.keys())[:5]
-                            # Limit key length and join
-                            truncated_keys = [str(k)[:20] + "..." if len(str(k)) > 20 else str(k) for k in keys_list]
-                            span.set_attribute("mcp.tool.result.sample_keys", ",".join(truncated_keys))
-                    elif hasattr(result, "__len__"):
+                    span.set_attribute("mcp.tool.result.type", type(result).__name__)
+                    
+                    if isinstance(result, (list, dict)) and hasattr(result, "__len__"):
+                        span.set_attribute("mcp.tool.result.size", len(result))
+                    elif isinstance(result, str):
                         span.set_attribute("mcp.tool.result.length", len(result))
-
-                    # For any result, record its type
-                    span.set_attribute("mcp.tool.result.class", type(result).__name__)
+                    
+                    # Capture full output if detailed tracing is enabled
+                    if _detailed_tracing_enabled:
+                        output_str = _safe_serialize(result)
+                        if output_str:
+                            span.set_attribute("mcp.tool.output", output_str)
 
                 return result
             except Exception as e:
