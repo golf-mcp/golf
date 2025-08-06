@@ -65,9 +65,7 @@ _auth_config: tuple[AuthConfig, list[str] | None] | None = None
 _api_key_context: str | None = None
 
 
-def configure_auth(
-    config: AuthConfig, required_scopes: list[str] | None = None
-) -> None:
+def configure_auth(config: AuthConfig, required_scopes: list[str] | None = None) -> None:
     """Configure authentication for the Golf server.
 
     This function should be called in auth.py to set up authentication

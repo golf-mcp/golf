@@ -18,10 +18,7 @@ async def welcome() -> list[dict]:
         },
         {
             "role": "user",
-            "content": (
-                "Welcome to {{project_name}}! This is a project built with GolfMCP. "
-                "How can I get started?"
-            ),
+            "content": ("Welcome to {{project_name}}! This is a project built with GolfMCP. How can I get started?"),
         },
     ]
 

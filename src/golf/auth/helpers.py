@@ -181,12 +181,8 @@ def debug_api_key_context() -> dict[str, Any]:
     try:
         main_module = sys.modules.get("__main__")
         if main_module:
-            debug_info["main_module_has_storage"] = hasattr(
-                main_module, "api_key_storage"
-            )
-            debug_info["main_module_has_context"] = hasattr(
-                main_module, "request_id_context"
-            )
+            debug_info["main_module_has_storage"] = hasattr(main_module, "api_key_storage")
+            debug_info["main_module_has_context"] = hasattr(main_module, "request_id_context")
 
             if hasattr(main_module, "request_id_context"):
                 request_id_context = main_module.request_id_context

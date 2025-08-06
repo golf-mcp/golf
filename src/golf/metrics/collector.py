@@ -74,18 +74,14 @@ class MetricsCollector:
             )
 
             # Session metrics
-            self._metrics["sessions_total"] = Counter(
-                "golf_sessions_total", "Total number of sessions created"
-            )
+            self._metrics["sessions_total"] = Counter("golf_sessions_total", "Total number of sessions created")
 
             self._metrics["session_duration"] = Histogram(
                 "golf_session_duration_seconds", "Session duration in seconds"
             )
 
             # System metrics
-            self._metrics["uptime"] = Gauge(
-                "golf_uptime_seconds", "Server uptime in seconds"
-            )
+            self._metrics["uptime"] = Gauge("golf_uptime_seconds", "Server uptime in seconds")
 
         except ImportError:
             # Prometheus client not available, disable metrics
@@ -101,9 +97,7 @@ class MetricsCollector:
         if not self.enabled or "tool_executions" not in self._metrics:
             return
 
-        self._metrics["tool_executions"].labels(
-            tool_name=tool_name, status=status
-        ).inc()
+        self._metrics["tool_executions"].labels(tool_name=tool_name, status=status).inc()
 
     def record_tool_duration(self, tool_name: str, duration: float) -> None:
         """Record tool execution duration.
@@ -128,9 +122,7 @@ class MetricsCollector:
         if not self.enabled or "http_requests" not in self._metrics:
             return
 
-        self._metrics["http_requests"].labels(
-            method=method, status_code=str(status_code), path=path
-        ).inc()
+        self._metrics["http_requests"].labels(method=method, status_code=str(status_code), path=path).inc()
 
     def record_http_duration(self, method: str, path: str, duration: float) -> None:
         """Record HTTP request duration.
@@ -143,9 +135,7 @@ class MetricsCollector:
         if not self.enabled or "http_duration" not in self._metrics:
             return
 
-        self._metrics["http_duration"].labels(method=method, path=path).observe(
-            duration
-        )
+        self._metrics["http_duration"].labels(method=method, path=path).observe(duration)
 
     def increment_resource_read(self, resource_uri: str) -> None:
         """Record a resource read.
@@ -180,9 +170,7 @@ class MetricsCollector:
         if not self.enabled or "errors" not in self._metrics:
             return
 
-        self._metrics["errors"].labels(
-            component_type=component_type, error_type=error_type
-        ).inc()
+        self._metrics["errors"].labels(component_type=component_type, error_type=error_type).inc()
 
     def increment_session(self) -> None:
         """Record a new session."""

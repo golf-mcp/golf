@@ -30,9 +30,7 @@ def generate_auth_code(
     # Check for API key configuration first
     api_key_config = get_api_key_config()
     if api_key_config:
-        return generate_api_key_auth_components(
-            server_name, opentelemetry_enabled, transport
-        )
+        return generate_api_key_auth_components(server_name, opentelemetry_enabled, transport)
 
     # Check for modern auth configuration
     auth_config_tuple = get_auth_config()
@@ -66,8 +64,7 @@ def generate_auth_code(
         "    auth_config, required_scopes = auth_config_tuple",
         "    try:",
         "        auth_provider = create_auth_provider(auth_config)",
-        "        print(f'Authentication configured with "
-        "{auth_config.provider_type} provider')",
+        "        print(f'Authentication configured with {auth_config.provider_type} provider')",
         "    except Exception as e:",
         "        print(f'Authentication setup failed: {e}', file=sys.stderr)",
         "        auth_provider = None",
@@ -165,8 +162,7 @@ def generate_api_key_auth_components(
         "                    {'error': 'unauthorized', "
         "'detail': f'Missing required {header_name} header'},"
         "                    status_code=401,",
-        "                    headers={'WWW-Authenticate': "
-        "f'{header_name} realm=\"MCP Server\"'}",
+        "                    headers={'WWW-Authenticate': f'{header_name} realm=\"MCP Server\"'}",
         "                )",
         "        ",
         "        # Continue with the request",

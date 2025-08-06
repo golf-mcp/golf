@@ -13,19 +13,11 @@ console = Console()
 class AuthConfig(BaseModel):
     """Authentication configuration."""
 
-    provider: str = Field(
-        ..., description="Authentication provider (e.g., 'jwks', 'google', 'github')"
-    )
+    provider: str = Field(..., description="Authentication provider (e.g., 'jwks', 'google', 'github')")
     scopes: list[str] = Field(default_factory=list, description="Required OAuth scopes")
-    client_id_env: str | None = Field(
-        None, description="Environment variable name for client ID"
-    )
-    client_secret_env: str | None = Field(
-        None, description="Environment variable name for client secret"
-    )
-    redirect_uri: str | None = Field(
-        None, description="OAuth redirect URI (defaults to localhost callback)"
-    )
+    client_id_env: str | None = Field(None, description="Environment variable name for client ID")
+    client_secret_env: str | None = Field(None, description="Environment variable name for client secret")
+    redirect_uri: str | None = Field(None, description="OAuth redirect URI (defaults to localhost callback)")
 
     @field_validator("provider")
     @classmethod
@@ -33,10 +25,7 @@ class AuthConfig(BaseModel):
         """Validate the provider value."""
         valid_providers = {"jwks", "google", "github", "custom"}
         if value not in valid_providers and not value.startswith("custom:"):
-            raise ValueError(
-                f"Invalid provider '{value}'. Must be one of {valid_providers} "
-                "or start with 'custom:'"
-            )
+            raise ValueError(f"Invalid provider '{value}'. Must be one of {valid_providers} or start with 'custom:'")
         return value
 
 
@@ -44,9 +33,7 @@ class DeployConfig(BaseModel):
     """Deployment configuration."""
 
     default: str = Field("vercel", description="Default deployment target")
-    options: dict[str, Any] = Field(
-        default_factory=dict, description="Target-specific options"
-    )
+    options: dict[str, Any] = Field(default_factory=dict, description="Target-specific options")
 
 
 class Settings(BaseSettings):
@@ -75,51 +62,36 @@ class Settings(BaseSettings):
     )
 
     # Auth settings
-    auth: str | AuthConfig | None = Field(
-        None, description="Authentication configuration or URI"
-    )
+    auth: str | AuthConfig | None = Field(None, description="Authentication configuration or URI")
 
     # Deploy settings
-    deploy: DeployConfig = Field(
-        default_factory=DeployConfig, description="Deployment configuration"
-    )
+    deploy: DeployConfig = Field(default_factory=DeployConfig, description="Deployment configuration")
 
     # Feature flags
     telemetry: bool = Field(True, description="Enable anonymous telemetry")
 
     # Project paths
     tools_dir: str = Field("tools", description="Directory containing tools")
-    resources_dir: str = Field(
-        "resources", description="Directory containing resources"
-    )
+    resources_dir: str = Field("resources", description="Directory containing resources")
     prompts_dir: str = Field("prompts", description="Directory containing prompts")
 
     # OpenTelemetry config
-    opentelemetry_enabled: bool = Field(
-        False, description="Enable OpenTelemetry tracing"
-    )
-    opentelemetry_default_exporter: str = Field(
-        "console", description="Default OpenTelemetry exporter type"
-    )
+    opentelemetry_enabled: bool = Field(False, description="Enable OpenTelemetry tracing")
+    opentelemetry_default_exporter: str = Field("console", description="Default OpenTelemetry exporter type")
 
     # Health check configuration
-    health_check_enabled: bool = Field(
-        False, description="Enable health check endpoint"
-    )
+    health_check_enabled: bool = Field(False, description="Enable health check endpoint")
     health_check_path: str = Field("/health", description="Health check endpoint path")
     health_check_response: str = Field("OK", description="Health check response text")
 
     # HTTP session behaviour
     stateless_http: bool = Field(
         False,
-        description="Make Streamable-HTTP transport stateless (new session "
-        "per request)",
+        description="Make Streamable-HTTP transport stateless (new session per request)",
     )
 
     # Metrics configuration
-    metrics_enabled: bool = Field(
-        False, description="Enable Prometheus metrics endpoint"
-    )
+    metrics_enabled: bool = Field(False, description="Enable Prometheus metrics endpoint")
     metrics_path: str = Field("/metrics", description="Metrics endpoint path")
 
 
@@ -167,7 +139,7 @@ def find_project_root(
         start_path: Path to start searching from (defaults to current directory)
 
     Returns:
-        Tuple of (project_root, config_path) if a project is found, or 
+        Tuple of (project_root, config_path) if a project is found, or
         (None, None) if not
     """
     config_path = find_config_path(start_path)
@@ -206,8 +178,7 @@ def load_settings(project_path: str | Path) -> Settings:
     toml_config_path = project_path / "golf.toml"
     if toml_config_path.exists():
         console.print(
-            "[yellow]Warning: Using .toml configuration is deprecated. Please "
-            "migrate to .json format.[/yellow]"
+            "[yellow]Warning: Using .toml configuration is deprecated. Please migrate to .json format.[/yellow]"
         )
         return _load_toml_settings(toml_config_path, settings)
 
@@ -230,9 +201,7 @@ def _load_json_settings(path: Path, settings: Settings) -> Settings:
 
         return settings
     except Exception as e:
-        console.print(
-            f"[bold red]Error loading JSON config from {path}: {e}[/bold red]"
-        )
+        console.print(f"[bold red]Error loading JSON config from {path}: {e}[/bold red]")
         return settings
 
 

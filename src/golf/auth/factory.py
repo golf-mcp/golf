@@ -78,9 +78,7 @@ def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
 
     # Validate configuration
     if not public_key and not jwks_uri:
-        raise ValueError(
-            "Either public_key or jwks_uri must be provided for JWT verification"
-        )
+        raise ValueError("Either public_key or jwks_uri must be provided for JWT verification")
 
     if public_key and jwks_uri:
         raise ValueError("Provide either public_key or jwks_uri, not both")
@@ -88,9 +86,7 @@ def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
     try:
         from fastmcp.server.auth import JWTVerifier
     except ImportError as e:
-        raise ImportError(
-            "JWTVerifier not available. Please install fastmcp>=2.11.0"
-        ) from e
+        raise ImportError("JWTVerifier not available. Please install fastmcp>=2.11.0") from e
 
     return JWTVerifier(
         public_key=public_key,
@@ -110,9 +106,7 @@ def _create_static_provider(config: StaticTokenConfig) -> "StaticTokenVerifier":
     try:
         from fastmcp.server.auth import StaticTokenVerifier
     except ImportError as e:
-        raise ImportError(
-            "StaticTokenVerifier not available. Please install fastmcp>=2.11.0"
-        ) from e
+        raise ImportError("StaticTokenVerifier not available. Please install fastmcp>=2.11.0") from e
 
     return StaticTokenVerifier(
         tokens=config.tokens,
@@ -126,8 +120,7 @@ def _create_oauth_server_provider(config: OAuthServerConfig) -> "AuthProvider":
         from fastmcp.server.auth import OAuthProvider
     except ImportError as e:
         raise ImportError(
-            "OAuthProvider not available in this FastMCP version. "
-            "Please upgrade to FastMCP 2.11.0 or later."
+            "OAuthProvider not available in this FastMCP version. Please upgrade to FastMCP 2.11.0 or later."
         ) from e
 
     # Resolve runtime values from environment variables
@@ -167,8 +160,7 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
         from fastmcp.server.auth import RemoteAuthProvider
     except ImportError as e:
         raise ImportError(
-            "RemoteAuthProvider not available in this FastMCP version. "
-            "Please upgrade to FastMCP 2.11.0 or later."
+            "RemoteAuthProvider not available in this FastMCP version. Please upgrade to FastMCP 2.11.0 or later."
         ) from e
 
     # Create the underlying token verifier
@@ -176,10 +168,7 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
 
     # Ensure it's actually a TokenVerifier
     if not hasattr(token_verifier, "verify_token"):
-        raise ValueError(
-            "Remote auth provider requires a TokenVerifier, "
-            f"got {type(token_verifier).__name__}"
-        )
+        raise ValueError(f"Remote auth provider requires a TokenVerifier, got {type(token_verifier).__name__}")
 
     return RemoteAuthProvider(
         token_verifier=token_verifier,

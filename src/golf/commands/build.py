@@ -32,17 +32,13 @@ def build_project(
         copy_env: Whether to copy environment variables to the built app
     """
     # Call the centralized build function from core.builder
-    core_build_project(
-        project_path, settings, output_dir, build_env=build_env, copy_env=copy_env
-    )
+    core_build_project(project_path, settings, output_dir, build_env=build_env, copy_env=copy_env)
 
 
 # Add a main section to run the build_project function when this module is
 # executed directly
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Build a standalone FastMCP application"
-    )
+    parser = argparse.ArgumentParser(description="Build a standalone FastMCP application")
     parser.add_argument(
         "--project-path",
         "-p",

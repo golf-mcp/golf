@@ -49,26 +49,26 @@ def generate_component_registration_with_telemetry(
     if component_type == "tool":
         wrapped_func = f"instrument_tool({func_ref}, '{component_name}')"
         return (
-            f'_tool = Tool.from_function({wrapped_func}, '
+            f"_tool = Tool.from_function({wrapped_func}, "
             f'name="{component_name}", description="{escaped_docstring}")\n'
-            f'mcp.add_tool(_tool)'
+            f"mcp.add_tool(_tool)"
         )
 
     elif component_type == "resource":
         wrapped_func = f"instrument_resource({func_ref}, '{uri_template}')"
         return (
-            f'_resource = Resource.from_function({wrapped_func}, '
+            f"_resource = Resource.from_function({wrapped_func}, "
             f'uri="{uri_template}", name="{component_name}", '
             f'description="{escaped_docstring}")\n'
-            f'mcp.add_resource(_resource)'
+            f"mcp.add_resource(_resource)"
         )
 
     elif component_type == "prompt":
         wrapped_func = f"instrument_prompt({func_ref}, '{component_name}')"
         return (
-            f'_prompt = Prompt.from_function({wrapped_func}, '
+            f"_prompt = Prompt.from_function({wrapped_func}, "
             f'name="{component_name}", description="{escaped_docstring}")\n'
-            f'mcp.add_prompt(_prompt)'
+            f"mcp.add_prompt(_prompt)"
         )
 
     else:
