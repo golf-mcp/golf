@@ -613,6 +613,383 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
         return sync_wrapper
 
 
+def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elicit") -> Callable[..., T]:
+    """Instrument an elicitation function with OpenTelemetry tracing."""
+    global _provider
+
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+
+    tracer = get_tracer()
+
+    @functools.wraps(func)
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Record metrics timing
+        start_time = time.time()
+        
+        # Create a more descriptive span name
+        span_name = f"mcp.elicitation.{elicitation_type}.request"
+        with tracer.start_as_current_span(span_name) as span:
+            # Add essential attributes
+            span.set_attribute("mcp.component.type", "elicitation")
+            span.set_attribute("mcp.elicitation.type", elicitation_type)
+            span.set_attribute(
+                "mcp.elicitation.module",
+                func.__module__ if hasattr(func, "__module__") else "unknown",
+            )
+
+            # Capture elicitation parameters if detailed tracing is enabled
+            if _detailed_tracing_enabled:
+                # Extract message from first argument (common pattern)
+                if args:
+                    message = args[0] if isinstance(args[0], str) else None
+                    if message:
+                        span.set_attribute("mcp.elicitation.message", _safe_serialize(message, 500))
+                
+                # Extract response_type from kwargs/args
+                response_type = kwargs.get("response_type") or (args[1] if len(args) > 1 else None)
+                if response_type is not None:
+                    if isinstance(response_type, list):
+                        span.set_attribute("mcp.elicitation.response_type", "choice")
+                        span.set_attribute("mcp.elicitation.choices", str(response_type))
+                    elif hasattr(response_type, "__name__"):
+                        span.set_attribute("mcp.elicitation.response_type", response_type.__name__)
+                    else:
+                        span.set_attribute("mcp.elicitation.response_type", str(type(response_type).__name__))
+
+            # Extract Context parameter if present
+            ctx = kwargs.get("ctx")
+            if ctx:
+                ctx_attrs = ["request_id", "session_id", "client_id", "user_id", "tenant_id"]
+                for attr in ctx_attrs:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
+                            span.set_attribute(f"mcp.context.{attr}", str(value))
+
+            # Add event for elicitation start
+            span.add_event("elicitation.request.started", {"elicitation.type": elicitation_type})
+
+            try:
+                result = await func(*args, **kwargs)
+                span.set_status(Status(StatusCode.OK))
+
+                # Add event for successful completion
+                span.add_event("elicitation.request.completed", {"elicitation.type": elicitation_type})
+
+                # Capture result metadata
+                if result is not None:
+                    span.set_attribute("mcp.elicitation.result.type", type(result).__name__)
+                    
+                    if isinstance(result, str):
+                        span.set_attribute("mcp.elicitation.result.length", len(result))
+                        if _detailed_tracing_enabled:
+                            span.set_attribute("mcp.elicitation.result.content", _safe_serialize(result, 500))
+                    elif isinstance(result, (list, dict)) and hasattr(result, "__len__"):
+                        span.set_attribute("mcp.elicitation.result.size", len(result))
+                        if _detailed_tracing_enabled:
+                            span.set_attribute("mcp.elicitation.result.content", _safe_serialize(result, 1000))
+
+                # Record metrics for successful elicitation
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_elicitation(elicitation_type, "success")
+                    metrics_collector.record_elicitation_duration(elicitation_type, time.time() - start_time)
+                except ImportError:
+                    pass
+
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+
+                # Add event for error
+                span.add_event(
+                    "elicitation.request.error",
+                    {
+                        "elicitation.type": elicitation_type,
+                        "error.type": type(e).__name__,
+                        "error.message": str(e),
+                    },
+                )
+
+                # Record metrics for failed elicitation
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_elicitation(elicitation_type, "error")
+                    metrics_collector.increment_error("elicitation", type(e).__name__)
+                except ImportError:
+                    pass
+
+                raise
+
+    @functools.wraps(func)
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Record metrics timing
+        start_time = time.time()
+        
+        # Create a more descriptive span name
+        span_name = f"mcp.elicitation.{elicitation_type}.request"
+        with tracer.start_as_current_span(span_name) as span:
+            # Add essential attributes
+            span.set_attribute("mcp.component.type", "elicitation")
+            span.set_attribute("mcp.elicitation.type", elicitation_type)
+            span.set_attribute(
+                "mcp.elicitation.module",
+                func.__module__ if hasattr(func, "__module__") else "unknown",
+            )
+
+            # Capture elicitation parameters if detailed tracing is enabled
+            if _detailed_tracing_enabled:
+                if args:
+                    message = args[0] if isinstance(args[0], str) else None
+                    if message:
+                        span.set_attribute("mcp.elicitation.message", _safe_serialize(message, 500))
+
+            # Add event for elicitation start
+            span.add_event("elicitation.request.started", {"elicitation.type": elicitation_type})
+
+            try:
+                result = func(*args, **kwargs)
+                span.set_status(Status(StatusCode.OK))
+
+                # Add event for successful completion
+                span.add_event("elicitation.request.completed", {"elicitation.type": elicitation_type})
+
+                # Capture result metadata
+                if result is not None:
+                    span.set_attribute("mcp.elicitation.result.type", type(result).__name__)
+
+                # Record metrics for successful elicitation
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_elicitation(elicitation_type, "success")
+                    metrics_collector.record_elicitation_duration(elicitation_type, time.time() - start_time)
+                except ImportError:
+                    pass
+
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+
+                # Add event for error
+                span.add_event(
+                    "elicitation.request.error",
+                    {
+                        "elicitation.type": elicitation_type,
+                        "error.type": type(e).__name__,
+                        "error.message": str(e),
+                    },
+                )
+
+                # Record metrics for failed elicitation
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_elicitation(elicitation_type, "error")
+                    metrics_collector.increment_error("elicitation", type(e).__name__)
+                except ImportError:
+                    pass
+
+                raise
+
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
+
+
+def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -> Callable[..., T]:
+    """Instrument a sampling function with OpenTelemetry tracing."""
+    global _provider
+
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+
+    tracer = get_tracer()
+
+    @functools.wraps(func)
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Record metrics timing
+        start_time = time.time()
+        
+        # Create a more descriptive span name
+        span_name = f"mcp.sampling.{sampling_type}.request"
+        with tracer.start_as_current_span(span_name) as span:
+            # Add essential attributes
+            span.set_attribute("mcp.component.type", "sampling")
+            span.set_attribute("mcp.sampling.type", sampling_type)
+            span.set_attribute(
+                "mcp.sampling.module",
+                func.__module__ if hasattr(func, "__module__") else "unknown",
+            )
+
+            # Capture sampling parameters
+            messages = kwargs.get("messages") or (args[0] if args else None)
+            if messages:
+                if isinstance(messages, str):
+                    span.set_attribute("mcp.sampling.messages.type", "string")
+                    span.set_attribute("mcp.sampling.messages.length", len(messages))
+                    if _detailed_tracing_enabled:
+                        span.set_attribute("mcp.sampling.messages.content", _safe_serialize(messages, 1000))
+                elif isinstance(messages, list):
+                    span.set_attribute("mcp.sampling.messages.type", "list")
+                    span.set_attribute("mcp.sampling.messages.count", len(messages))
+                    if _detailed_tracing_enabled:
+                        span.set_attribute("mcp.sampling.messages.content", _safe_serialize(messages, 1000))
+
+            # Capture other sampling parameters
+            system_prompt = kwargs.get("system_prompt")
+            if system_prompt:
+                span.set_attribute("mcp.sampling.system_prompt.length", len(system_prompt))
+                if _detailed_tracing_enabled:
+                    span.set_attribute("mcp.sampling.system_prompt.content", _safe_serialize(system_prompt, 500))
+
+            temperature = kwargs.get("temperature")
+            if temperature is not None:
+                span.set_attribute("mcp.sampling.temperature", temperature)
+
+            max_tokens = kwargs.get("max_tokens")
+            if max_tokens is not None:
+                span.set_attribute("mcp.sampling.max_tokens", max_tokens)
+
+            model_preferences = kwargs.get("model_preferences")
+            if model_preferences:
+                if isinstance(model_preferences, str):
+                    span.set_attribute("mcp.sampling.model_preferences", model_preferences)
+                elif isinstance(model_preferences, list):
+                    span.set_attribute("mcp.sampling.model_preferences", ",".join(model_preferences))
+
+            # Extract Context parameter if present
+            ctx = kwargs.get("ctx")
+            if ctx:
+                ctx_attrs = ["request_id", "session_id", "client_id", "user_id", "tenant_id"]
+                for attr in ctx_attrs:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
+                            span.set_attribute(f"mcp.context.{attr}", str(value))
+
+            # Add event for sampling start
+            span.add_event("sampling.request.started", {"sampling.type": sampling_type})
+
+            try:
+                result = await func(*args, **kwargs)
+                span.set_status(Status(StatusCode.OK))
+
+                # Add event for successful completion
+                span.add_event("sampling.request.completed", {"sampling.type": sampling_type})
+
+                # Capture result metadata
+                if result is not None:
+                    span.set_attribute("mcp.sampling.result.type", type(result).__name__)
+                    
+                    if isinstance(result, str):
+                        span.set_attribute("mcp.sampling.result.length", len(result))
+                        span.set_attribute("mcp.sampling.result.tokens_estimate", len(result.split()))
+                        if _detailed_tracing_enabled:
+                            span.set_attribute("mcp.sampling.result.content", _safe_serialize(result, 1000))
+
+                # Record metrics for successful sampling
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_sampling(sampling_type, "success")
+                    metrics_collector.record_sampling_duration(sampling_type, time.time() - start_time)
+                    if isinstance(result, str):
+                        metrics_collector.record_sampling_tokens(sampling_type, len(result.split()))
+                except ImportError:
+                    pass
+
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+
+                # Add event for error
+                span.add_event(
+                    "sampling.request.error",
+                    {
+                        "sampling.type": sampling_type,
+                        "error.type": type(e).__name__,
+                        "error.message": str(e),
+                    },
+                )
+
+                # Record metrics for failed sampling
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_sampling(sampling_type, "error")
+                    metrics_collector.increment_error("sampling", type(e).__name__)
+                except ImportError:
+                    pass
+
+                raise
+
+    @functools.wraps(func)
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Record metrics timing
+        start_time = time.time()
+        
+        # Create a more descriptive span name
+        span_name = f"mcp.sampling.{sampling_type}.request"
+        with tracer.start_as_current_span(span_name) as span:
+            # Add essential attributes
+            span.set_attribute("mcp.component.type", "sampling")
+            span.set_attribute("mcp.sampling.type", sampling_type)
+            span.set_attribute(
+                "mcp.sampling.module",
+                func.__module__ if hasattr(func, "__module__") else "unknown",
+            )
+
+            # Add event for sampling start
+            span.add_event("sampling.request.started", {"sampling.type": sampling_type})
+
+            try:
+                result = func(*args, **kwargs)
+                span.set_status(Status(StatusCode.OK))
+
+                # Add event for successful completion
+                span.add_event("sampling.request.completed", {"sampling.type": sampling_type})
+
+                # Record metrics for successful sampling
+                try:
+                    from golf.metrics import get_metrics_collector
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_sampling(sampling_type, "success")
+                    metrics_collector.record_sampling_duration(sampling_type, time.time() - start_time)
+                except ImportError:
+                    pass
+
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+
+                # Add event for error
+                span.add_event(
+                    "sampling.request.error",
+                    {
+                        "sampling.type": sampling_type,
+                        "error.type": type(e).__name__,
+                        "error.message": str(e),
+                    },
+                )
+                raise
+
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
+
+
 def instrument_prompt(func: Callable[..., T], prompt_name: str) -> Callable[..., T]:
     """Instrument a prompt function with OpenTelemetry tracing."""
     global _provider
