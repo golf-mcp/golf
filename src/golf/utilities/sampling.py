@@ -5,8 +5,21 @@ can use without needing to manage FastMCP Context objects directly.
 """
 
 from typing import Any
+from collections.abc import Callable
 
 from .context import get_current_context
+
+# Apply telemetry instrumentation if available
+try:
+    from golf.telemetry import instrument_sampling
+
+    _instrumentation_available = True
+except ImportError:
+    _instrumentation_available = False
+
+    def instrument_sampling(func: Callable, sampling_type: str = "sample") -> Callable:
+        """No-op instrumentation when telemetry is not available."""
+        return func
 
 
 async def sample(
@@ -200,3 +213,9 @@ async def sample_with_context(
         system_prompt=system_prompt,
         **kwargs,
     )
+
+
+# Apply instrumentation to all sampling functions
+sample = instrument_sampling(sample, "sample")
+sample_structured = instrument_sampling(sample_structured, "structured")
+sample_with_context = instrument_sampling(sample_with_context, "context")

@@ -66,6 +66,38 @@ class MetricsCollector:
                 ["prompt_name"],
             )
 
+            # Sampling metrics
+            self._metrics["sampling_requests"] = Counter(
+                "golf_sampling_requests_total",
+                "Total number of sampling requests",
+                ["sampling_type", "status"],
+            )
+
+            self._metrics["sampling_duration"] = Histogram(
+                "golf_sampling_duration_seconds",
+                "Sampling request duration in seconds",
+                ["sampling_type"],
+            )
+
+            self._metrics["sampling_tokens"] = Histogram(
+                "golf_sampling_tokens",
+                "Number of tokens in sampling responses",
+                ["sampling_type"],
+            )
+
+            # Elicitation metrics
+            self._metrics["elicitation_requests"] = Counter(
+                "golf_elicitation_requests_total",
+                "Total number of elicitation requests",
+                ["elicitation_type", "status"],
+            )
+
+            self._metrics["elicitation_duration"] = Histogram(
+                "golf_elicitation_duration_seconds",
+                "Elicitation request duration in seconds",
+                ["elicitation_type"],
+            )
+
             # Error metrics
             self._metrics["errors"] = Counter(
                 "golf_errors_total",
@@ -200,6 +232,66 @@ class MetricsCollector:
             return
 
         self._metrics["uptime"].set(seconds)
+
+    def increment_sampling(self, sampling_type: str, status: str) -> None:
+        """Record a sampling request.
+
+        Args:
+            sampling_type: Type of sampling ('sample', 'structured', 'context')
+            status: Request status ('success' or 'error')
+        """
+        if not self.enabled or "sampling_requests" not in self._metrics:
+            return
+
+        self._metrics["sampling_requests"].labels(sampling_type=sampling_type, status=status).inc()
+
+    def record_sampling_duration(self, sampling_type: str, duration: float) -> None:
+        """Record sampling request duration.
+
+        Args:
+            sampling_type: Type of sampling
+            duration: Request duration in seconds
+        """
+        if not self.enabled or "sampling_duration" not in self._metrics:
+            return
+
+        self._metrics["sampling_duration"].labels(sampling_type=sampling_type).observe(duration)
+
+    def record_sampling_tokens(self, sampling_type: str, token_count: int) -> None:
+        """Record sampling token count.
+
+        Args:
+            sampling_type: Type of sampling
+            token_count: Number of tokens in the response
+        """
+        if not self.enabled or "sampling_tokens" not in self._metrics:
+            return
+
+        self._metrics["sampling_tokens"].labels(sampling_type=sampling_type).observe(token_count)
+
+    def increment_elicitation(self, elicitation_type: str, status: str) -> None:
+        """Record an elicitation request.
+
+        Args:
+            elicitation_type: Type of elicitation ('elicit', 'confirmation')
+            status: Request status ('success' or 'error')
+        """
+        if not self.enabled or "elicitation_requests" not in self._metrics:
+            return
+
+        self._metrics["elicitation_requests"].labels(elicitation_type=elicitation_type, status=status).inc()
+
+    def record_elicitation_duration(self, elicitation_type: str, duration: float) -> None:
+        """Record elicitation request duration.
+
+        Args:
+            elicitation_type: Type of elicitation
+            duration: Request duration in seconds
+        """
+        if not self.enabled or "elicitation_duration" not in self._metrics:
+            return
+
+        self._metrics["elicitation_duration"].labels(elicitation_type=elicitation_type).observe(duration)
 
 
 def init_metrics_collector(enabled: bool = False) -> MetricsCollector:
