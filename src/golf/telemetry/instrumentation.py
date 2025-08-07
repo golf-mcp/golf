@@ -632,11 +632,6 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
         with tracer.start_as_current_span(span_name) as span:
             # Add essential attributes
             span.set_attribute("mcp.component.type", "elicitation")
-            span.set_attribute("mcp.elicitation.type", elicitation_type)
-            span.set_attribute(
-                "mcp.elicitation.module",
-                func.__module__ if hasattr(func, "__module__") else "unknown",
-            )
 
             # Capture elicitation parameters if detailed tracing is enabled
             if _detailed_tracing_enabled:
@@ -668,27 +663,22 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                             span.set_attribute(f"mcp.context.{attr}", str(value))
 
             # Add event for elicitation start
-            span.add_event("elicitation.request.started", {"elicitation.type": elicitation_type})
+            span.add_event("elicitation.request.started")
 
             try:
                 result = await func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
 
                 # Add event for successful completion
-                span.add_event("elicitation.request.completed", {"elicitation.type": elicitation_type})
+                span.add_event("elicitation.request.completed")
 
                 # Capture result metadata
-                if result is not None:
-                    span.set_attribute("mcp.elicitation.result.type", type(result).__name__)
-                    
+                if result is not None and _detailed_tracing_enabled:
                     if isinstance(result, str):
-                        span.set_attribute("mcp.elicitation.result.length", len(result))
-                        if _detailed_tracing_enabled:
-                            span.set_attribute("mcp.elicitation.result.content", _safe_serialize(result, 500))
+                        span.set_attribute("mcp.elicitation.result.content", _safe_serialize(result, 500))
                     elif isinstance(result, (list, dict)) and hasattr(result, "__len__"):
                         span.set_attribute("mcp.elicitation.result.size", len(result))
-                        if _detailed_tracing_enabled:
-                            span.set_attribute("mcp.elicitation.result.content", _safe_serialize(result, 1000))
+                        span.set_attribute("mcp.elicitation.result.content", _safe_serialize(result, 1000))
 
                 # Record metrics for successful elicitation
                 try:
@@ -708,7 +698,6 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                 span.add_event(
                     "elicitation.request.error",
                     {
-                        "elicitation.type": elicitation_type,
                         "error.type": type(e).__name__,
                         "error.message": str(e),
                     },
@@ -740,11 +729,6 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
         with tracer.start_as_current_span(span_name) as span:
             # Add essential attributes
             span.set_attribute("mcp.component.type", "elicitation")
-            span.set_attribute("mcp.elicitation.type", elicitation_type)
-            span.set_attribute(
-                "mcp.elicitation.module",
-                func.__module__ if hasattr(func, "__module__") else "unknown",
-            )
 
             # Capture elicitation parameters if detailed tracing is enabled
             if _detailed_tracing_enabled:
@@ -754,18 +738,14 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                         span.set_attribute("mcp.elicitation.message", _safe_serialize(message, 500))
 
             # Add event for elicitation start
-            span.add_event("elicitation.request.started", {"elicitation.type": elicitation_type})
+            span.add_event("elicitation.request.started")
 
             try:
                 result = func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
 
                 # Add event for successful completion
-                span.add_event("elicitation.request.completed", {"elicitation.type": elicitation_type})
-
-                # Capture result metadata
-                if result is not None:
-                    span.set_attribute("mcp.elicitation.result.type", type(result).__name__)
+                span.add_event("elicitation.request.completed")
 
                 # Record metrics for successful elicitation
                 try:
@@ -785,7 +765,6 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                 span.add_event(
                     "elicitation.request.error",
                     {
-                        "elicitation.type": elicitation_type,
                         "error.type": type(e).__name__,
                         "error.message": str(e),
                     },
@@ -827,32 +806,20 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
         with tracer.start_as_current_span(span_name) as span:
             # Add essential attributes
             span.set_attribute("mcp.component.type", "sampling")
-            span.set_attribute("mcp.sampling.type", sampling_type)
-            span.set_attribute(
-                "mcp.sampling.module",
-                func.__module__ if hasattr(func, "__module__") else "unknown",
-            )
 
             # Capture sampling parameters
             messages = kwargs.get("messages") or (args[0] if args else None)
-            if messages:
+            if messages and _detailed_tracing_enabled:
                 if isinstance(messages, str):
-                    span.set_attribute("mcp.sampling.messages.type", "string")
-                    span.set_attribute("mcp.sampling.messages.length", len(messages))
-                    if _detailed_tracing_enabled:
-                        span.set_attribute("mcp.sampling.messages.content", _safe_serialize(messages, 1000))
+                    span.set_attribute("mcp.sampling.messages.content", _safe_serialize(messages, 1000))
                 elif isinstance(messages, list):
-                    span.set_attribute("mcp.sampling.messages.type", "list")
                     span.set_attribute("mcp.sampling.messages.count", len(messages))
-                    if _detailed_tracing_enabled:
-                        span.set_attribute("mcp.sampling.messages.content", _safe_serialize(messages, 1000))
+                    span.set_attribute("mcp.sampling.messages.content", _safe_serialize(messages, 1000))
 
             # Capture other sampling parameters
             system_prompt = kwargs.get("system_prompt")
-            if system_prompt:
-                span.set_attribute("mcp.sampling.system_prompt.length", len(system_prompt))
-                if _detailed_tracing_enabled:
-                    span.set_attribute("mcp.sampling.system_prompt.content", _safe_serialize(system_prompt, 500))
+            if system_prompt and _detailed_tracing_enabled:
+                span.set_attribute("mcp.sampling.system_prompt.content", _safe_serialize(system_prompt, 500))
 
             temperature = kwargs.get("temperature")
             if temperature is not None:
@@ -880,24 +847,18 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
                             span.set_attribute(f"mcp.context.{attr}", str(value))
 
             # Add event for sampling start
-            span.add_event("sampling.request.started", {"sampling.type": sampling_type})
+            span.add_event("sampling.request.started")
 
             try:
                 result = await func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
 
                 # Add event for successful completion
-                span.add_event("sampling.request.completed", {"sampling.type": sampling_type})
+                span.add_event("sampling.request.completed")
 
                 # Capture result metadata
-                if result is not None:
-                    span.set_attribute("mcp.sampling.result.type", type(result).__name__)
-                    
-                    if isinstance(result, str):
-                        span.set_attribute("mcp.sampling.result.length", len(result))
-                        span.set_attribute("mcp.sampling.result.tokens_estimate", len(result.split()))
-                        if _detailed_tracing_enabled:
-                            span.set_attribute("mcp.sampling.result.content", _safe_serialize(result, 1000))
+                if result is not None and _detailed_tracing_enabled and isinstance(result, str):
+                    span.set_attribute("mcp.sampling.result.content", _safe_serialize(result, 1000))
 
                 # Record metrics for successful sampling
                 try:
@@ -919,7 +880,6 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
                 span.add_event(
                     "sampling.request.error",
                     {
-                        "sampling.type": sampling_type,
                         "error.type": type(e).__name__,
                         "error.message": str(e),
                     },
@@ -951,21 +911,16 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
         with tracer.start_as_current_span(span_name) as span:
             # Add essential attributes
             span.set_attribute("mcp.component.type", "sampling")
-            span.set_attribute("mcp.sampling.type", sampling_type)
-            span.set_attribute(
-                "mcp.sampling.module",
-                func.__module__ if hasattr(func, "__module__") else "unknown",
-            )
 
             # Add event for sampling start
-            span.add_event("sampling.request.started", {"sampling.type": sampling_type})
+            span.add_event("sampling.request.started")
 
             try:
                 result = func(*args, **kwargs)
                 span.set_status(Status(StatusCode.OK))
 
                 # Add event for successful completion
-                span.add_event("sampling.request.completed", {"sampling.type": sampling_type})
+                span.add_event("sampling.request.completed")
 
                 # Record metrics for successful sampling
                 try:
@@ -985,7 +940,6 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
                 span.add_event(
                     "sampling.request.error",
                     {
-                        "sampling.type": sampling_type,
                         "error.type": type(e).__name__,
                         "error.message": str(e),
                     },
