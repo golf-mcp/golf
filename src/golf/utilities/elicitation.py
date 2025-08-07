@@ -5,10 +5,22 @@ can use without needing to manage FastMCP Context objects directly.
 """
 
 from typing import Any, TypeVar, overload
+from collections.abc import Callable
 
 from .context import get_current_context
 
 T = TypeVar("T")
+
+# Apply telemetry instrumentation if available
+try:
+    from golf.telemetry import instrument_elicitation
+    _instrumentation_available = True
+except ImportError:
+    _instrumentation_available = False
+    
+    def instrument_elicitation(func: Callable, elicitation_type: str = "elicit") -> Callable:
+        """No-op instrumentation when telemetry is not available."""
+        return func
 
 
 @overload
@@ -38,6 +50,7 @@ async def elicit(
     ...
 
 
+@instrument_elicitation
 async def elicit(
     message: str,
     response_type: type[T] | list[str] | None = None,
@@ -150,3 +163,7 @@ async def elicit_confirmation(message: str) -> bool:
         if "declined" in str(e):
             return False
         raise  # Re-raise cancellation or other errors
+
+
+# Apply instrumentation to the confirmation function
+elicit_confirmation = instrument_elicitation(elicit_confirmation, "confirmation")
