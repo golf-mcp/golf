@@ -632,6 +632,7 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
         with tracer.start_as_current_span(span_name) as span:
             # Add essential attributes
             span.set_attribute("mcp.component.type", "elicitation")
+            span.set_attribute("mcp.elicitation.type", elicitation_type)
 
             # Capture elicitation parameters if detailed tracing is enabled
             if _detailed_tracing_enabled:
@@ -731,6 +732,7 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
         with tracer.start_as_current_span(span_name) as span:
             # Add essential attributes
             span.set_attribute("mcp.component.type", "elicitation")
+            span.set_attribute("mcp.elicitation.type", elicitation_type)
 
             # Capture elicitation parameters if detailed tracing is enabled
             if _detailed_tracing_enabled:
@@ -810,6 +812,7 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
         with tracer.start_as_current_span(span_name) as span:
             # Add essential attributes
             span.set_attribute("mcp.component.type", "sampling")
+            span.set_attribute("mcp.sampling.type", sampling_type)
 
             # Capture sampling parameters
             messages = kwargs.get("messages") or (args[0] if args else None)
@@ -817,12 +820,14 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
                 if isinstance(messages, str):
                     span.set_attribute("mcp.sampling.messages.content", _safe_serialize(messages, 1000))
                 elif isinstance(messages, list):
+                    span.set_attribute("mcp.sampling.messages.type", "list")
                     span.set_attribute("mcp.sampling.messages.count", len(messages))
                     span.set_attribute("mcp.sampling.messages.content", _safe_serialize(messages, 1000))
 
             # Capture other sampling parameters
             system_prompt = kwargs.get("system_prompt")
             if system_prompt and _detailed_tracing_enabled:
+                span.set_attribute("mcp.sampling.system_prompt.length", len(str(system_prompt)))
                 span.set_attribute("mcp.sampling.system_prompt.content", _safe_serialize(system_prompt, 500))
 
             temperature = kwargs.get("temperature")
@@ -917,6 +922,7 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
         with tracer.start_as_current_span(span_name) as span:
             # Add essential attributes
             span.set_attribute("mcp.component.type", "sampling")
+            span.set_attribute("mcp.sampling.type", sampling_type)
 
             # Add event for sampling start
             span.add_event("sampling.request.started")
