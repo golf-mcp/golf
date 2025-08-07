@@ -615,6 +615,12 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
 
 def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elicit") -> Callable[..., T]:
     """Instrument an elicitation function with OpenTelemetry tracing."""
+    global _provider
+
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+
     tracer = get_tracer()
 
     @functools.wraps(func)
@@ -795,6 +801,12 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
 
 def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -> Callable[..., T]:
     """Instrument a sampling function with OpenTelemetry tracing."""
+    global _provider
+
+    # If telemetry is disabled, return the original function
+    if _provider is None:
+        return func
+
     tracer = get_tracer()
 
     @functools.wraps(func)

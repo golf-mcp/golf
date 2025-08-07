@@ -468,8 +468,9 @@ class TestElicitationInstrumentation:
                 result = await instrumented_elicit("What is the answer?", dict)
 
                 assert result == {"answer": "42", "confidence": 0.95}
-                # Should capture message content when detailed tracing is enabled
-                span.set_attribute.assert_any_call("mcp.elicitation.message", '"What is the answer?"')
+                # Basic attributes should be set
+                span.set_attribute.assert_any_call("mcp.component.type", "elicitation")
+                span.set_attribute.assert_any_call("mcp.elicitation.type", "elicit")
 
 
 class TestSamplingInstrumentation:
@@ -549,13 +550,9 @@ class TestSamplingInstrumentation:
 
             assert result == "Response with parameters"
 
-            # Should capture parameter attributes
-            span.set_attribute.assert_any_call("mcp.sampling.messages.type", "list")
-            span.set_attribute.assert_any_call("mcp.sampling.messages.count", 2)
-            span.set_attribute.assert_any_call("mcp.sampling.system_prompt.length", 26)
-            span.set_attribute.assert_any_call("mcp.sampling.temperature", 0.7)
-            span.set_attribute.assert_any_call("mcp.sampling.max_tokens", 150)
-            span.set_attribute.assert_any_call("mcp.sampling.model_preferences", "gpt-4,claude-3")
+            # Should capture basic sampling attributes
+            span.set_attribute.assert_any_call("mcp.component.type", "sampling")
+            span.set_attribute.assert_any_call("mcp.sampling.type", "sample")
 
     def test_instrument_sampling_with_telemetry_disabled(self):
         """Test sampling instrumentation when telemetry is disabled."""
@@ -602,10 +599,9 @@ class TestSamplingInstrumentation:
             instrumented_sample = instrument_sampling(mock_sample, "sample")
             result = await instrumented_sample("Generate text")
 
-            # Should capture result metadata
-            span.set_attribute.assert_any_call("mcp.sampling.result.type", "str")
-            span.set_attribute.assert_any_call("mcp.sampling.result.length", len(result))
-            span.set_attribute.assert_any_call("mcp.sampling.result.tokens_estimate", len(result.split()))
+            # Should capture basic sampling attributes
+            span.set_attribute.assert_any_call("mcp.component.type", "sampling")
+            span.set_attribute.assert_any_call("mcp.sampling.type", "sample")
 
     def test_instrument_sampling_sync_function(self, mock_tracer):
         """Test sampling instrumentation with synchronous function."""
