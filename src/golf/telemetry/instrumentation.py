@@ -623,10 +623,10 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
         global _provider
         if _provider is None:
             return await func(*args, **kwargs)
-            
+
         # Record metrics timing
         start_time = time.time()
-        
+
         # Create a more descriptive span name
         span_name = f"mcp.elicitation.{elicitation_type}.request"
         with tracer.start_as_current_span(span_name) as span:
@@ -640,7 +640,7 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                     message = args[0] if isinstance(args[0], str) else None
                     if message:
                         span.set_attribute("mcp.elicitation.message", _safe_serialize(message, 500))
-                
+
                 # Extract response_type from kwargs/args
                 response_type = kwargs.get("response_type") or (args[1] if len(args) > 1 else None)
                 if response_type is not None:
@@ -683,6 +683,7 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                 # Record metrics for successful elicitation
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_elicitation(elicitation_type, "success")
                     metrics_collector.record_elicitation_duration(elicitation_type, time.time() - start_time)
@@ -706,6 +707,7 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                 # Record metrics for failed elicitation
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_elicitation(elicitation_type, "error")
                     metrics_collector.increment_error("elicitation", type(e).__name__)
@@ -720,10 +722,10 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
         global _provider
         if _provider is None:
             return func(*args, **kwargs)
-            
+
         # Record metrics timing
         start_time = time.time()
-        
+
         # Create a more descriptive span name
         span_name = f"mcp.elicitation.{elicitation_type}.request"
         with tracer.start_as_current_span(span_name) as span:
@@ -750,6 +752,7 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                 # Record metrics for successful elicitation
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_elicitation(elicitation_type, "success")
                     metrics_collector.record_elicitation_duration(elicitation_type, time.time() - start_time)
@@ -773,6 +776,7 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
                 # Record metrics for failed elicitation
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_elicitation(elicitation_type, "error")
                     metrics_collector.increment_error("elicitation", type(e).__name__)
@@ -797,10 +801,10 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
         global _provider
         if _provider is None:
             return await func(*args, **kwargs)
-            
+
         # Record metrics timing
         start_time = time.time()
-        
+
         # Create a more descriptive span name
         span_name = f"mcp.sampling.{sampling_type}.request"
         with tracer.start_as_current_span(span_name) as span:
@@ -863,6 +867,7 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
                 # Record metrics for successful sampling
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_sampling(sampling_type, "success")
                     metrics_collector.record_sampling_duration(sampling_type, time.time() - start_time)
@@ -888,6 +893,7 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
                 # Record metrics for failed sampling
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_sampling(sampling_type, "error")
                     metrics_collector.increment_error("sampling", type(e).__name__)
@@ -902,10 +908,10 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
         global _provider
         if _provider is None:
             return func(*args, **kwargs)
-            
+
         # Record metrics timing
         start_time = time.time()
-        
+
         # Create a more descriptive span name
         span_name = f"mcp.sampling.{sampling_type}.request"
         with tracer.start_as_current_span(span_name) as span:
@@ -925,6 +931,7 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
                 # Record metrics for successful sampling
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_sampling(sampling_type, "success")
                     metrics_collector.record_sampling_duration(sampling_type, time.time() - start_time)

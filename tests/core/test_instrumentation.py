@@ -469,9 +469,7 @@ class TestElicitationInstrumentation:
 
                 assert result == {"answer": "42", "confidence": 0.95}
                 # Should capture message content when detailed tracing is enabled
-                span.set_attribute.assert_any_call(
-                    "mcp.elicitation.message", '"What is the answer?"'
-                )
+                span.set_attribute.assert_any_call("mcp.elicitation.message", '"What is the answer?"')
 
 
 class TestSamplingInstrumentation:
@@ -521,9 +519,7 @@ class TestSamplingInstrumentation:
 
             instrumented_func = instrument_sampling(mock_sample_structured, "structured")
             result = await instrumented_func(
-                "Extract info", 
-                format_instructions="Return JSON",
-                system_prompt="You are helpful"
+                "Extract info", format_instructions="Return JSON", system_prompt="You are helpful"
             )
 
             assert result == '{"name": "John", "age": 30}'
@@ -538,11 +534,7 @@ class TestSamplingInstrumentation:
         with patch("golf.telemetry.instrumentation._provider", Mock()):
 
             async def mock_sample(
-                messages, 
-                system_prompt=None, 
-                temperature=None, 
-                max_tokens=None,
-                model_preferences=None
+                messages, system_prompt=None, temperature=None, max_tokens=None, model_preferences=None
             ) -> str:
                 return "Response with parameters"
 
@@ -552,11 +544,11 @@ class TestSamplingInstrumentation:
                 system_prompt="You are a helpful assistant",
                 temperature=0.7,
                 max_tokens=150,
-                model_preferences=["gpt-4", "claude-3"]
+                model_preferences=["gpt-4", "claude-3"],
             )
 
             assert result == "Response with parameters"
-            
+
             # Should capture parameter attributes
             span.set_attribute.assert_any_call("mcp.sampling.messages.type", "list")
             span.set_attribute.assert_any_call("mcp.sampling.messages.count", 2)
@@ -639,18 +631,18 @@ class TestUtilitiesIntegration:
         """Test that elicitation utilities are properly instrumented."""
         # Import the utilities to trigger instrumentation
         from golf.utilities import elicit, elicit_confirmation
-        
+
         # These functions should be instrumented versions
         # We can't easily test the actual instrumentation without mocking FastMCP context,
         # but we can verify the functions exist and have the right signatures
         assert callable(elicit)
         assert callable(elicit_confirmation)
 
-    @pytest.mark.asyncio 
+    @pytest.mark.asyncio
     async def test_sampling_utilities_instrumented(self):
         """Test that sampling utilities are properly instrumented."""
         from golf.utilities import sample, sample_structured, sample_with_context
-        
+
         # These functions should be instrumented versions
         assert callable(sample)
         assert callable(sample_structured)
@@ -659,13 +651,13 @@ class TestUtilitiesIntegration:
     def test_metrics_integration_available(self):
         """Test that metrics integration is available."""
         from golf.metrics import get_metrics_collector
-        
+
         collector = get_metrics_collector()
         assert collector is not None
-        
+
         # Verify new methods exist
-        assert hasattr(collector, 'increment_sampling')
-        assert hasattr(collector, 'record_sampling_duration')
-        assert hasattr(collector, 'record_sampling_tokens')
-        assert hasattr(collector, 'increment_elicitation')
-        assert hasattr(collector, 'record_elicitation_duration')
+        assert hasattr(collector, "increment_sampling")
+        assert hasattr(collector, "record_sampling_duration")
+        assert hasattr(collector, "record_sampling_tokens")
+        assert hasattr(collector, "increment_elicitation")
+        assert hasattr(collector, "record_elicitation_duration")

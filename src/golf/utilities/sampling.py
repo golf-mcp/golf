@@ -12,10 +12,11 @@ from .context import get_current_context
 # Apply telemetry instrumentation if available
 try:
     from golf.telemetry import instrument_sampling
+
     _instrumentation_available = True
 except ImportError:
     _instrumentation_available = False
-    
+
     def instrument_sampling(func: Callable, sampling_type: str = "sample") -> Callable:
         """No-op instrumentation when telemetry is not available."""
         return func

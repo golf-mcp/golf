@@ -14,10 +14,11 @@ T = TypeVar("T")
 # Apply telemetry instrumentation if available
 try:
     from golf.telemetry import instrument_elicitation
+
     _instrumentation_available = True
 except ImportError:
     _instrumentation_available = False
-    
+
     def instrument_elicitation(func: Callable, elicitation_type: str = "elicit") -> Callable:
         """No-op instrumentation when telemetry is not available."""
         return func
