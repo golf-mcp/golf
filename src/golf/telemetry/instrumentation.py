@@ -615,16 +615,15 @@ def instrument_resource(func: Callable[..., T], resource_uri: str) -> Callable[.
 
 def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elicit") -> Callable[..., T]:
     """Instrument an elicitation function with OpenTelemetry tracing."""
-    global _provider
-
-    # If telemetry is disabled, return the original function
-    if _provider is None:
-        return func
-
     tracer = get_tracer()
 
     @functools.wraps(func)
     async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # If telemetry is disabled at runtime, call original function
+        global _provider
+        if _provider is None:
+            return await func(*args, **kwargs)
+            
         # Record metrics timing
         start_time = time.time()
         
@@ -728,6 +727,11 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
 
     @functools.wraps(func)
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # If telemetry is disabled at runtime, call original function
+        global _provider
+        if _provider is None:
+            return func(*args, **kwargs)
+            
         # Record metrics timing
         start_time = time.time()
         
@@ -806,16 +810,15 @@ def instrument_elicitation(func: Callable[..., T], elicitation_type: str = "elic
 
 def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -> Callable[..., T]:
     """Instrument a sampling function with OpenTelemetry tracing."""
-    global _provider
-
-    # If telemetry is disabled, return the original function
-    if _provider is None:
-        return func
-
     tracer = get_tracer()
 
     @functools.wraps(func)
     async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # If telemetry is disabled at runtime, call original function
+        global _provider
+        if _provider is None:
+            return await func(*args, **kwargs)
+            
         # Record metrics timing
         start_time = time.time()
         
@@ -935,6 +938,11 @@ def instrument_sampling(func: Callable[..., T], sampling_type: str = "sample") -
 
     @functools.wraps(func)
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        # If telemetry is disabled at runtime, call original function
+        global _provider
+        if _provider is None:
+            return func(*args, **kwargs)
+            
         # Record metrics timing
         start_time = time.time()
         

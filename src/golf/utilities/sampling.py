@@ -21,7 +21,6 @@ except ImportError:
         return func
 
 
-@instrument_sampling
 async def sample(
     messages: str | list[str],
     system_prompt: str | None = None,
@@ -215,6 +214,7 @@ async def sample_with_context(
     )
 
 
-# Apply instrumentation to the specialized sampling functions
+# Apply instrumentation to all sampling functions
+sample = instrument_sampling(sample, "sample")
 sample_structured = instrument_sampling(sample_structured, "structured")
 sample_with_context = instrument_sampling(sample_with_context, "context")

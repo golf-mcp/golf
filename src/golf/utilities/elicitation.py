@@ -50,7 +50,6 @@ async def elicit(
     ...
 
 
-@instrument_elicitation
 async def elicit(
     message: str,
     response_type: type[T] | list[str] | None = None,
@@ -165,5 +164,6 @@ async def elicit_confirmation(message: str) -> bool:
         raise  # Re-raise cancellation or other errors
 
 
-# Apply instrumentation to the confirmation function
+# Apply instrumentation to all elicitation functions
+elicit = instrument_elicitation(elicit, "elicit")
 elicit_confirmation = instrument_elicitation(elicit_confirmation, "confirmation")
