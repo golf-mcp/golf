@@ -55,6 +55,9 @@ def generate_auth_code(
         "import sys",
         "from golf.auth.factory import create_auth_provider",
         "from golf.auth import get_auth_config",
+        "",
+        "# Import auth.py to execute authentication configuration",
+        "import auth",
     ]
 
     setup_code_lines = [
@@ -64,7 +67,7 @@ def generate_auth_code(
         "    auth_config, required_scopes = auth_config_tuple",
         "    try:",
         "        auth_provider = create_auth_provider(auth_config)",
-        "        print(f'Authentication configured with {auth_config.provider_type} provider')",
+        "        pass  # Authentication configured successfully",
         "    except Exception as e:",
         "        print(f'Authentication setup failed: {e}', file=sys.stderr)",
         "        auth_provider = None",
@@ -109,6 +112,9 @@ def generate_api_key_auth_components(
         "from starlette.requests import Request",
         "from starlette.responses import JSONResponse",
         "import os",
+        "",
+        "# Import auth.py to execute authentication configuration",
+        "import auth",
     ]
 
     setup_code_lines = [
