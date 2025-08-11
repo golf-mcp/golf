@@ -27,28 +27,16 @@ console = Console()
 def initialize_project(
     project_name: str,
     output_dir: Path,
-    template: str = "basic",
 ) -> None:
-    """Initialize a new GolfMCP project with the specified template.
+    """Initialize a new GolfMCP project.
 
     Args:
         project_name: Name of the project
         output_dir: Directory where the project will be created
-        template: Template to use (basic or api_key)
     """
     try:
-        # Validate template
-        valid_templates = ("basic", "api_key")
-        if template not in valid_templates:
-            console.print(f"[bold red]Error:[/bold red] Unknown template '{template}'")
-            console.print(f"Available templates: {', '.join(valid_templates)}")
-            track_command(
-                "init",
-                success=False,
-                error_type="InvalidTemplate",
-                error_message=f"Unknown template: {template}",
-            )
-            return
+        # Use the basic template by default
+        template = "basic"
 
         # Check if directory exists
         if output_dir.exists():

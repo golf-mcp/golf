@@ -82,7 +82,6 @@ def callback(
 def init(
     project_name: str = typer.Argument(..., help="Name of the project to create"),
     output_dir: Path | None = typer.Option(None, "--output-dir", "-o", help="Directory to create the project in"),
-    template: str = typer.Option("basic", "--template", "-t", help="Template to use (basic or api_key)"),
 ) -> None:
     """Initialize a new GolfMCP project.
 
@@ -92,7 +91,7 @@ def init(
     # Show the Golf logo for project initialization
     create_welcome_banner(__version__, console)
     console.print()
-    create_command_header("Initialize Project", f"Creating {project_name} with {template} template", console)
+    create_command_header("Initialize Project", f"Creating {project_name}", console)
 
     # Import here to avoid circular imports
     from golf.commands.init import initialize_project
@@ -102,7 +101,7 @@ def init(
         output_dir = Path.cwd() / project_name
 
     # Execute the initialization command (it handles its own tracking)
-    initialize_project(project_name=project_name, output_dir=output_dir, template=template)
+    initialize_project(project_name=project_name, output_dir=output_dir)
 
 
 # Create a build group with subcommands
