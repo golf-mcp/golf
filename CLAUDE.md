@@ -66,7 +66,7 @@ golf --version
 - `src/golf/auth/` - Authentication providers (OAuth, API keys)
 - `src/golf/telemetry/` - Usage tracking and OpenTelemetry instrumentation
 - `src/golf/metrics/` - Prometheus metrics collection
-- `src/golf/examples/` - Example projects (basic, api_key templates)
+- `src/golf/examples/` - Example projects (basic template)
 - `tests/` - Test suite with pytest
 
 ## Testing Framework

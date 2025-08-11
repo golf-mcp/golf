@@ -17,7 +17,7 @@ class TestHealthCheckIntegration:
         project_dir = temp_dir / "health_check_project"
 
         # Initialize project
-        initialize_project("health_check_project", project_dir, template="basic")
+        initialize_project("health_check_project", project_dir)
 
         # Update config to enable health check
         config_file = project_dir / "golf.json"
@@ -51,48 +51,13 @@ class TestHealthCheckIntegration:
 
         # Build completed successfully
 
-    def test_health_check_with_api_key_template(self, temp_dir: Path) -> None:
-        """Test health check integration with API key template."""
-        project_dir = temp_dir / "api_key_health_project"
-
-        # Initialize with API key template
-        initialize_project("api_key_health_project", project_dir, template="api_key")
-
-        # Update config to enable health check
-        config_file = project_dir / "golf.json"
-        config = json.loads(config_file.read_text())
-        config.update(
-            {
-                "health_check_enabled": True,
-                "health_check_path": "/health",
-                "health_check_response": "API server is healthy",
-            }
-        )
-        config_file.write_text(json.dumps(config, indent=2))
-
-        # Build the project
-        settings = load_settings(project_dir)
-        output_dir = project_dir / "dist"
-
-        build_project(project_dir, settings, output_dir, build_env="dev", copy_env=True)
-
-        # Verify both health check and auth components are present
-        server_file = output_dir / "server.py"
-        server_code = server_file.read_text()
-
-        # Health check should be present
-        assert '@mcp.custom_route("/health", methods=["GET"])' in server_code
-        assert 'return PlainTextResponse("API server is healthy")' in server_code
-
-        # API key auth should also be present (from template)
-        assert "configure_api_key" in server_code or "API" in server_code
 
     def test_health_check_disabled_by_default(self, temp_dir: Path) -> None:
         """Test that health check is disabled by default in new projects."""
         project_dir = temp_dir / "default_project"
 
         # Initialize project with defaults
-        initialize_project("default_project", project_dir, template="basic")
+        initialize_project("default_project", project_dir)
 
         # Build without modifying config
         settings = load_settings(project_dir)
@@ -113,7 +78,7 @@ class TestHealthCheckIntegration:
         project_dir = temp_dir / "otel_health_project"
 
         # Initialize project
-        initialize_project("otel_health_project", project_dir, template="basic")
+        initialize_project("otel_health_project", project_dir)
 
         # Update config to enable both health check and OpenTelemetry
         config_file = project_dir / "golf.json"
@@ -158,7 +123,7 @@ class TestHealthCheckIntegration:
             project_dir = temp_dir / f"transport_project_{i}"
 
             # Initialize project
-            initialize_project(f"transport_project_{i}", project_dir, template="basic")
+            initialize_project(f"transport_project_{i}", project_dir)
 
             # Update config
             config_file = project_dir / "golf.json"
@@ -200,7 +165,7 @@ class TestHealthCheckValidation:
         project_dir = temp_dir / "path_test_project"
 
         # Initialize project
-        initialize_project("path_test_project", project_dir, template="basic")
+        initialize_project("path_test_project", project_dir)
 
         # Test various path formats
         test_paths = ["/health", "/api/health", "/status/check", "/healthz", "/ping"]
@@ -241,7 +206,7 @@ class TestHealthCheckValidation:
         project_dir = temp_dir / "special_chars_project"
 
         # Initialize project
-        initialize_project("special_chars_project", project_dir, template="basic")
+        initialize_project("special_chars_project", project_dir)
 
         # Test response with special characters
         special_response = 'Service "Health" Status: OK & Running!'
