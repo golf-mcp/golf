@@ -15,7 +15,7 @@ class TestInitCommand:
         """Test that init creates the expected project structure."""
         project_dir = temp_dir / "my_project"
 
-        initialize_project("my_project", project_dir, template="basic")
+        initialize_project("my_project", project_dir)
 
         # Check directory structure
         assert project_dir.exists()
@@ -29,7 +29,7 @@ class TestInitCommand:
         """Test that golf.json is created with correct content."""
         project_dir = temp_dir / "test_project"
 
-        initialize_project("test_project", project_dir, template="basic")
+        initialize_project("test_project", project_dir)
 
         config = json.loads((project_dir / "golf.json").read_text())
         assert config["name"] == "basic-server-example"
@@ -40,7 +40,7 @@ class TestInitCommand:
         """Test that template files are copied correctly."""
         project_dir = temp_dir / "MyApp"
 
-        initialize_project("MyApp", project_dir, template="basic")
+        initialize_project("MyApp", project_dir)
 
         # Check that golf.json has the template content
         config = json.loads((project_dir / "golf.json").read_text())
@@ -55,7 +55,7 @@ class TestInitCommand:
         project_dir.mkdir()
 
         # Should not raise an error
-        initialize_project("existing", project_dir, template="basic")
+        initialize_project("existing", project_dir)
 
         assert (project_dir / "golf.json").exists()
 
@@ -69,7 +69,7 @@ class TestInitCommand:
         """Test that basic template does not include health check configuration by default."""
         project_dir = temp_dir / "health_check_project"
 
-        initialize_project("health_check_project", project_dir, template="basic")
+        initialize_project("health_check_project", project_dir)
 
         # Check that golf.json has basic template content
         config = json.loads((project_dir / "golf.json").read_text())
@@ -82,11 +82,11 @@ class TestInitCommand:
         assert "description" in config
         assert config["transport"] == "http"
 
-    def test_api_key_template_compatibility_with_health_check(self, temp_dir: Path) -> None:
-        """Test that API key template is compatible with health check configuration."""
-        project_dir = temp_dir / "api_key_project"
+    def test_basic_template_compatibility_with_health_check(self, temp_dir: Path) -> None:
+        """Test that basic template is compatible with health check configuration."""
+        project_dir = temp_dir / "health_check_project"
 
-        initialize_project("api_key_project", project_dir, template="api_key")
+        initialize_project("health_check_project", project_dir)
 
         # Check that we can add health check configuration
         config_file = project_dir / "golf.json"

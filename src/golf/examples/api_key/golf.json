@@ -1,5 +1,0 @@
-{
-  "name": "api-key-mcp-server",
-  "description": "MCP server for GitHub API operations with API key authentication",
-  "transport": "http"
-}
