@@ -24,7 +24,6 @@ class WeatherApiClient:
     async def get_forecast(self, city: str, days: int = 3) -> dict[str, Any]:
         """Get weather forecast for a city (mock implementation)."""
         # This would make an API call in a real implementation
-        print(f"Would call {self.api_url}/forecast/{city} with API key {self.api_key[:4]}...")
         return {
             "city": city,
             "unit": self.unit,
@@ -33,7 +32,6 @@ class WeatherApiClient:
 
     async def get_current(self, city: str) -> dict[str, Any]:
         """Get current weather for a city (mock implementation)."""
-        print(f"Would call {self.api_url}/current/{city} with API key {self.api_key[:4]}...")
         return {
             "city": city,
             "unit": self.unit,
