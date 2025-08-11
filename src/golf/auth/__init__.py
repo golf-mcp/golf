@@ -62,7 +62,6 @@ __all__ = [
 
 # Global storage for auth configuration
 _auth_config: tuple[AuthConfig, list[str] | None] | None = None
-_api_key_context: str | None = None
 
 
 def configure_auth(config: AuthConfig, required_scopes: list[str] | None = None) -> None:
