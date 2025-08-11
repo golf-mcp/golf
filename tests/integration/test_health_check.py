@@ -51,7 +51,6 @@ class TestHealthCheckIntegration:
 
         # Build completed successfully
 
-
     def test_health_check_disabled_by_default(self, temp_dir: Path) -> None:
         """Test that health check is disabled by default in new projects."""
         project_dir = temp_dir / "default_project"
