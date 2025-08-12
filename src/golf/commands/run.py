@@ -50,7 +50,7 @@ def run_server(
     create_command_header("Starting Server", f"{settings.name}", console)
 
     # Show server info with flashy styling
-    server_host = host or settings.host or "127.0.0.1"
+    server_host = host or settings.host or "localhost"
     server_port = port or settings.port or 3000
 
     server_content = Text()

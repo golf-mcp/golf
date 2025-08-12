@@ -62,7 +62,7 @@ cd your-project-name
 golf build dev
 golf run
 ```
-This will start the FastMCP server, typically on `http://127.0.0.1:3000` (configurable in `golf.json`).
+This will start the FastMCP server, typically on `http://localhost:3000` (configurable in `golf.json`).
 
 That's it! Your Golf server is running and ready for integration.
 
@@ -133,7 +133,7 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
 {
   "name": "{{project_name}}",          // Your MCP server name (required)
   "description": "A Golf project",     // Brief description of your server's purpose
-  "host": "127.0.0.1",                // Server host - use "0.0.0.0" to listen on all interfaces
+  "host": "localhost",                // Server host - use "0.0.0.0" to listen on all interfaces
   "port": 3000,                       // Server port - any available port number
   "transport": "sse",                 // Communication protocol:
                                       // - "sse": Server-Sent Events (recommended for web clients)
@@ -163,7 +163,7 @@ The `golf.json` file is the heart of your Golf project configuration. Here's wha
   - `"sse"` is ideal for web-based clients and real-time communication
   - `"streamable-http"` provides HTTP streaming for traditional API clients
   - `"stdio"` enables integration with command-line tools and scripts
-- **`host` & `port`**: Control where your server listens. Use `"127.0.0.1"` for local development or `"0.0.0.0"` to accept external connections.
+- **`host` & `port`**: Control where your server listens. Use `"localhost"` for local development or `"0.0.0.0"` to accept external connections.
 - **`stateless_http`**: When true, makes the streamable-http transport stateless by creating a new session for each request. This ensures that server restarts don't break existing client connections, making the server truly stateless.
 - **`health_check_enabled`**: When true, enables a health check endpoint for Kubernetes readiness/liveness probes and load balancers
 - **`health_check_path`**: Customizable path for the health check endpoint (defaults to "/health")

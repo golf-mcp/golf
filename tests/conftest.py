@@ -29,7 +29,7 @@ def sample_project(temp_dir: Path) -> Path:
         """{
     "name": "TestProject",
     "description": "A test Golf project",
-    "host": "127.0.0.1",
+    "host": "localhost",
     "port": 3000,
     "transport": "sse"
 }"""

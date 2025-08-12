@@ -12,7 +12,7 @@ from golf.auth.providers import AuthConfig
 
 def generate_auth_code(
     server_name: str,
-    host: str = "127.0.0.1",
+    host: str = "localhost",
     port: int = 3000,
     https: bool = False,
     opentelemetry_enabled: bool = False,

@@ -64,7 +64,7 @@ class TestSettingsLoading:
         """Test loading settings with defaults when no config exists."""
         settings = load_settings(temp_dir)
         assert settings.name == "GolfMCP Project"
-        assert settings.host == "127.0.0.1"
+        assert settings.host == "localhost"
         assert settings.port == 3000
         assert settings.transport == "streamable-http"
 

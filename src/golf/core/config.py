@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     output_dir: str = Field("build", description="Build artifact folder")
 
     # Server settings
-    host: str = Field("127.0.0.1", description="Server host")
+    host: str = Field("localhost", description="Server host")
     port: int = Field(3000, description="Server port")
     transport: str = Field(
         "streamable-http",

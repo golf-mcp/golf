@@ -858,7 +858,7 @@ class CodeGenerator:
             "    from rich.panel import Panel",
             "    console = Console()",
             "    # Get configuration from environment variables or use defaults",
-            '    host = os.environ.get("HOST", "127.0.0.1")',
+            '    host = os.environ.get("HOST", "localhost")',
             '    port = int(os.environ.get("PORT", 3000))',
             f'    transport_to_run = "{self.settings.transport}"',
             "",
