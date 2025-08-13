@@ -5,8 +5,6 @@ from typing import Any
 
 from starlette.requests import Request
 
-# Re-export get_access_token from the MCP SDK
-
 # Context variable to store the current request's API key
 _current_api_key: ContextVar[str | None] = ContextVar("current_api_key", default=None)
 
