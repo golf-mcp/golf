@@ -82,7 +82,7 @@ def is_telemetry_enabled() -> bool:
     2. GOLF_TEST_MODE environment variable (always disabled in test mode)
     3. GOLF_TELEMETRY environment variable
     4. Persistent preference file
-    5. Default to True (opt-out model)
+    5. Default to False (opt-in model)
     """
     global _telemetry_enabled
 
