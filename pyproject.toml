@@ -30,6 +30,7 @@ dependencies = [
     "rich>=14.0.0",
     "fastmcp>=2.11.0,<3.0.0",
     "pydantic>=2.11.0",
+    "pydantic-settings>=2.0.0",
     "python-dotenv>=1.1.0",
     "black>=24.10.0",
     "pyjwt>=2.0.0",
@@ -90,6 +91,7 @@ python = ">=3.8" # Match requires-python
 fastmcp = ">=2.11.0,<3.0.0"
 typer = {extras = ["all"], version = ">=0.15.4"}
 pydantic = ">=2.11.0"
+pydantic-settings = ">=2.0.0"
 rich = ">=14.0.0"
 python-dotenv = ">=1.1.0"
 black = ">=24.10.0"
