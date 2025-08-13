@@ -172,7 +172,7 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
 
     return RemoteAuthProvider(
         token_verifier=token_verifier,
-        authorization_servers=[config.authorization_servers],
+        authorization_servers=config.authorization_servers,
         resource_server_url=config.resource_server_url,
     )
 
