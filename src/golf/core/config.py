@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     description: str | None = Field(None, description="Project description")
 
     # Build settings
-    output_dir: str = Field("build", description="Build artifact folder")
+    output_dir: str = Field("dist", description="Build artifact folder")
 
     # Server settings
     host: str = Field("localhost", description="Server host")
