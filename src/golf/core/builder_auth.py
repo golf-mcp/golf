@@ -49,26 +49,28 @@ def generate_auth_code(
             "Please update your auth.py file."
         )
 
-    # Generate modern auth components
+    # Generate modern auth components with embedded configuration
     auth_imports = [
         "import os",
         "import sys",
         "from golf.auth.factory import create_auth_provider",
-        "from golf.auth import get_auth_config",
+        "from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConfig, OAuthServerConfig",
     ]
 
+    # Embed the auth configuration directly in the generated code
+    # Convert the auth config to its string representation for embedding
+    auth_config_repr = repr(auth_config)
+    required_scopes_repr = repr(required_scopes)
+
     setup_code_lines = [
-        "# Modern FastMCP 2.11+ authentication setup",
-        "auth_config_tuple = get_auth_config()",
-        "if auth_config_tuple:",
-        "    auth_config, required_scopes = auth_config_tuple",
-        "    try:",
-        "        auth_provider = create_auth_provider(auth_config)",
-        "        print(f'Authentication configured with {auth_config.provider_type} provider')",
-        "    except Exception as e:",
-        "        print(f'Authentication setup failed: {e}', file=sys.stderr)",
-        "        auth_provider = None",
-        "else:",
+        "# Modern FastMCP 2.11+ authentication setup with embedded configuration",
+        f"auth_config = {auth_config_repr}",
+        f"required_scopes = {required_scopes_repr}",
+        "try:",
+        "    auth_provider = create_auth_provider(auth_config)",
+        "    print(f'Authentication configured with {auth_config.provider_type} provider')",
+        "except Exception as e:",
+        "    print(f'Authentication setup failed: {e}', file=sys.stderr)",
         "    auth_provider = None",
         "",
     ]
@@ -183,9 +185,9 @@ def generate_api_key_auth_components(
 
 def generate_auth_routes() -> str:
     """Generate code for auth routes in the FastMCP app.
-
-    FastMCP 2.11+ handles auth routes automatically through the auth provider,
-    so we don't need to generate custom routes anymore.
+    
+    Auth providers (RemoteAuthProvider, OAuthProvider) provide OAuth metadata routes
+    that need to be added to the server.
     """
     # API key auth doesn't need special routes
     api_key_config = get_api_key_config()
@@ -196,6 +198,16 @@ def generate_auth_routes() -> str:
     if not is_auth_configured():
         return ""
 
-    # FastMCP 2.11+ auth providers handle their own routes automatically
-    # No need to generate custom routes
-    return ""
+    # Auth providers provide OAuth metadata routes that need to be added to the server
+    return """
+# Add OAuth metadata routes from auth provider
+if auth_provider and hasattr(auth_provider, 'get_routes'):
+    auth_routes = auth_provider.get_routes()
+    if auth_routes:
+        # Add routes to FastMCP's additional HTTP routes list
+        try:
+            mcp._additional_http_routes.extend(auth_routes)
+            print(f"Added {len(auth_routes)} OAuth metadata routes")
+        except Exception as e:
+            print(f"Warning: Failed to add OAuth routes: {e}")
+"""
