@@ -10,7 +10,7 @@ from typing import Any
 import black
 from rich.console import Console
 
-from golf.auth import get_auth_config, is_auth_configured
+from golf.auth import is_auth_configured
 from golf.auth.api_key import get_api_key_config
 from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.core.builder_telemetry import (
@@ -1072,14 +1072,6 @@ def build_project(
             # Use exec to run the script as a module
             code = compile(script_content, str(config_path), "exec")
             exec(code, {})
-
-            # Check if auth was configured by the script
-            auth_config_result = get_auth_config()
-            if auth_config_result:
-                provider, scopes = auth_config_result
-            else:
-                # No auth configuration found
-                pass
 
         except Exception as e:
             console.print(f"[red]Error executing {config_path.name}: {str(e)}[/red]")

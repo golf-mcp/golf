@@ -33,12 +33,10 @@ def generate_auth_code(
         return generate_api_key_auth_components(server_name, opentelemetry_enabled, transport)
 
     # Check for modern auth configuration
-    auth_config_tuple = get_auth_config()
-    if not auth_config_tuple:
+    auth_config = get_auth_config()
+    if not auth_config:
         # If no auth config, return empty components
         return {"imports": [], "setup_code": [], "fastmcp_args": {}, "has_auth": False}
-
-    auth_config, required_scopes = auth_config_tuple
 
     # Validate that we have a modern auth config
     if not isinstance(auth_config, AuthConfig):
@@ -60,12 +58,10 @@ def generate_auth_code(
     # Embed the auth configuration directly in the generated code
     # Convert the auth config to its string representation for embedding
     auth_config_repr = repr(auth_config)
-    required_scopes_repr = repr(required_scopes)
 
     setup_code_lines = [
         "# Modern FastMCP 2.11+ authentication setup with embedded configuration",
         f"auth_config = {auth_config_repr}",
-        f"required_scopes = {required_scopes_repr}",
         "try:",
         "    auth_provider = create_auth_provider(auth_config)",
         "    print(f'Authentication configured with {auth_config.provider_type} provider')",
