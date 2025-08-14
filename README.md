@@ -30,7 +30,7 @@
 
 Golf is a **framework** designed to streamline the creation of MCP server applications. It allows developers to define server's capabilities—*tools*, *prompts*, and *resources*—as simple Python files within a conventional directory structure. Golf then automatically discovers, parses, and compiles these components into a runnable FastMCP server, minimizing boilerplate and accelerating development.
 
-With Golf v0.2.0, you get **enterprise-grade authentication** (JWT, API key, development tokens), **built-in utilities** for LLM interactions, and **automatic telemetry** integration. Focus on implementing your agent's logic while Golf handles authentication, monitoring, and server infrastructure.
+With Golf v0.2.0, you get **enterprise-grade authentication** (JWT, OAuth Server, API key, development tokens), **built-in utilities** for LLM interactions, and **automatic telemetry** integration. Focus on implementing your agent's logic while Golf handles authentication, monitoring, and server infrastructure.
 
 ## Quick Start
 
@@ -85,11 +85,11 @@ A Golf project initialized with `golf init` will have a structure similar to thi
 │   └─ welcome.py     # Example prompt
 │
 ├─ .env               # Environment variables (e.g., API keys, server port)
-└─ auth.py            # Authentication configuration (JWT, API key, dev tokens)
+└─ auth.py            # Authentication configuration (JWT, OAuth Server, API key, dev tokens)
 ```
 
 -   **`golf.json`**: Configures server name, port, transport, telemetry, and other build settings.
--   **`auth.py`**: Dedicated authentication configuration file (new in v0.2.0) for JWT, API key, or development authentication.
+-   **`auth.py`**: Dedicated authentication configuration file (new in v0.2.0, breaking change from v0.1.x authentication API) for JWT, OAuth Server, API key, or development authentication.
 -   **`tools/`**, **`resources/`**, **`prompts/`**: Contain your Python files, each defining a single component. These directories can also contain nested subdirectories to further organize your components (e.g., `tools/payments/charge.py`). The module docstring of each file serves as the component's description.
     -   Component IDs are automatically derived from their file path. For example, `tools/hello.py` becomes `hello`, and a nested file like `tools/payments/submit.py` would become `submit_payments` (filename, followed by reversed parent directories under the main category, joined by underscores).
 -   **`common.py`** (not shown, but can be placed in subdirectories like `tools/payments/common.py`): Used to share code (clients, models, etc.) among components in the same subdirectory.
@@ -132,10 +132,26 @@ Golf includes enterprise-grade authentication, built-in utilities, and automatic
 
 ```python
 # auth.py - Configure authentication
-from golf.auth import configure_api_key, configure_jwt_auth, configure_dev_auth
+from golf.auth import configure_auth, JWTAuthConfig, StaticTokenConfig, OAuthServerConfig
 
-# API Key (pass-through to external APIs)
-configure_api_key(header_name="Authorization", header_prefix="Bearer ")
+# JWT authentication (production)
+configure_auth(JWTAuthConfig(
+    jwks_uri_env_var="JWKS_URI",
+    issuer_env_var="JWT_ISSUER", 
+    audience_env_var="JWT_AUDIENCE",
+    required_scopes=["read", "write"]
+))
+
+# OAuth Server mode (Golf acts as OAuth 2.0 server)
+# configure_auth(OAuthServerConfig(
+#     base_url="https://your-golf-server.com",
+#     valid_scopes=["read", "write", "admin"]
+# ))
+
+# Static tokens (development only)
+# configure_auth(StaticTokenConfig(
+#     tokens={"dev-token": {"client_id": "dev", "scopes": ["read"]}}
+# ))
 
 # Built-in utilities available in all tools
 from golf.utils import elicit, sample, get_context
