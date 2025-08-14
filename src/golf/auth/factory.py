@@ -145,41 +145,48 @@ def _create_oauth_server_provider(config: OAuthServerConfig) -> "AuthProvider":
             # Apply the same validation as the config field to env var value
             try:
                 from urllib.parse import urlparse
+
                 env_value = env_value.strip()
                 parsed = urlparse(env_value)
-                
+
                 if not parsed.scheme or not parsed.netloc:
-                    raise ValueError(f"Invalid base URL from environment variable {config.base_url_env_var}: '{env_value}'")
-                
+                    raise ValueError(
+                        f"Invalid base URL from environment variable {config.base_url_env_var}: '{env_value}'"
+                    )
+
                 if parsed.scheme not in ("http", "https"):
                     raise ValueError(f"Base URL from environment must use http/https: '{env_value}'")
-                    
+
                 # Production HTTPS check
-                is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
-                               os.environ.get("NODE_ENV", "").lower() == "production" or \
-                               os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
-                
+                is_production = (
+                    os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
+                    or os.environ.get("NODE_ENV", "").lower() == "production"
+                    or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+                )
+
                 if is_production and parsed.scheme == "http":
                     raise ValueError(f"Base URL must use HTTPS in production: '{env_value}'")
-                    
+
                 base_url = env_value
-                
+
             except Exception as e:
                 raise ValueError(f"Invalid base URL from environment variable {config.base_url_env_var}: {e}") from e
 
     # Additional security validations before creating provider
     from urllib.parse import urlparse
-    
-    # Validate final base_url 
+
+    # Validate final base_url
     parsed_base = urlparse(base_url)
     if not parsed_base.scheme or not parsed_base.netloc:
         raise ValueError(f"Invalid base URL: '{base_url}'")
-    
+
     # Security check: prevent localhost in production
-    is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
-                   os.environ.get("NODE_ENV", "").lower() == "production" or \
-                   os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
-    
+    is_production = (
+        os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
+        or os.environ.get("NODE_ENV", "").lower() == "production"
+        or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+    )
+
     if is_production and parsed_base.hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
         raise ValueError(f"Cannot use localhost/loopback addresses in production: '{base_url}'")
 
@@ -306,7 +313,7 @@ def create_dev_token_provider(
 
 def register_builtin_providers() -> None:
     """Register built-in authentication providers in the registry.
-    
+
     This function registers the standard Golf authentication providers:
     - jwt: JWT token verification
     - static: Static token verification (development)
@@ -314,7 +321,7 @@ def register_builtin_providers() -> None:
     - remote: Remote authorization server integration
     """
     registry = get_provider_registry()
-    
+
     # Register built-in provider factories
     registry.register_factory("jwt", _create_jwt_provider)
     registry.register_factory("static", _create_static_provider)

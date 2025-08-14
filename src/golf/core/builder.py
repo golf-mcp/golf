@@ -10,7 +10,7 @@ from typing import Any
 import black
 from rich.console import Console
 
-from golf.auth import get_auth_config, is_auth_configured
+from golf.auth import is_auth_configured
 from golf.auth.api_key import get_api_key_config
 from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.core.builder_telemetry import (

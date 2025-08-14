@@ -49,31 +49,34 @@ class JWTAuthConfig(BaseModel):
         # Ensure exactly one of public_key or jwks_uri is provided
         if not self.public_key and not self.jwks_uri and not self.public_key_env_var and not self.jwks_uri_env_var:
             raise ValueError("Either public_key, jwks_uri, or their environment variable equivalents must be provided")
-        
+
         if (self.public_key or self.public_key_env_var) and (self.jwks_uri or self.jwks_uri_env_var):
             raise ValueError("Provide either public_key or jwks_uri (or their env vars), not both")
 
         # Warn about missing issuer/audience in production-like environments
-        is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
-                       os.environ.get("NODE_ENV", "").lower() == "production" or \
-                       os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
-        
+        is_production = (
+            os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
+            or os.environ.get("NODE_ENV", "").lower() == "production"
+            or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+        )
+
         if is_production:
             missing_fields = []
             if not self.issuer and not self.issuer_env_var:
                 missing_fields.append("issuer")
             if not self.audience and not self.audience_env_var:
                 missing_fields.append("audience")
-            
+
             if missing_fields:
                 import warnings
+
                 warnings.warn(
                     f"JWT configuration is missing recommended fields for production: {', '.join(missing_fields)}. "
                     "This may allow tokens from unintended issuers or audiences to be accepted.",
                     UserWarning,
-                    stacklevel=2
+                    stacklevel=2,
                 )
-        
+
         return self
 
 
@@ -119,7 +122,9 @@ class OAuthServerConfig(BaseModel):
     service_documentation_url: str | None = Field(None, description="URL of service documentation")
 
     # Client registration settings
-    valid_scopes: list[str] = Field(default_factory=list, description="Valid scopes for client registration (OAuth 2.0 format)")
+    valid_scopes: list[str] = Field(
+        default_factory=list, description="Valid scopes for client registration (OAuth 2.0 format)"
+    )
     default_scopes: list[str] = Field(default_factory=list, description="Default scopes for new clients")
 
     # Token revocation settings
@@ -137,40 +142,43 @@ class OAuthServerConfig(BaseModel):
         """Validate base URL for security and format compliance."""
         if not v or not v.strip():
             raise ValueError("base_url cannot be empty")
-        
+
         url = v.strip()
         try:
             parsed = urlparse(url)
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError(f"Invalid base URL format: '{url}' - must include scheme and netloc")
-            
+
             if parsed.scheme not in ("http", "https"):
                 raise ValueError(f"Base URL must use http or https scheme: '{url}'")
-            
+
             # Warn about HTTP in production-like environments
-            is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
-                           os.environ.get("NODE_ENV", "").lower() == "production" or \
-                           os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
-            
+            is_production = (
+                os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
+                or os.environ.get("NODE_ENV", "").lower() == "production"
+                or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+            )
+
             if is_production and parsed.scheme == "http":
                 import warnings
+
                 warnings.warn(
                     f"Base URL '{url}' uses HTTP in production environment. "
                     "HTTPS is strongly recommended for OAuth servers to prevent token interception.",
                     UserWarning,
-                    stacklevel=2
+                    stacklevel=2,
                 )
-            
+
             # Prevent common SSRF targets
             if parsed.hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
                 if is_production:
                     raise ValueError(f"Base URL cannot use localhost/loopback addresses in production: '{url}'")
-        
+
         except Exception as e:
             if isinstance(e, ValueError):
                 raise
             raise ValueError(f"Invalid base URL '{url}': {e}") from e
-        
+
         return url
 
     @field_validator("issuer_url", "service_documentation_url")
@@ -179,38 +187,41 @@ class OAuthServerConfig(BaseModel):
         """Validate optional URLs for security and format compliance."""
         if not v:
             return v
-        
+
         url = v.strip()
         if not url:
             return None
-        
+
         try:
             parsed = urlparse(url)
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError(f"Invalid URL format: '{url}' - must include scheme and netloc")
-            
+
             if parsed.scheme not in ("http", "https"):
                 raise ValueError(f"URL must use http or https scheme: '{url}'")
-            
+
             # Check for HTTPS requirement in production for issuer URL
-            if v == cls.__dict__.get('issuer_url'):  # This is the issuer_url field
-                is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
-                               os.environ.get("NODE_ENV", "").lower() == "production" or \
-                               os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
-                
+            if v == cls.__dict__.get("issuer_url"):  # This is the issuer_url field
+                is_production = (
+                    os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
+                    or os.environ.get("NODE_ENV", "").lower() == "production"
+                    or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+                )
+
                 if is_production and parsed.scheme == "http":
                     import warnings
+
                     warnings.warn(
                         f"Issuer URL '{url}' uses HTTP in production. HTTPS is required for OAuth issuer URLs.",
                         UserWarning,
-                        stacklevel=2
+                        stacklevel=2,
                     )
-        
+
         except Exception as e:
             if isinstance(e, ValueError):
                 raise
             raise ValueError(f"Invalid URL '{url}': {e}") from e
-        
+
         return url
 
     @field_validator("valid_scopes", "default_scopes", "required_scopes")
@@ -219,35 +230,38 @@ class OAuthServerConfig(BaseModel):
         """Validate OAuth 2.0 scopes format and security."""
         if not v:
             return v
-        
+
         valid_scopes = []
         for scope in v:
             scope = scope.strip()
             if not scope:
                 raise ValueError("Scopes cannot be empty or whitespace-only")
-            
+
             # OAuth 2.0 scope format validation (RFC 6749)
             # Scopes should be ASCII printable characters except space, and no control characters
             if not all(32 < ord(c) < 127 and c not in ' "\\' for c in scope):
-                raise ValueError(f"Invalid scope format: '{scope}' - must be ASCII printable without spaces, quotes, or backslashes")
-            
+                raise ValueError(
+                    f"Invalid scope format: '{scope}' - must be ASCII printable without spaces, quotes, or backslashes"
+                )
+
             # Reasonable length limit to prevent abuse
             if len(scope) > 128:
                 raise ValueError(f"Scope too long: '{scope}' - maximum 128 characters")
-            
+
             # Prevent potentially dangerous scope names
             dangerous_scopes = {"admin", "root", "superuser", "system", "*", "all"}
             if scope.lower() in dangerous_scopes:
                 import warnings
+
                 warnings.warn(
                     f"Potentially dangerous scope detected: '{scope}'. "
                     "Consider using more specific, principle-of-least-privilege scopes.",
                     UserWarning,
-                    stacklevel=2
+                    stacklevel=2,
                 )
-            
+
             valid_scopes.append(scope)
-        
+
         return valid_scopes
 
     @model_validator(mode="after")
@@ -257,18 +271,14 @@ class OAuthServerConfig(BaseModel):
         if self.default_scopes and self.valid_scopes:
             invalid_defaults = set(self.default_scopes) - set(self.valid_scopes)
             if invalid_defaults:
-                raise ValueError(
-                    f"default_scopes contains invalid scopes not in valid_scopes: {invalid_defaults}"
-                )
-        
-        # Validate required_scopes are subset of valid_scopes  
+                raise ValueError(f"default_scopes contains invalid scopes not in valid_scopes: {invalid_defaults}")
+
+        # Validate required_scopes are subset of valid_scopes
         if self.required_scopes and self.valid_scopes:
             invalid_required = set(self.required_scopes) - set(self.valid_scopes)
             if invalid_required:
-                raise ValueError(
-                    f"required_scopes contains invalid scopes not in valid_scopes: {invalid_required}"
-                )
-        
+                raise ValueError(f"required_scopes contains invalid scopes not in valid_scopes: {invalid_required}")
+
         return self
 
 
@@ -310,13 +320,13 @@ class RemoteAuthConfig(BaseModel):
             raise ValueError(
                 "authorization_servers cannot be empty - at least one authorization server URL is required"
             )
-        
+
         valid_urls = []
         for url in v:
             url = url.strip()
             if not url:
                 raise ValueError("authorization_servers cannot contain empty URLs")
-            
+
             # Validate URL format
             try:
                 parsed = urlparse(url)
@@ -328,9 +338,9 @@ class RemoteAuthConfig(BaseModel):
                     raise ValueError(f"Authorization server URL must use http or https scheme: '{url}'")
             except Exception as e:
                 raise ValueError(f"Invalid authorization server URL '{url}': {e}") from e
-            
+
             valid_urls.append(url)
-        
+
         return valid_urls
 
     @field_validator("resource_server_url")
@@ -339,19 +349,17 @@ class RemoteAuthConfig(BaseModel):
         """Validate resource server URL is a valid URL."""
         if not v or not v.strip():
             raise ValueError("resource_server_url cannot be empty")
-        
+
         url = v.strip()
         try:
             parsed = urlparse(url)
             if not parsed.scheme or not parsed.netloc:
-                raise ValueError(
-                    f"Invalid URL format for resource server: '{url}' - must include scheme and netloc"
-                )
+                raise ValueError(f"Invalid URL format for resource server: '{url}' - must include scheme and netloc")
             if parsed.scheme not in ("http", "https"):
                 raise ValueError(f"Resource server URL must use http or https scheme: '{url}'")
         except Exception as e:
             raise ValueError(f"Invalid resource server URL '{url}': {e}") from e
-        
+
         return url
 
     @model_validator(mode="after")
@@ -360,25 +368,27 @@ class RemoteAuthConfig(BaseModel):
         # The duck-typing check is already handled by the factory function, but we can
         # add a basic sanity check here that the config types are ones we know work
         config = self.token_verifier_config
-        
+
         if not isinstance(config, JWTAuthConfig | StaticTokenConfig):
             raise ValueError(
                 f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, got {type(config).__name__}"
             )
-        
+
         # For JWT configs, ensure they have the minimum required fields
         if isinstance(config, JWTAuthConfig) and (
-            not config.public_key and not config.jwks_uri and 
-            not config.public_key_env_var and not config.jwks_uri_env_var
+            not config.public_key
+            and not config.jwks_uri
+            and not config.public_key_env_var
+            and not config.jwks_uri_env_var
         ):
             raise ValueError(
                 "JWT token verifier config must provide public_key, jwks_uri, or their environment variable equivalents"
             )
-        
+
         # For static token configs, ensure they have tokens
         if isinstance(config, StaticTokenConfig) and not config.tokens:
             raise ValueError("Static token verifier config must provide at least one token")
-        
+
         return self
 
 
