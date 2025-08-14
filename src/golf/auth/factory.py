@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from fastmcp.server.auth.auth import AuthProvider
     from fastmcp.server.auth import JWTVerifier, StaticTokenVerifier
-from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
+from mcp.server.auth.settings import RevocationOptions
 
 from .providers import (
     AuthConfig,
@@ -137,21 +137,54 @@ def _create_oauth_server_provider(config: OAuthServerConfig) -> "AuthProvider":
             "OAuthProvider not available in this FastMCP version. Please upgrade to FastMCP 2.11.0 or later."
         ) from e
 
-    # Resolve runtime values from environment variables
+    # Resolve runtime values from environment variables with validation
     base_url = config.base_url
     if config.base_url_env_var:
         env_value = os.environ.get(config.base_url_env_var)
         if env_value:
-            base_url = env_value
+            # Apply the same validation as the config field to env var value
+            try:
+                from urllib.parse import urlparse
+                env_value = env_value.strip()
+                parsed = urlparse(env_value)
+                
+                if not parsed.scheme or not parsed.netloc:
+                    raise ValueError(f"Invalid base URL from environment variable {config.base_url_env_var}: '{env_value}'")
+                
+                if parsed.scheme not in ("http", "https"):
+                    raise ValueError(f"Base URL from environment must use http/https: '{env_value}'")
+                    
+                # Production HTTPS check
+                is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
+                               os.environ.get("NODE_ENV", "").lower() == "production" or \
+                               os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+                
+                if is_production and parsed.scheme == "http":
+                    raise ValueError(f"Base URL must use HTTPS in production: '{env_value}'")
+                    
+                base_url = env_value
+                
+            except Exception as e:
+                raise ValueError(f"Invalid base URL from environment variable {config.base_url_env_var}: {e}") from e
 
-    # Create client registration options
+    # Additional security validations before creating provider
+    from urllib.parse import urlparse
+    
+    # Validate final base_url 
+    parsed_base = urlparse(base_url)
+    if not parsed_base.scheme or not parsed_base.netloc:
+        raise ValueError(f"Invalid base URL: '{base_url}'")
+    
+    # Security check: prevent localhost in production
+    is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
+                   os.environ.get("NODE_ENV", "").lower() == "production" or \
+                   os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+    
+    if is_production and parsed_base.hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
+        raise ValueError(f"Cannot use localhost/loopback addresses in production: '{base_url}'")
+
+    # Client registration options - always disabled for security
     client_reg_options = None
-    if config.allow_client_registration:
-        client_reg_options = ClientRegistrationOptions(
-            enabled=True,
-            valid_scopes=config.valid_scopes,
-            default_scopes=config.default_scopes,
-        )
 
     # Create revocation options
     revocation_options = None

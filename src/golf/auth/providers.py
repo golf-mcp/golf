@@ -102,19 +102,24 @@ class OAuthServerConfig(BaseModel):
     """Configuration for full OAuth authorization server using FastMCP's OAuthProvider.
 
     Use this when you want your Golf server to act as a complete OAuth server,
-    handling client registration, authorization flows, and token issuance.
+    handling authorization flows and token issuance.
+
+    Security Considerations:
+        - URLs are validated to prevent SSRF attacks
+        - Scopes are validated against OAuth 2.0 standards
+        - Base URL must use HTTPS in production environments
+        - Client registration is disabled for security
     """
 
     provider_type: Literal["oauth_server"] = "oauth_server"
 
     # OAuth server URLs
-    base_url: str = Field(..., description="Public URL of this Golf server")
-    issuer_url: str | None = Field(None, description="OAuth issuer URL (defaults to base_url)")
+    base_url: str = Field(..., description="Public URL of this Golf server (must use HTTPS in production)")
+    issuer_url: str | None = Field(None, description="OAuth issuer URL (defaults to base_url, must be HTTPS)")
     service_documentation_url: str | None = Field(None, description="URL of service documentation")
 
     # Client registration settings
-    allow_client_registration: bool = Field(True, description="Allow dynamic client registration")
-    valid_scopes: list[str] = Field(default_factory=list, description="Valid scopes for client registration")
+    valid_scopes: list[str] = Field(default_factory=list, description="Valid scopes for client registration (OAuth 2.0 format)")
     default_scopes: list[str] = Field(default_factory=list, description="Default scopes for new clients")
 
     # Token revocation settings
@@ -125,6 +130,146 @@ class OAuthServerConfig(BaseModel):
 
     # Environment variable names for runtime configuration
     base_url_env_var: str | None = Field(None, description="Environment variable name for base URL")
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, v: str) -> str:
+        """Validate base URL for security and format compliance."""
+        if not v or not v.strip():
+            raise ValueError("base_url cannot be empty")
+        
+        url = v.strip()
+        try:
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError(f"Invalid base URL format: '{url}' - must include scheme and netloc")
+            
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(f"Base URL must use http or https scheme: '{url}'")
+            
+            # Warn about HTTP in production-like environments
+            is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
+                           os.environ.get("NODE_ENV", "").lower() == "production" or \
+                           os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+            
+            if is_production and parsed.scheme == "http":
+                import warnings
+                warnings.warn(
+                    f"Base URL '{url}' uses HTTP in production environment. "
+                    "HTTPS is strongly recommended for OAuth servers to prevent token interception.",
+                    UserWarning,
+                    stacklevel=2
+                )
+            
+            # Prevent common SSRF targets
+            if parsed.hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
+                if is_production:
+                    raise ValueError(f"Base URL cannot use localhost/loopback addresses in production: '{url}'")
+        
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            raise ValueError(f"Invalid base URL '{url}': {e}") from e
+        
+        return url
+
+    @field_validator("issuer_url", "service_documentation_url")
+    @classmethod
+    def validate_optional_urls(cls, v: str | None) -> str | None:
+        """Validate optional URLs for security and format compliance."""
+        if not v:
+            return v
+        
+        url = v.strip()
+        if not url:
+            return None
+        
+        try:
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError(f"Invalid URL format: '{url}' - must include scheme and netloc")
+            
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(f"URL must use http or https scheme: '{url}'")
+            
+            # Check for HTTPS requirement in production for issuer URL
+            if v == cls.__dict__.get('issuer_url'):  # This is the issuer_url field
+                is_production = os.environ.get("GOLF_ENV", "").lower() in ("prod", "production") or \
+                               os.environ.get("NODE_ENV", "").lower() == "production" or \
+                               os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+                
+                if is_production and parsed.scheme == "http":
+                    import warnings
+                    warnings.warn(
+                        f"Issuer URL '{url}' uses HTTP in production. HTTPS is required for OAuth issuer URLs.",
+                        UserWarning,
+                        stacklevel=2
+                    )
+        
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            raise ValueError(f"Invalid URL '{url}': {e}") from e
+        
+        return url
+
+    @field_validator("valid_scopes", "default_scopes", "required_scopes")
+    @classmethod
+    def validate_scopes(cls, v: list[str]) -> list[str]:
+        """Validate OAuth 2.0 scopes format and security."""
+        if not v:
+            return v
+        
+        valid_scopes = []
+        for scope in v:
+            scope = scope.strip()
+            if not scope:
+                raise ValueError("Scopes cannot be empty or whitespace-only")
+            
+            # OAuth 2.0 scope format validation (RFC 6749)
+            # Scopes should be ASCII printable characters except space, and no control characters
+            if not all(32 < ord(c) < 127 and c not in ' "\\' for c in scope):
+                raise ValueError(f"Invalid scope format: '{scope}' - must be ASCII printable without spaces, quotes, or backslashes")
+            
+            # Reasonable length limit to prevent abuse
+            if len(scope) > 128:
+                raise ValueError(f"Scope too long: '{scope}' - maximum 128 characters")
+            
+            # Prevent potentially dangerous scope names
+            dangerous_scopes = {"admin", "root", "superuser", "system", "*", "all"}
+            if scope.lower() in dangerous_scopes:
+                import warnings
+                warnings.warn(
+                    f"Potentially dangerous scope detected: '{scope}'. "
+                    "Consider using more specific, principle-of-least-privilege scopes.",
+                    UserWarning,
+                    stacklevel=2
+                )
+            
+            valid_scopes.append(scope)
+        
+        return valid_scopes
+
+    @model_validator(mode="after")
+    def validate_oauth_server_config(self) -> "OAuthServerConfig":
+        """Validate OAuth server configuration for security and consistency."""
+        # Validate default_scopes are subset of valid_scopes
+        if self.default_scopes and self.valid_scopes:
+            invalid_defaults = set(self.default_scopes) - set(self.valid_scopes)
+            if invalid_defaults:
+                raise ValueError(
+                    f"default_scopes contains invalid scopes not in valid_scopes: {invalid_defaults}"
+                )
+        
+        # Validate required_scopes are subset of valid_scopes  
+        if self.required_scopes and self.valid_scopes:
+            invalid_required = set(self.required_scopes) - set(self.valid_scopes)
+            if invalid_required:
+                raise ValueError(
+                    f"required_scopes contains invalid scopes not in valid_scopes: {invalid_required}"
+                )
+        
+        return self
 
 
 class RemoteAuthConfig(BaseModel):
