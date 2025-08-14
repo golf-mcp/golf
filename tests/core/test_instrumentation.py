@@ -56,10 +56,8 @@ class TestTelemetryInitialization:
             assert provider is not None
             assert os.environ.get("OTEL_TRACES_EXPORTER") == "otlp_http"
             from golf import _endpoints
-            assert (
-                os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-                == _endpoints.OTEL_ENDPOINT
-            )
+
+            assert os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") == _endpoints.OTEL_ENDPOINT
 
     def test_init_telemetry_with_headers(self, monkeypatch):
         """Test telemetry initialization with custom headers."""
@@ -339,10 +337,8 @@ class TestIntegrationScenarios:
         # Verify auto-configuration
         assert os.environ.get("OTEL_TRACES_EXPORTER") == "otlp_http"
         from golf import _endpoints
-        assert (
-            os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-            == _endpoints.OTEL_ENDPOINT
-        )
+
+        assert os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") == _endpoints.OTEL_ENDPOINT
         assert "X-Golf-Key=golf_test_key_123" in os.environ.get("OTEL_EXPORTER_OTLP_HEADERS", "")
 
     def test_mixed_component_instrumentation(self):
