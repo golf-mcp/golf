@@ -30,7 +30,7 @@
 
 Golf is a **framework** designed to streamline the creation of MCP server applications. It allows developers to define server's capabilities—*tools*, *prompts*, and *resources*—as simple Python files within a conventional directory structure. Golf then automatically discovers, parses, and compiles these components into a runnable FastMCP server, minimizing boilerplate and accelerating development.
 
-With Golf, you can focus on implementing your agent's logic rather than wrestling with server setup and integration complexities. It's built for developers who want a quick, organized way to build powerful MCP servers.
+With Golf v0.2.0, you get **enterprise-grade authentication** (JWT, OAuth Server, API key, development tokens), **built-in utilities** for LLM interactions, and **automatic telemetry** integration. Focus on implementing your agent's logic while Golf handles authentication, monitoring, and server infrastructure.
 
 ## Quick Start
 
@@ -85,10 +85,11 @@ A Golf project initialized with `golf init` will have a structure similar to thi
 │   └─ welcome.py     # Example prompt
 │
 ├─ .env               # Environment variables (e.g., API keys, server port)
-└─ auth.py            # Authentication configuration (JWT, OAuth, API keys)
+└─ auth.py            # Authentication configuration (JWT, OAuth Server, API key, dev tokens)
 ```
 
 -   **`golf.json`**: Configures server name, port, transport, telemetry, and other build settings.
+-   **`auth.py`**: Dedicated authentication configuration file (new in v0.2.0, breaking change from v0.1.x authentication API) for JWT, OAuth Server, API key, or development authentication.
 -   **`tools/`**, **`resources/`**, **`prompts/`**: Contain your Python files, each defining a single component. These directories can also contain nested subdirectories to further organize your components (e.g., `tools/payments/charge.py`). The module docstring of each file serves as the component's description.
     -   Component IDs are automatically derived from their file path. For example, `tools/hello.py` becomes `hello`, and a nested file like `tools/payments/submit.py` would become `submit_payments` (filename, followed by reversed parent directories under the main category, joined by underscores).
 -   **`common.py`** (not shown, but can be placed in subdirectories like `tools/payments/common.py`): Used to share code (clients, models, etc.) among components in the same subdirectory.
@@ -125,118 +126,63 @@ export = hello
 ```
 Golf will automatically discover this file. The module docstring `"""Hello World tool {{project_name}}."""` is used as the tool's description. It infers parameters from the `hello` function's signature and uses the `Output` Pydantic model for the output schema. The tool will be registered with the ID `hello`.
 
-## Configuration (`golf.json`)
+## Authentication & Features
 
-The `golf.json` file is the heart of your Golf project configuration. Here's what each field controls:
+Golf includes enterprise-grade authentication, built-in utilities, and automatic telemetry:
 
-```jsonc
-{
-  "name": "{{project_name}}",          // Your MCP server name (required)
-  "description": "A Golf project",     // Brief description of your server's purpose
-  "host": "localhost",                // Server host - use "0.0.0.0" to listen on all interfaces
-  "port": 3000,                       // Server port - any available port number
-  "transport": "sse",                 // Communication protocol:
-                                      // - "sse": Server-Sent Events (recommended for web clients)
-                                      // - "streamable-http": HTTP with streaming support
-                                      // - "stdio": Standard I/O (for CLI integration)
-  
-  // HTTP Transport Configuration (optional)
-  "stateless_http": false,            // Make streamable-http transport stateless (new session per request)
-                                      // When true, server restarts won't break existing client connections
-  
-  // Health Check Configuration (optional)
-  "health_check_enabled": false,      // Enable health check endpoint for Kubernetes/load balancers
-  "health_check_path": "/health",     // HTTP path for health check endpoint
-  "health_check_response": "OK",      // Response text returned by health check
-  
-  // OpenTelemetry Configuration (optional)
-  "opentelemetry_enabled": false,     // Enable distributed tracing
-  "opentelemetry_default_exporter": "console"  // Default exporter if OTEL_TRACES_EXPORTER not set
-                                               // Options: "console", "otlp_http"
-}
-```
-
-### Key Configuration Options:
-
-- **`name`**: The identifier for your MCP server. This will be shown to clients connecting to your server.
-- **`transport`**: Choose based on your client needs:
-  - `"sse"` is ideal for web-based clients and real-time communication
-  - `"streamable-http"` provides HTTP streaming for traditional API clients
-  - `"stdio"` enables integration with command-line tools and scripts
-- **`host` & `port`**: Control where your server listens. Use `"localhost"` for local development or `"0.0.0.0"` to accept external connections.
-- **`stateless_http`**: When true, makes the streamable-http transport stateless by creating a new session for each request. This ensures that server restarts don't break existing client connections, making the server truly stateless.
-- **`health_check_enabled`**: When true, enables a health check endpoint for Kubernetes readiness/liveness probes and load balancers
-- **`health_check_path`**: Customizable path for the health check endpoint (defaults to "/health")
-- **`health_check_response`**: Customizable response text for successful health checks (defaults to "OK")
-- **`opentelemetry_enabled`**: When true, enables distributed tracing for debugging and monitoring your MCP server
-- **`opentelemetry_default_exporter`**: Sets the default trace exporter. Can be overridden by the `OTEL_TRACES_EXPORTER` environment variable
-
-## Features
-
-### 🏥 Health Check Support
-
-Golf includes built-in health check endpoint support for production deployments. When enabled, it automatically adds a custom HTTP route that can be used by:
-- Kubernetes readiness and liveness probes
-- Load balancers and reverse proxies
-- Monitoring systems
-- Container orchestration platforms
-
-#### Configuration
-
-Enable health checks in your `golf.json`:
-```json
-{
-  "health_check_enabled": true,
-  "health_check_path": "/health",
-  "health_check_response": "Service is healthy"
-}
-```
-
-The generated server will include a route like:
 ```python
-@mcp.custom_route('/health', methods=["GET"])
-async def health_check(request: Request) -> PlainTextResponse:
-    """Health check endpoint for Kubernetes and load balancers."""
-    return PlainTextResponse("Service is healthy")
+# auth.py - Configure authentication
+from golf.auth import configure_auth, JWTAuthConfig, StaticTokenConfig, OAuthServerConfig
+
+# JWT authentication (production)
+configure_auth(JWTAuthConfig(
+    jwks_uri_env_var="JWKS_URI",
+    issuer_env_var="JWT_ISSUER", 
+    audience_env_var="JWT_AUDIENCE",
+    required_scopes=["read", "write"]
+))
+
+# OAuth Server mode (Golf acts as OAuth 2.0 server)
+# configure_auth(OAuthServerConfig(
+#     base_url="https://your-golf-server.com",
+#     valid_scopes=["read", "write", "admin"]
+# ))
+
+# Static tokens (development only)
+# configure_auth(StaticTokenConfig(
+#     tokens={"dev-token": {"client_id": "dev", "scopes": ["read"]}}
+# ))
+
+# Built-in utilities available in all tools
+from golf.utils import elicit, sample, get_context
 ```
 
-### 🔍 OpenTelemetry Support
+```bash
+# Automatic telemetry with Golf Platform
+export GOLF_API_KEY="your-key"
+golf run  # ✅ Telemetry enabled automatically
+```
 
-Golf includes built-in OpenTelemetry instrumentation for distributed tracing. When enabled, it automatically traces:
-- Tool executions with arguments and results
-- Resource reads and template expansions
-- Prompt generations
-- HTTP requests and sessions
+**[📚 Complete Documentation →](https://docs.golf.dev)**
 
-#### Configuration
+## Configuration
 
-Enable OpenTelemetry in your `golf.json`:
+Basic configuration in `golf.json`:
+
 ```json
 {
-  "opentelemetry_enabled": true,
-  "opentelemetry_default_exporter": "otlp_http"
+  "name": "My Golf Server",
+  "host": "localhost",
+  "port": 3000,
+  "transport": "sse",
+  "opentelemetry_enabled": false,
+  "detailed_tracing": false
 }
 ```
 
-Then configure via environment variables:
-```bash
-# For OTLP HTTP exporter (e.g., Jaeger, Grafana Tempo)
-OTEL_TRACES_EXPORTER=otlp_http
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
-OTEL_SERVICE_NAME=my-golf-server  # Optional, defaults to project name
-
-# For console exporter (debugging)
-OTEL_TRACES_EXPORTER=console
-```
-
-**Note**: When using the OTLP HTTP exporter, you must set `OTEL_EXPORTER_OTLP_ENDPOINT`. If not configured, Golf will display a warning and disable tracing to avoid errors.
-
-## Roadmap
-
-Here are the things we are working hard on:
-
-*   **`golf deploy` command for one click deployments to Vercel, Blaxel and other providers**
-*   **Production-ready OAuth token management, to allow for persistent, encrypted token storage and client mapping**
+- **`transport`**: Choose `"sse"`, `"streamable-http"`, or `"stdio"`
+- **`opentelemetry_enabled`**: Auto-enabled with `GOLF_API_KEY`
+- **`detailed_tracing`**: Capture input/output (use carefully with sensitive data)
 
 
 ## Privacy & Telemetry
