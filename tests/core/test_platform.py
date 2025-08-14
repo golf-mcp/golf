@@ -68,6 +68,7 @@ export = test_function
             mock_context.post.assert_called_once()
             call_args = mock_context.post.call_args
             from golf import _endpoints
+
             assert call_args.args[0] == _endpoints.PLATFORM_API_URL
 
             # Verify request headers
