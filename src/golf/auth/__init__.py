@@ -20,6 +20,13 @@ from .factory import (
     create_simple_jwt_provider,
     create_dev_token_provider,
 )
+from .registry import (
+    BaseProviderPlugin,
+    AuthProviderFactory,
+    get_provider_registry,
+    register_provider_factory,
+    register_provider_plugin,
+)
 
 # Re-export for backward compatibility
 from .api_key import configure_api_key, get_api_key_config, is_api_key_configured
@@ -48,6 +55,12 @@ __all__ = [
     "create_auth_provider",
     "create_simple_jwt_provider",
     "create_dev_token_provider",
+    # Provider registry and plugins
+    "BaseProviderPlugin",
+    "AuthProviderFactory",
+    "get_provider_registry",
+    "register_provider_factory",
+    "register_provider_plugin",
     # API key functions (backward compatibility)
     "configure_api_key",
     "get_api_key_config",
@@ -61,10 +74,10 @@ __all__ = [
 ]
 
 # Global storage for auth configuration
-_auth_config: tuple[AuthConfig, list[str] | None] | None = None
+_auth_config: AuthConfig | None = None
 
 
-def configure_auth(config: AuthConfig, required_scopes: list[str] | None = None) -> None:
+def configure_auth(config: AuthConfig) -> None:
     """Configure authentication for the Golf server.
 
     This function should be called in auth.py to set up authentication
@@ -72,7 +85,7 @@ def configure_auth(config: AuthConfig, required_scopes: list[str] | None = None)
 
     Args:
         config: Authentication configuration (JWT, OAuth, Static, or Remote)
-        required_scopes: Optional list of scopes required for all requests
+                The required_scopes should be specified in the config itself.
 
     Examples:
         # JWT authentication with Auth0
@@ -97,7 +110,8 @@ def configure_auth(config: AuthConfig, required_scopes: list[str] | None = None)
                         "client_id": "dev-client",
                         "scopes": ["read", "write"],
                     }
-                }
+                },
+                required_scopes=["read"],
             )
         )
 
@@ -109,11 +123,12 @@ def configure_auth(config: AuthConfig, required_scopes: list[str] | None = None)
                 base_url="https://your-server.example.com",
                 valid_scopes=["read", "write", "admin"],
                 default_scopes=["read"],
+                required_scopes=["read"],
             )
         )
     """
     global _auth_config
-    _auth_config = (config, required_scopes)
+    _auth_config = config
 
 
 def configure_jwt_auth(
@@ -144,7 +159,7 @@ def configure_jwt_auth(
         required_scopes=required_scopes or [],
         **env_vars,
     )
-    configure_auth(config, required_scopes)
+    configure_auth(config)
 
 
 def configure_dev_auth(
@@ -173,14 +188,14 @@ def configure_dev_auth(
         tokens=tokens,
         required_scopes=required_scopes or [],
     )
-    configure_auth(config, required_scopes)
+    configure_auth(config)
 
 
-def get_auth_config() -> tuple[AuthConfig, list[str] | None] | None:
+def get_auth_config() -> AuthConfig | None:
     """Get the current auth configuration.
 
     Returns:
-        Tuple of (auth_config, required_scopes) if configured, None otherwise
+        AuthConfig if configured, None otherwise
     """
     return _auth_config
 
@@ -204,9 +219,8 @@ def create_auth_provider_from_config() -> object | None:
     Returns:
         FastMCP AuthProvider instance or None if not configured
     """
-    config_tuple = get_auth_config()
-    if not config_tuple:
+    config = get_auth_config()
+    if not config:
         return None
 
-    config, _ = config_tuple
     return create_auth_provider(config)

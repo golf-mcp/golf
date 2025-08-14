@@ -18,10 +18,18 @@ from .providers import (
     OAuthServerConfig,
     RemoteAuthConfig,
 )
+from .registry import (
+    get_provider_registry,
+    create_auth_provider_from_registry,
+)
 
 
 def create_auth_provider(config: AuthConfig) -> "AuthProvider":
     """Create a FastMCP AuthProvider from Golf auth configuration.
+
+    This function uses the provider registry system to allow extensibility.
+    Built-in providers are automatically registered, and custom providers
+    can be added via the registry system.
 
     Args:
         config: Golf authentication configuration
@@ -32,17 +40,23 @@ def create_auth_provider(config: AuthConfig) -> "AuthProvider":
     Raises:
         ValueError: If configuration is invalid
         ImportError: If required dependencies are missing
+        KeyError: If provider type is not registered
     """
-    if config.provider_type == "jwt":
-        return _create_jwt_provider(config)
-    elif config.provider_type == "static":
-        return _create_static_provider(config)
-    elif config.provider_type == "oauth_server":
-        return _create_oauth_server_provider(config)
-    elif config.provider_type == "remote":
-        return _create_remote_provider(config)
-    else:
-        raise ValueError(f"Unknown provider type: {config.provider_type}")
+    try:
+        return create_auth_provider_from_registry(config)
+    except KeyError:
+        # Fall back to legacy dispatch for backward compatibility
+        # This ensures existing code continues to work during transition
+        if config.provider_type == "jwt":
+            return _create_jwt_provider(config)
+        elif config.provider_type == "static":
+            return _create_static_provider(config)
+        elif config.provider_type == "oauth_server":
+            return _create_oauth_server_provider(config)
+        elif config.provider_type == "remote":
+            return _create_remote_provider(config)
+        else:
+            raise ValueError(f"Unknown provider type: {config.provider_type}") from None
 
 
 def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
@@ -163,6 +177,20 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
             "RemoteAuthProvider not available in this FastMCP version. Please upgrade to FastMCP 2.11.0 or later."
         ) from e
 
+    # Resolve runtime values from environment variables
+    authorization_servers = config.authorization_servers
+    if config.authorization_servers_env_var:
+        env_value = os.environ.get(config.authorization_servers_env_var)
+        if env_value:
+            # Split comma-separated values and strip whitespace
+            authorization_servers = [s.strip() for s in env_value.split(",")]
+
+    resource_server_url = config.resource_server_url
+    if config.resource_server_url_env_var:
+        env_value = os.environ.get(config.resource_server_url_env_var)
+        if env_value:
+            resource_server_url = env_value
+
     # Create the underlying token verifier
     token_verifier = create_auth_provider(config.token_verifier_config)
 
@@ -172,8 +200,8 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
 
     return RemoteAuthProvider(
         token_verifier=token_verifier,
-        authorization_servers=config.authorization_servers,
-        resource_server_url=config.resource_server_url,
+        authorization_servers=authorization_servers,
+        resource_server_url=resource_server_url,
     )
 
 
@@ -241,3 +269,25 @@ def create_dev_token_provider(
         required_scopes=required_scopes or [],
     )
     return _create_static_provider(config)
+
+
+def register_builtin_providers() -> None:
+    """Register built-in authentication providers in the registry.
+    
+    This function registers the standard Golf authentication providers:
+    - jwt: JWT token verification
+    - static: Static token verification (development)
+    - oauth_server: Full OAuth authorization server
+    - remote: Remote authorization server integration
+    """
+    registry = get_provider_registry()
+    
+    # Register built-in provider factories
+    registry.register_factory("jwt", _create_jwt_provider)
+    registry.register_factory("static", _create_static_provider)
+    registry.register_factory("oauth_server", _create_oauth_server_provider)
+    registry.register_factory("remote", _create_remote_provider)
+
+
+# Register built-in providers when module is imported
+register_builtin_providers()

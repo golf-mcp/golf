@@ -1073,14 +1073,6 @@ def build_project(
             code = compile(script_content, str(config_path), "exec")
             exec(code, {})
 
-            # Check if auth was configured by the script
-            auth_config_result = get_auth_config()
-            if auth_config_result:
-                provider, scopes = auth_config_result
-            else:
-                # No auth configuration found
-                pass
-
         except Exception as e:
             console.print(f"[red]Error executing {config_path.name}: {str(e)}[/red]")
             import traceback
