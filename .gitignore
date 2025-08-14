@@ -12,6 +12,7 @@ Makefile
 htmlcov/
 .ruff_cache/
 new/
+.DS_Store
 
 # Generated endpoints file (created by editable install)
 src/golf/_endpoints.py
