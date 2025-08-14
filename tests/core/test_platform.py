@@ -67,7 +67,9 @@ export = test_function
             # Verify the HTTP request was made correctly
             mock_context.post.assert_called_once()
             call_args = mock_context.post.call_args
-            assert call_args.args[0] == "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/resources"
+            from golf import _endpoints
+
+            assert call_args.args[0] == _endpoints.PLATFORM_API_URL
 
             # Verify request headers
             headers = call_args.kwargs["headers"]

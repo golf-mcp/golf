@@ -12,6 +12,14 @@ from golf import __version__
 from golf.core.config import Settings
 from golf.core.parser import ComponentType, ParsedComponent
 
+# Import endpoints with fallback for dev mode
+try:
+    # In built wheels, this exists (generated from _endpoints.py.in)
+    from golf import _endpoints  # type: ignore
+except ImportError:
+    # In editable/dev installs, fall back to env-based values
+    from golf import _endpoints_fallback as _endpoints  # type: ignore
+
 console = Console()
 
 
@@ -65,7 +73,7 @@ async def register_project_with_platform(
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
-                "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/resources",
+                _endpoints.PLATFORM_API_URL,
                 json=metadata,
                 headers={
                     "X-Golf-Key": api_key,
