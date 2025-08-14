@@ -55,9 +55,10 @@ class TestTelemetryInitialization:
             provider = init_telemetry("test-service")
             assert provider is not None
             assert os.environ.get("OTEL_TRACES_EXPORTER") == "otlp_http"
+            from golf import _endpoints
             assert (
                 os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-                == "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/v1/otel"
+                == _endpoints.OTEL_ENDPOINT
             )
 
     def test_init_telemetry_with_headers(self, monkeypatch):
@@ -337,9 +338,10 @@ class TestIntegrationScenarios:
 
         # Verify auto-configuration
         assert os.environ.get("OTEL_TRACES_EXPORTER") == "otlp_http"
+        from golf import _endpoints
         assert (
             os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
-            == "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/v1/otel"
+            == _endpoints.OTEL_ENDPOINT
         )
         assert "X-Golf-Key=golf_test_key_123" in os.environ.get("OTEL_EXPORTER_OTLP_HEADERS", "")
 
