@@ -52,8 +52,10 @@ class build_py(_build_py):
         # First run the normal build
         super().run()
         
-        # Then render endpoints into the build_lib (require env vars for production builds)
-        rendered = render_endpoints(require_env_vars=True)
+        # Then render endpoints into the build_lib
+        # Skip env var requirement if in CI environment or if this looks like a test install
+        is_ci = os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")
+        rendered = render_endpoints(require_env_vars=not is_ci)
         out_file = pathlib.Path(self.build_lib) / PACKAGE_OUT_REL
         out_file.parent.mkdir(parents=True, exist_ok=True)
         out_file.write_text(rendered, encoding="utf-8")
