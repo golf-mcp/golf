@@ -185,7 +185,7 @@ def generate_api_key_auth_components(
 
 def generate_auth_routes() -> str:
     """Generate code for auth routes in the FastMCP app.
-    
+
     Auth providers (RemoteAuthProvider, OAuthProvider) provide OAuth metadata routes
     that need to be added to the server.
     """
