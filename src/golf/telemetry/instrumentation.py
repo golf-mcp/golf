@@ -78,9 +78,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
 
         # Only set endpoint if not already configured (allow user override)
         if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
-            os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
-                _endpoints.OTEL_ENDPOINT
-            )
+            os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = _endpoints.OTEL_ENDPOINT
 
         # Set Golf platform headers (append to existing if present)
         existing_headers = os.environ.get("OTEL_EXPORTER_OTLP_HEADERS", "")
