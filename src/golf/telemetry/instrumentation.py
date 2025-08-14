@@ -13,6 +13,14 @@ from collections.abc import AsyncGenerator
 from collections import OrderedDict
 
 from opentelemetry import baggage, trace
+
+# Import endpoints with fallback for dev mode
+try:
+    # In built wheels, this exists (generated from _endpoints.py.in)
+    from golf import _endpoints  # type: ignore
+except ImportError:
+    # In editable/dev installs, fall back to env-based values
+    from golf import _endpoints_fallback as _endpoints  # type: ignore
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -71,7 +79,7 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         # Only set endpoint if not already configured (allow user override)
         if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
             os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
-                "https://golf-backend.golf-auth-1.authed-qukc4.ryvn.run/api/v1/otel"
+                _endpoints.OTEL_ENDPOINT
             )
 
         # Set Golf platform headers (append to existing if present)
