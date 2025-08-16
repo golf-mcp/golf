@@ -17,3 +17,4 @@ new/
 # Generated endpoints file (created by editable install)
 src/golf/_endpoints.py
 build.sh
+.claude

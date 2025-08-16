@@ -85,6 +85,22 @@ Uses pytest with these key configurations:
 - **Mypy** type checking with strict settings
 - Configuration in `pyproject.toml`
 
+## Git Commit Guidelines
+
+Follow these commit message patterns when making changes:
+
+- `fix[component]: description` - Bug fixes (e.g., `fix[parser]: handle edge case in import resolution`)
+- `feat[component]: description` - New features (e.g., `feat[builder]: add shared file support`)
+- `refactor[component]: description` - Code refactoring (e.g., `refactor[auth]: simplify provider creation`)
+- `test[component]: description` - Test additions/changes (e.g., `test[core]: add integration tests`)
+- `docs[component]: description` - Documentation updates (e.g., `docs[api]: update authentication guide`)
+- `style[component]: description` - Code formatting (e.g., `style[core]: format with ruff`)
+
+Examples from recent commits:
+- `fix[parser]: add shared file discovery for enhanced imports`
+- `fix[builder]: enhance import mapping for any shared file`
+- `fix[transformer]: improve import transformation patterns`
+
 ## Component System
 
 Golf projects have this structure:
