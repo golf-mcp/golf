@@ -986,30 +986,30 @@ def parse_common_files(project_path: Path) -> dict[str, Path]:
 
 def _is_golf_component_file(file_path: Path) -> bool:
     """Check if a Python file is a Golf component (has export or resource_uri).
-    
+
     Args:
         file_path: Path to the Python file to check
-        
+
     Returns:
         True if the file appears to be a Golf component, False otherwise
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
-            
+
         # Parse the file to check for Golf component patterns
         tree = ast.parse(content)
-        
+
         # Look for 'export' or 'resource_uri' variable assignments
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
                 for target in node.targets:
                     if isinstance(target, ast.Name):
-                        if target.id in ('export', 'resource_uri'):
+                        if target.id in ("export", "resource_uri"):
                             return True
-        
+
         return False
-        
+
     except (SyntaxError, OSError, UnicodeDecodeError):
         # If we can't parse the file, assume it's not a component
         return False
@@ -1037,7 +1037,7 @@ def parse_shared_files(project_path: Path) -> dict[str, Path]:
             # Skip files in __pycache__ or other hidden directories
             if "__pycache__" in py_file.parts or any(part.startswith(".") for part in py_file.parts):
                 continue
-            
+
             # Skip files that are Golf components (have export or resource_uri)
             if _is_golf_component_file(py_file):
                 continue
@@ -1045,8 +1045,8 @@ def parse_shared_files(project_path: Path) -> dict[str, Path]:
             # Calculate the module path for this shared file
             # For example: tools/weather/helpers.py -> tools/weather/helpers
             relative_path = py_file.relative_to(project_path)
-            module_path = str(relative_path.with_suffix(''))  # Remove .py extension
-            
+            module_path = str(relative_path.with_suffix(""))  # Remove .py extension
+
             shared_files[module_path] = py_file
 
     return shared_files

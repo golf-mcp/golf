@@ -60,12 +60,12 @@ class ImportTransformer(ast.NodeTransformer):
             try:
                 # Check if this is a shared module import
                 source_str = str(source_module.relative_to(self.project_root))
-                
+
                 # First, try direct module path match (e.g., "tools/weather/helpers")
                 if source_str in self.import_map:
                     new_module = self.import_map[source_str]
                     return ast.ImportFrom(module=new_module, names=node.names, level=0)
-                
+
                 # If direct match fails, try directory-based matching
                 # This handles cases like `from . import common` where the import_map
                 # has "tools/weather/common" but we're looking for "tools/weather"
@@ -75,7 +75,7 @@ class ImportTransformer(ast.NodeTransformer):
                     if node.module:
                         new_module = f"{new_module}.{node.module}"
                     return ast.ImportFrom(module=new_module, names=node.names, level=0)
-                
+
                 # Check for specific module imports within the directory
                 for import_path, mapped_path in self.import_map.items():
                     # Handle cases where we import a specific module from a directory
@@ -84,7 +84,7 @@ class ImportTransformer(ast.NodeTransformer):
                         module_name = import_path.replace(source_dir_str + "/", "")
                         if module_name == node.module:
                             return ast.ImportFrom(module=mapped_path, names=node.names, level=0)
-                        
+
             except ValueError:
                 # source_module is not relative to project_root, leave import unchanged
                 pass

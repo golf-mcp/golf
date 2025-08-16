@@ -316,6 +316,7 @@ class CodeGenerator:
 
             # Find shared Python files and build import map
             from golf.core.parser import parse_shared_files
+
             self.shared_files = parse_shared_files(self.project_path)
             self.import_map = build_import_map(self.project_path, self.shared_files)
 
@@ -1319,7 +1320,7 @@ def build_import_map(project_path: Path, shared_files: dict[str, Path]) -> dict[
 
     This maps from original relative import paths to absolute import paths
     in the components directory structure.
-    
+
     Args:
         project_path: Path to the project root
         shared_files: Dictionary mapping module paths to shared file paths
@@ -1355,9 +1356,9 @@ def build_import_map(project_path: Path, shared_files: dict[str, Path]) -> dict[
             # Map the specific shared module
             # e.g., "tools/weather/helpers" -> "components.tools.weather.helpers"
             import_map[module_path_str] = new_path
-            
+
             # Also map the directory path for relative imports
-            # e.g., "tools/weather" -> "components.tools.weather"  
+            # e.g., "tools/weather" -> "components.tools.weather"
             dir_path_str = str(module_path.parent)
             if dir_path_str != "." and dir_path_str not in import_map:
                 dir_rel_to_component = module_path.parent.relative_to(component_type)
