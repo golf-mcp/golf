@@ -304,7 +304,7 @@ class CodeGenerator:
         self.copy_env = copy_env
         self.components = {}
         self.manifest = {}
-        self.common_files = {}
+        self.shared_files = {}
         self.import_map = {}
 
     def generate(self) -> None:
@@ -314,9 +314,10 @@ class CodeGenerator:
             self.components = parse_project(self.project_path)
             self.manifest = build_manifest(self.project_path, self.settings)
 
-            # Find common.py files and build import map
-            self.common_files = find_common_files(self.project_path, self.components)
-            self.import_map = build_import_map(self.project_path, self.common_files)
+            # Find shared Python files and build import map
+            from golf.core.parser import parse_shared_files
+            self.shared_files = parse_shared_files(self.project_path)
+            self.import_map = build_import_map(self.project_path, self.shared_files)
 
         # Create output directory structure
         with console.status("Creating directory structure..."):
@@ -359,20 +360,20 @@ class CodeGenerator:
 
         for directory in dirs:
             directory.mkdir(parents=True, exist_ok=True)
-        # Process common.py files directly in the components directory
-        self._process_common_files()
+        # Process shared files directly in the components directory
+        self._process_shared_files()
 
-    def _process_common_files(self) -> None:
-        """Process and transform common.py files in the components directory
+    def _process_shared_files(self) -> None:
+        """Process and transform shared Python files in the components directory
         structure."""
-        # Reuse the already fetched common_files instead of calling the function again
-        for dir_path_str, common_file in self.common_files.items():
-            # Convert string path to Path object
-            dir_path = Path(dir_path_str)
+        # Process all shared files
+        for module_path_str, shared_file in self.shared_files.items():
+            # Convert module path to Path object (e.g., "tools/weather/helpers")
+            module_path = Path(module_path_str)
 
             # Determine the component type
             component_type = None
-            for part in dir_path.parts:
+            for part in module_path.parts:
                 if part in ["tools", "resources", "prompts"]:
                     component_type = part
                     break
@@ -381,14 +382,14 @@ class CodeGenerator:
                 continue
 
             # Calculate target directory in components structure
-            rel_to_component = dir_path.relative_to(component_type)
-            target_dir = self.output_dir / "components" / component_type / rel_to_component
+            rel_to_component = module_path.relative_to(component_type)
+            target_dir = self.output_dir / "components" / component_type / rel_to_component.parent
 
             # Create directory if it doesn't exist
             target_dir.mkdir(parents=True, exist_ok=True)
 
-            # Create the common.py file in the target directory
-            target_file = target_dir / "common.py"
+            # Create the shared file in the target directory (preserve original filename)
+            target_file = target_dir / shared_file.name
 
             # Use transformer to process the file
             transform_component(
@@ -396,7 +397,7 @@ class CodeGenerator:
                 output_file=target_file,
                 project_path=self.project_path,
                 import_map=self.import_map,
-                source_file=common_file,
+                source_file=shared_file,
             )
 
     def _generate_tools(self) -> None:
@@ -1309,34 +1310,29 @@ from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConf
                 )
 
 
-# Renamed function - was find_shared_modules
-def find_common_files(project_path: Path, components: dict[ComponentType, list[ParsedComponent]]) -> dict[str, Path]:
-    """Find all common.py files used by components."""
-    # We'll use the parser's functionality to find common files directly
-    from golf.core.parser import parse_common_files
-
-    common_files = parse_common_files(project_path)
-
-    # Return the found files without debug messages
-    return common_files
+# Legacy function removed - replaced by parse_shared_files in parser module
 
 
-# Updated parameter name from shared_modules to common_files
-def build_import_map(project_path: Path, common_files: dict[str, Path]) -> dict[str, str]:
+# Updated to handle any shared file, not just common.py files
+def build_import_map(project_path: Path, shared_files: dict[str, Path]) -> dict[str, str]:
     """Build a mapping of import paths to their new locations in the build output.
 
     This maps from original relative import paths to absolute import paths
     in the components directory structure.
+    
+    Args:
+        project_path: Path to the project root
+        shared_files: Dictionary mapping module paths to shared file paths
     """
     import_map = {}
 
-    for dir_path_str, _file_path in common_files.items():
-        # Convert string path to Path object
-        dir_path = Path(dir_path_str)
+    for module_path_str, file_path in shared_files.items():
+        # Convert module path to Path object (e.g., "tools/weather/helpers" -> Path("tools/weather/helpers"))
+        module_path = Path(module_path_str)
 
         # Get the component type (tools, resources, prompts)
         component_type = None
-        for part in dir_path.parts:
+        for part in module_path.parts:
             if part in ["tools", "resources", "prompts"]:
                 component_type = part
                 break
@@ -1346,23 +1342,32 @@ def build_import_map(project_path: Path, common_files: dict[str, Path]) -> dict[
 
         # Calculate the relative path within the component type
         try:
-            rel_to_component = dir_path.relative_to(component_type)
+            rel_to_component = module_path.relative_to(component_type)
             # Create the new import path
             if str(rel_to_component) == ".":
-                # This is at the root of the component type
+                # This shouldn't happen for individual files, but handle it
                 new_path = f"components.{component_type}"
             else:
                 # Replace path separators with dots
                 path_parts = str(rel_to_component).replace("\\", "/").split("/")
                 new_path = f"components.{component_type}.{'.'.join(path_parts)}"
 
-            # Map both the directory and the common file
-            orig_module = dir_path_str
-            import_map[orig_module] = new_path
+            # Map the specific shared module
+            # e.g., "tools/weather/helpers" -> "components.tools.weather.helpers"
+            import_map[module_path_str] = new_path
+            
+            # Also map the directory path for relative imports
+            # e.g., "tools/weather" -> "components.tools.weather"  
+            dir_path_str = str(module_path.parent)
+            if dir_path_str != "." and dir_path_str not in import_map:
+                dir_rel_to_component = module_path.parent.relative_to(component_type)
+                if str(dir_rel_to_component) == ".":
+                    dir_new_path = f"components.{component_type}"
+                else:
+                    dir_path_parts = str(dir_rel_to_component).replace("\\", "/").split("/")
+                    dir_new_path = f"components.{component_type}.{'.'.join(dir_path_parts)}"
+                import_map[dir_path_str] = dir_new_path
 
-            # Also map the specific common module
-            common_module = f"{dir_path_str}/common"
-            import_map[common_module] = f"{new_path}.common"
         except ValueError:
             continue
 
