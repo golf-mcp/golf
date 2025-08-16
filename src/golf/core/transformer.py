@@ -51,35 +51,62 @@ class ImportTransformer(ast.NodeTransformer):
                 source_dir = source_dir.parent
 
             if node.module:
+                # Handle imports like `from .helpers import utils`
                 source_module = source_dir / node.module.replace(".", "/")
             else:
+                # Handle imports like `from . import something`
                 source_module = source_dir
 
-            # Check if this is a common module import
-            source_str = str(source_module.relative_to(self.project_root))
-            if source_str in self.import_map:
-                # Replace with absolute import
-                new_module = self.import_map[source_str]
-                return ast.ImportFrom(module=new_module, names=node.names, level=0)
+            try:
+                # Check if this is a shared module import
+                source_str = str(source_module.relative_to(self.project_root))
+                
+                # First, try direct module path match (e.g., "tools/weather/helpers")
+                if source_str in self.import_map:
+                    new_module = self.import_map[source_str]
+                    return ast.ImportFrom(module=new_module, names=node.names, level=0)
+                
+                # If direct match fails, try directory-based matching
+                # This handles cases like `from . import common` where the import_map
+                # has "tools/weather/common" but we're looking for "tools/weather"
+                source_dir_str = str(source_dir.relative_to(self.project_root))
+                if source_dir_str in self.import_map:
+                    new_module = self.import_map[source_dir_str]
+                    if node.module:
+                        new_module = f"{new_module}.{node.module}"
+                    return ast.ImportFrom(module=new_module, names=node.names, level=0)
+                
+                # Check for specific module imports within the directory
+                for import_path, mapped_path in self.import_map.items():
+                    # Handle cases where we import a specific module from a directory
+                    # e.g., `from .common import something` should match "tools/weather/common"
+                    if import_path.startswith(source_dir_str + "/") and node.module:
+                        module_name = import_path.replace(source_dir_str + "/", "")
+                        if module_name == node.module:
+                            return ast.ImportFrom(module=mapped_path, names=node.names, level=0)
+                        
+            except ValueError:
+                # source_module is not relative to project_root, leave import unchanged
+                pass
 
         return node
 
 
 def transform_component(
-    component: ParsedComponent,
+    component: ParsedComponent | None,
     output_file: Path,
     project_path: Path,
     import_map: dict[str, str],
-    source_file: Path = None,
+    source_file: Path | None = None,
 ) -> str:
     """Transform a GolfMCP component into a standalone FastMCP component.
 
     Args:
-        component: Parsed component to transform
+        component: Parsed component to transform (optional if source_file provided)
         output_file: Path to write the transformed component to
         project_path: Path to the project root
         import_map: Mapping of original module paths to generated paths
-        source_file: Optional path to source file (for common.py files)
+        source_file: Optional path to source file (for shared files)
 
     Returns:
         Generated component code
