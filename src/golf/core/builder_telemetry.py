@@ -29,6 +29,7 @@ def generate_component_registration_with_telemetry(
     entry_function: str,
     docstring: str = "",
     uri_template: str = None,
+    is_template: bool = False,
 ) -> str:
     """Generate component registration code with telemetry instrumentation.
 
@@ -39,6 +40,7 @@ def generate_component_registration_with_telemetry(
         entry_function: Entry function name
         docstring: Component description
         uri_template: URI template for resources (optional)
+        is_template: Whether the resource is a template (has URI parameters)
 
     Returns:
         Python code string for registering the component with instrumentation
@@ -56,12 +58,20 @@ def generate_component_registration_with_telemetry(
 
     elif component_type == "resource":
         wrapped_func = f"instrument_resource({func_ref}, '{uri_template}')"
-        return (
-            f"_resource = Resource.from_function({wrapped_func}, "
-            f'uri="{uri_template}", name="{component_name}", '
-            f'description="{escaped_docstring}")\n'
-            f"mcp.add_resource(_resource)"
-        )
+        if is_template:
+            return (
+                f"_resource = ResourceTemplate.from_function({wrapped_func}, "
+                f'uri_template="{uri_template}", name="{component_name}", '
+                f'description="{escaped_docstring}")\n'
+                f"mcp.add_template(_resource)"
+            )
+        else:
+            return (
+                f"_resource = Resource.from_function({wrapped_func}, "
+                f'uri="{uri_template}", name="{component_name}", '
+                f'description="{escaped_docstring}")\n'
+                f"mcp.add_resource(_resource)"
+            )
 
     elif component_type == "prompt":
         wrapped_func = f"instrument_prompt({func_ref}, '{component_name}')"
