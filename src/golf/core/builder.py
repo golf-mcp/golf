@@ -498,17 +498,17 @@ class CodeGenerator:
 
     def _is_resource_template(self, component: ParsedComponent) -> bool:
         """Check if a resource component is a template (has URI parameters).
-        
+
         Args:
             component: The parsed component to check
-            
+
         Returns:
             True if the resource has URI parameters, False otherwise
         """
         return (
-            component.type == ComponentType.RESOURCE and
-            component.parameters is not None and 
-            len(component.parameters) > 0
+            component.type == ComponentType.RESOURCE
+            and component.parameters is not None
+            and len(component.parameters) > 0
         )
 
     def _generate_server(self) -> None:
@@ -528,7 +528,7 @@ class CodeGenerator:
         # Create imports section
         imports = [
             "from fastmcp import FastMCP",
-            "from fastmcp.tools import Tool", 
+            "from fastmcp.tools import Tool",
             "from fastmcp.resources import Resource, ResourceTemplate",
             "from fastmcp.prompts import Prompt",
             "import os",
@@ -769,7 +769,9 @@ class CodeGenerator:
 
                     elif component_type == ComponentType.RESOURCE:
                         if self._is_resource_template(component):
-                            registration = f"# Register the resource template '{component.name}' from {full_module_path}"
+                            registration = (
+                                f"# Register the resource template '{component.name}' from {full_module_path}"
+                            )
 
                             # Use the entry_function if available, otherwise try the
                             # export variable
