@@ -496,6 +496,21 @@ class CodeGenerator:
 
         return config
 
+    def _is_resource_template(self, component: ParsedComponent) -> bool:
+        """Check if a resource component is a template (has URI parameters).
+
+        Args:
+            component: The parsed component to check
+
+        Returns:
+            True if the resource has URI parameters, False otherwise
+        """
+        return (
+            component.type == ComponentType.RESOURCE
+            and component.parameters is not None
+            and len(component.parameters) > 0
+        )
+
     def _generate_server(self) -> None:
         """Generate the main server entry point."""
         server_file = self.output_dir / "server.py"
@@ -514,7 +529,7 @@ class CodeGenerator:
         imports = [
             "from fastmcp import FastMCP",
             "from fastmcp.tools import Tool",
-            "from fastmcp.resources import Resource",
+            "from fastmcp.resources import Resource, ResourceTemplate",
             "from fastmcp.prompts import Prompt",
             "import os",
             "import sys",
@@ -654,12 +669,20 @@ class CodeGenerator:
                             registration += f".with_annotations({component.annotations})"
                         registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
-                        registration += (
-                            f"\n_resource = Resource.from_function(_wrapped_func, "
-                            f'uri="{component.uri_template}", name="{component.name}", '
-                            f'description="{component.docstring or ""}")\n'
-                            f"mcp.add_resource(_resource)"
-                        )
+                        if self._is_resource_template(component):
+                            registration += (
+                                f"\n_template = ResourceTemplate.from_function(_wrapped_func, "
+                                f'uri_template="{component.uri_template}", name="{component.name}", '
+                                f'description="{component.docstring or ""}")\n'
+                                f"mcp.add_template(_template)"
+                            )
+                        else:
+                            registration += (
+                                f"\n_resource = Resource.from_function(_wrapped_func, "
+                                f'uri="{component.uri_template}", name="{component.name}", '
+                                f'description="{component.docstring or ""}")\n'
+                                f"mcp.add_resource(_resource)"
+                            )
                     else:  # PROMPT
                         registration += (
                             f"\n_prompt = Prompt.from_function(_wrapped_func, "
@@ -692,12 +715,20 @@ class CodeGenerator:
                             registration += f".with_annotations({component.annotations})"
                         registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
-                        registration += (
-                            f"\n_resource = Resource.from_function(_wrapped_func, "
-                            f'uri="{component.uri_template}", name="{component.name}", '
-                            f'description="{component.docstring or ""}")\n'
-                            f"mcp.add_resource(_resource)"
-                        )
+                        if self._is_resource_template(component):
+                            registration += (
+                                f"\n_template = ResourceTemplate.from_function(_wrapped_func, "
+                                f'uri_template="{component.uri_template}", name="{component.name}", '
+                                f'description="{component.docstring or ""}")\n'
+                                f"mcp.add_template(_template)"
+                            )
+                        else:
+                            registration += (
+                                f"\n_resource = Resource.from_function(_wrapped_func, "
+                                f'uri="{component.uri_template}", name="{component.name}", '
+                                f'description="{component.docstring or ""}")\n'
+                                f"mcp.add_resource(_resource)"
+                            )
                     else:  # PROMPT
                         registration += (
                             f"\n_prompt = Prompt.from_function(_wrapped_func, "
@@ -737,33 +768,64 @@ class CodeGenerator:
                         registration += "\nmcp.add_tool(_tool)"
 
                     elif component_type == ComponentType.RESOURCE:
-                        registration = f"# Register the resource '{component.name}' from {full_module_path}"
-
-                        # Use the entry_function if available, otherwise try the
-                        # export variable
-                        if hasattr(component, "entry_function") and component.entry_function:
-                            registration += (
-                                f"\n_resource = Resource.from_function("
-                                f"{full_module_path}.{component.entry_function}, "
-                                f'uri="{component.uri_template}"'
+                        if self._is_resource_template(component):
+                            registration = (
+                                f"# Register the resource template '{component.name}' from {full_module_path}"
                             )
+
+                            # Use the entry_function if available, otherwise try the
+                            # export variable
+                            if hasattr(component, "entry_function") and component.entry_function:
+                                registration += (
+                                    f"\n_template = ResourceTemplate.from_function("
+                                    f"{full_module_path}.{component.entry_function}, "
+                                    f'uri_template="{component.uri_template}"'
+                                )
+                            else:
+                                registration += (
+                                    f"\n_template = ResourceTemplate.from_function("
+                                    f"{full_module_path}.export, "
+                                    f'uri_template="{component.uri_template}"'
+                                )
+
+                            # Add the name parameter
+                            registration += f', name="{component.name}"'
+
+                            # Add description from docstring
+                            if component.docstring:
+                                # Escape any quotes in the docstring
+                                escaped_docstring = component.docstring.replace('"', '\\"')
+                                registration += f', description="{escaped_docstring}"'
+
+                            registration += ")\nmcp.add_template(_template)"
                         else:
-                            registration += (
-                                f"\n_resource = Resource.from_function("
-                                f"{full_module_path}.export, "
-                                f'uri="{component.uri_template}"'
-                            )
+                            registration = f"# Register the resource '{component.name}' from {full_module_path}"
 
-                        # Add the name parameter
-                        registration += f', name="{component.name}"'
+                            # Use the entry_function if available, otherwise try the
+                            # export variable
+                            if hasattr(component, "entry_function") and component.entry_function:
+                                registration += (
+                                    f"\n_resource = Resource.from_function("
+                                    f"{full_module_path}.{component.entry_function}, "
+                                    f'uri="{component.uri_template}"'
+                                )
+                            else:
+                                registration += (
+                                    f"\n_resource = Resource.from_function("
+                                    f"{full_module_path}.export, "
+                                    f'uri="{component.uri_template}"'
+                                )
 
-                        # Add description from docstring
-                        if component.docstring:
-                            # Escape any quotes in the docstring
-                            escaped_docstring = component.docstring.replace('"', '\\"')
-                            registration += f', description="{escaped_docstring}"'
+                            # Add the name parameter
+                            registration += f', name="{component.name}"'
 
-                        registration += ")\nmcp.add_resource(_resource)"
+                            # Add description from docstring
+                            if component.docstring:
+                                # Escape any quotes in the docstring
+                                escaped_docstring = component.docstring.replace('"', '\\"')
+                                registration += f', description="{escaped_docstring}"'
+
+                            registration += ")\nmcp.add_resource(_resource)"
 
                     else:  # PROMPT
                         registration = f"# Register the prompt '{component.name}' from {full_module_path}"
