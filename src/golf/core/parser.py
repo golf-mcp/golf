@@ -982,3 +982,71 @@ def parse_common_files(project_path: Path) -> dict[str, Path]:
             common_files[module_path] = common_file
 
     return common_files
+
+
+def _is_golf_component_file(file_path: Path) -> bool:
+    """Check if a Python file is a Golf component (has export or resource_uri).
+
+    Args:
+        file_path: Path to the Python file to check
+
+    Returns:
+        True if the file appears to be a Golf component, False otherwise
+    """
+    try:
+        with open(file_path, encoding="utf-8") as f:
+            content = f.read()
+
+        # Parse the file to check for Golf component patterns
+        tree = ast.parse(content)
+
+        # Look for 'export' or 'resource_uri' variable assignments
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        if target.id in ("export", "resource_uri"):
+                            return True
+
+        return False
+
+    except (SyntaxError, OSError, UnicodeDecodeError):
+        # If we can't parse the file, assume it's not a component
+        return False
+
+
+def parse_shared_files(project_path: Path) -> dict[str, Path]:
+    """Find all shared Python files in the project (non-component .py files).
+
+    Args:
+        project_path: Path to the project root
+
+    Returns:
+        Dictionary mapping module paths to shared file paths
+    """
+    shared_files = {}
+
+    # Search for all .py files in tools, resources, and prompts directories
+    for dir_name in ["tools", "resources", "prompts"]:
+        base_dir = project_path / dir_name
+        if not base_dir.exists() or not base_dir.is_dir():
+            continue
+
+        # Find all .py files (recursively)
+        for py_file in base_dir.glob("**/*.py"):
+            # Skip files in __pycache__ or other hidden directories
+            if "__pycache__" in py_file.parts or any(part.startswith(".") for part in py_file.parts):
+                continue
+
+            # Skip files that are Golf components (have export or resource_uri)
+            if _is_golf_component_file(py_file):
+                continue
+
+            # Calculate the module path for this shared file
+            # For example: tools/weather/helpers.py -> tools/weather/helpers
+            relative_path = py_file.relative_to(project_path)
+            module_path = str(relative_path.with_suffix(""))  # Remove .py extension
+
+            shared_files[module_path] = py_file
+
+    return shared_files
