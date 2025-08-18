@@ -28,7 +28,7 @@
 
 ## Overview
 
-Golf is a **framework** designed to streamline the creation of MCP server applications. It allows developers to define server's capabilities—*tools*, *prompts*, and *resources*—as simple Python files within a conventional directory structure. Golf then automatically discovers, parses, and compiles these components into a runnable FastMCP server, minimizing boilerplate and accelerating development.
+Golf is a **framework** designed to streamline the creation of MCP server applications. It allows developers to define server's capabilities—*tools*, *prompts*, and *resources*—as simple Python files within a conventional directory structure. Golf then automatically discovers, parses, and compiles these components into a runnable MCP server, minimizing boilerplate and accelerating development.
 
 With Golf v0.2.0, you get **enterprise-grade authentication** (JWT, OAuth Server, API key, development tokens), **built-in utilities** for LLM interactions, and **automatic telemetry** integration. Focus on implementing your agent's logic while Golf handles authentication, monitoring, and server infrastructure.
 
@@ -62,7 +62,7 @@ cd your-project-name
 golf build dev
 golf run
 ```
-This will start the FastMCP server, typically on `http://localhost:3000` (configurable in `golf.json`).
+This will start the MCP server, typically on `http://localhost:3000` (configurable in `golf.json`).
 
 That's it! Your Golf server is running and ready for integration.
 
