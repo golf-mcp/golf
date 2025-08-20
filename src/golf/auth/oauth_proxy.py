@@ -574,6 +574,10 @@ class OAuthProxy(AuthProvider):
         """Verify incoming request using the configured token verifier."""
         return await self.token_verifier.verify_request(request)
         
+    async def verify_token(self, token: str) -> dict:
+        """Verify a bearer token using the configured token verifier."""
+        return await self.token_verifier.verify_token(token)
+        
     def get_resource_metadata_url(self) -> Optional[str]:
         """Get the resource metadata URL for this proxy."""
         if self.resource_server_url:
