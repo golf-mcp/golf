@@ -224,12 +224,15 @@ class OAuthProxy(AuthProvider):
             "created_at": int(time.time()),
         }
         
-        return self._cors_json_response({
+        response_data = {
             "client_id": client_id,
             "client_secret": client_secret,
             "client_secret_expires_at": 0,  # Never expires
             "redirect_uris": data.get("redirect_uris", []),
-        })
+        }
+        
+        print(f"Registration response: {response_data}")
+        return self._cors_json_response(response_data)
         
     async def _authorize_endpoint(self, request: Request) -> Response:
         """OAuth authorization endpoint - redirects to upstream provider."""
@@ -365,12 +368,26 @@ class OAuthProxy(AuthProvider):
                 "error_description": f"Token exchange failed: {str(e)}"
             })
             
-        # Store tokens for this session
-        session["tokens"] = tokens
-        session["completed_at"] = int(time.time())
+        # Generate a NEW authorization code for the client (not the upstream state)
+        client_code = secrets.token_urlsafe(32)
         
-        # Build callback URL to original client
-        client_redirect_params = {"code": state}  # Use our state as the authorization code
+        # Store the client code with tokens and original session data
+        self._client_sessions[client_code] = {
+            "client_id": session["client_id"],
+            "redirect_uri": session["redirect_uri"],
+            "original_state": session.get("original_state"),
+            "client_code_challenge": session.get("client_code_challenge"),
+            "client_code_challenge_method": session.get("client_code_challenge_method"),
+            "tokens": tokens,  # Store the upstream tokens
+            "completed_at": int(time.time()),
+            "created_at": session.get("created_at"),
+        }
+        
+        # Clean up the original session (keyed by upstream state)
+        del self._client_sessions[state]
+        
+        # Build callback URL to original client with our NEW client code
+        client_redirect_params = {"code": client_code}  # Use our NEW client code
         
         if session.get("original_state"):
             client_redirect_params["state"] = session["original_state"]
@@ -410,23 +427,50 @@ class OAuthProxy(AuthProvider):
         client_id = data.get("client_id")
         client_secret = data.get("client_secret")
         
+        print(f"Token exchange - code: {code}, client_id: {client_id}")
+        print(f"Available sessions: {list(self._client_sessions.keys())}")
+        
         # Validate client
+        print(f"Validating client_id: {client_id}")
+        print(f"Registered clients: {list(self._registered_clients.keys())}")
+        
         if not client_id or client_id not in self._registered_clients:
+            print("Client ID validation failed")
             return self._cors_json_response({
                 "error": "invalid_client",
                 "error_description": "Unknown client_id"
             })
             
         stored_client = self._registered_clients[client_id]
-        if stored_client["client_secret"] != client_secret:
+        print(f"Stored client secret: '{stored_client['client_secret']}'")
+        print(f"Received client secret: '{client_secret}'")
+        
+        # For PKCE flows, client secret is optional (RFC 7636)
+        # Only validate client secret if one was provided
+        if client_secret is not None and client_secret != "None":
+            if stored_client["client_secret"] != client_secret:
+                print("Client secret validation failed")
+                return self._cors_json_response({
+                    "error": "invalid_client",
+                    "error_description": "Invalid client_secret"
+                })
+        else:
+            print("Skipping client secret validation (PKCE flow)")
+            
+        print("Client validation passed")
+            
+        # Look up session by code (which is our client code)
+        session = self._client_sessions.get(code)
+        print(f"Session lookup result: {session}")
+        
+        if not session:
             return self._cors_json_response({
-                "error": "invalid_client",
-                "error_description": "Invalid client_secret"
+                "error": "invalid_grant",
+                "error_description": "Authorization code not found"
             })
             
-        # Look up session by code (which is our state)
-        session = self._client_sessions.get(code)
-        if not session or session["client_id"] != client_id:
+        if session["client_id"] != client_id:
+            print(f"Client ID mismatch: session={session['client_id']}, request={client_id}")
             return self._cors_json_response({
                 "error": "invalid_grant",
                 "error_description": "Invalid or expired authorization code"
