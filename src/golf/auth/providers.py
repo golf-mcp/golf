@@ -299,6 +299,12 @@ class RemoteAuthConfig(BaseModel):
     # This server's URL
     resource_server_url: str = Field(..., description="URL of this resource server")
 
+    # Scopes this resource supports (advertised via /.well-known/oauth-protected-resource)
+    scopes_supported: list[str] = Field(
+        default_factory=list,
+        description="Scopes this resource supports (advertised via /.well-known/oauth-protected-resource)",
+    )
+
     # Token verification (delegate to another config)
     token_verifier_config: JWTAuthConfig | StaticTokenConfig = Field(
         ..., description="Configuration for the underlying token verifier"
@@ -362,6 +368,45 @@ class RemoteAuthConfig(BaseModel):
 
         return url
 
+    @field_validator("scopes_supported")
+    @classmethod
+    def validate_scopes_supported(cls, v: list[str]) -> list[str]:
+        """Validate scopes_supported format and security."""
+        if not v:
+            return v
+
+        cleaned_scopes = []
+        for scope in v:
+            scope = scope.strip()
+            if not scope:
+                raise ValueError("Scopes cannot be empty or whitespace-only")
+
+            # OAuth 2.0 scope format validation (RFC 6749)
+            if not all(32 < ord(c) < 127 and c not in ' "\\' for c in scope):
+                raise ValueError(
+                    f"Invalid scope format: '{scope}' - must be ASCII printable without spaces, quotes, or backslashes"
+                )
+
+            # Reasonable length limit to prevent abuse
+            if len(scope) > 128:
+                raise ValueError(f"Scope too long: '{scope}' - maximum 128 characters")
+
+            # Warn about potentially dangerous scope names
+            dangerous_scopes = {"admin", "root", "superuser", "system", "*", "all"}
+            if scope.lower() in dangerous_scopes:
+                import warnings
+
+                warnings.warn(
+                    f"Potentially dangerous scope detected: '{scope}'. "
+                    "Consider using more specific, principle-of-least-privilege scopes.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
+            cleaned_scopes.append(scope)
+
+        return cleaned_scopes
+
     @model_validator(mode="after")
     def validate_token_verifier_compatibility(self) -> "RemoteAuthConfig":
         """Validate that the token verifier config is compatible with token verification."""
@@ -388,6 +433,11 @@ class RemoteAuthConfig(BaseModel):
         # For static token configs, ensure they have tokens
         if isinstance(config, StaticTokenConfig) and not config.tokens:
             raise ValueError("Static token verifier config must provide at least one token")
+
+        # Convenience: if user didn't set scopes_supported, default to verifier.required_scopes
+        if not self.scopes_supported:
+            if hasattr(config, "required_scopes") and config.required_scopes:
+                self.scopes_supported = list(config.required_scopes)
 
         return self
 

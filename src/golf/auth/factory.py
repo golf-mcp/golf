@@ -238,6 +238,11 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
     if not hasattr(token_verifier, "verify_token"):
         raise ValueError(f"Remote auth provider requires a TokenVerifier, got {type(token_verifier).__name__}")
 
+    # Update token verifier's required_scopes to match our scopes_supported for PRM
+    # RemoteAuthProvider uses token_verifier.required_scopes for scopes_supported in PRM
+    if config.scopes_supported and hasattr(token_verifier, "required_scopes"):
+        token_verifier.required_scopes = list(config.scopes_supported)
+
     return RemoteAuthProvider(
         token_verifier=token_verifier,
         authorization_servers=authorization_servers,
