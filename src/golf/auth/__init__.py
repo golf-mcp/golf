@@ -14,6 +14,7 @@ from .providers import (
     StaticTokenConfig,
     OAuthServerConfig,
     RemoteAuthConfig,
+    OAuthProxyConfig,
 )
 from .factory import (
     create_auth_provider,
@@ -44,6 +45,7 @@ __all__ = [
     "configure_auth",
     "configure_jwt_auth",
     "configure_dev_auth",
+    "configure_oauth_proxy",
     "get_auth_config",
     # Provider configurations
     "AuthConfig",
@@ -51,6 +53,7 @@ __all__ = [
     "StaticTokenConfig",
     "OAuthServerConfig",
     "RemoteAuthConfig",
+    "OAuthProxyConfig",
     # Factory functions
     "create_auth_provider",
     "create_simple_jwt_provider",
@@ -187,6 +190,45 @@ def configure_dev_auth(
     config = StaticTokenConfig(
         tokens=tokens,
         required_scopes=required_scopes or [],
+    )
+    configure_auth(config)
+
+
+def configure_oauth_proxy(
+    *,
+    upstream_authorization_endpoint: str,
+    upstream_token_endpoint: str, 
+    upstream_client_id: str,
+    upstream_client_secret: str,
+    base_url: str,
+    token_verifier_config: JWTAuthConfig | StaticTokenConfig,
+    upstream_revocation_endpoint: str | None = None,
+    redirect_path: str = "/oauth/callback",
+    scopes_supported: list[str] | None = None,
+) -> None:
+    """Convenience function to configure OAuth proxy authentication.
+
+    Args:
+        upstream_authorization_endpoint: Upstream provider's authorization endpoint
+        upstream_token_endpoint: Upstream provider's token endpoint
+        upstream_client_id: Your registered client ID with upstream provider
+        upstream_client_secret: Your registered client secret with upstream provider
+        base_url: Public URL of this proxy server
+        token_verifier_config: Configuration for validating upstream tokens
+        upstream_revocation_endpoint: Optional upstream revocation endpoint
+        redirect_path: Callback path (must match provider registration)
+        scopes_supported: Scopes this proxy supports
+    """
+    config = OAuthProxyConfig(
+        upstream_authorization_endpoint=upstream_authorization_endpoint,
+        upstream_token_endpoint=upstream_token_endpoint,
+        upstream_client_id=upstream_client_id,
+        upstream_client_secret=upstream_client_secret,
+        upstream_revocation_endpoint=upstream_revocation_endpoint,
+        base_url=base_url,
+        redirect_path=redirect_path,
+        scopes_supported=scopes_supported or [],
+        token_verifier_config=token_verifier_config,
     )
     configure_auth(config)
 
