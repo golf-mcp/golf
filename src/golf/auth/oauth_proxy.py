@@ -316,6 +316,8 @@ class OAuthProxy(AuthProvider):
                 # Note: We don't store the code_verifier, so PKCE verification 
                 # happens at the upstream provider level
                 pass
+            
+            print(f"Token exchange request to {self.upstream_token_endpoint}: {token_data}")
                 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -325,9 +327,19 @@ class OAuthProxy(AuthProvider):
                 )
                 
             if response.status_code != 200:
+                # Log the actual error for debugging
+                error_details = f"Status: {response.status_code}"
+                try:
+                    error_body = response.json()
+                    error_details += f", Body: {error_body}"
+                except:
+                    error_details += f", Text: {response.text}"
+                    
+                print(f"Token exchange failed: {error_details}")
+                
                 return self._cors_json_response({
-                    "error": "server_error",
-                    "error_description": "Failed to exchange authorization code"
+                    "error": "server_error", 
+                    "error_description": f"Failed to exchange authorization code: {error_details}"
                 })
                 
             tokens = response.json()
