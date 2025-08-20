@@ -17,6 +17,7 @@ from .providers import (
     StaticTokenConfig,
     OAuthServerConfig,
     RemoteAuthConfig,
+    OAuthProxyConfig,
 )
 from .registry import (
     get_provider_registry,
@@ -55,9 +56,8 @@ def create_auth_provider(config: AuthConfig) -> "AuthProvider":
             return _create_oauth_server_provider(config)
         elif config.provider_type == "remote":
             return _create_remote_provider(config)
-        else:
-            raise ValueError(f"Unknown provider type: {config.provider_type}") from None
-
+        elif config.provider_type == "oauth_proxy":
+            return _create_oauth_proxy_provider(config)
 
 def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
     """Create JWT token verifier from configuration."""
@@ -250,6 +250,89 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
     )
 
 
+def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
+    """Create OAuth proxy provider from configuration."""
+    try:
+        from fastmcp.server.auth import OAuthProxy
+    except ImportError as e:
+        raise ImportError(
+            "OAuthProxy not available in this FastMCP version. Please upgrade to FastMCP 2.11.0 or later."
+        ) from e
+
+    # Resolve runtime values from environment variables
+    upstream_authorization_endpoint = config.upstream_authorization_endpoint
+    if config.upstream_authorization_endpoint_env_var:
+        env_value = os.environ.get(config.upstream_authorization_endpoint_env_var)
+        if env_value:
+            upstream_authorization_endpoint = env_value.strip()
+
+    upstream_token_endpoint = config.upstream_token_endpoint
+    if config.upstream_token_endpoint_env_var:
+        env_value = os.environ.get(config.upstream_token_endpoint_env_var)
+        if env_value:
+            upstream_token_endpoint = env_value.strip()
+
+    upstream_client_id = config.upstream_client_id
+    if config.upstream_client_id_env_var:
+        env_value = os.environ.get(config.upstream_client_id_env_var)
+        if env_value:
+            upstream_client_id = env_value.strip()
+
+    upstream_client_secret = config.upstream_client_secret
+    if config.upstream_client_secret_env_var:
+        env_value = os.environ.get(config.upstream_client_secret_env_var)
+        if env_value:
+            upstream_client_secret = env_value.strip()
+
+    upstream_revocation_endpoint = config.upstream_revocation_endpoint
+    if config.upstream_revocation_endpoint_env_var:
+        env_value = os.environ.get(config.upstream_revocation_endpoint_env_var)
+        if env_value:
+            upstream_revocation_endpoint = env_value.strip()
+
+    base_url = config.base_url
+    if config.base_url_env_var:
+        env_value = os.environ.get(config.base_url_env_var)
+        if env_value:
+            base_url = env_value.strip()
+
+    # Validate resolved configuration
+    if not upstream_authorization_endpoint:
+        raise ValueError("upstream_authorization_endpoint is required")
+    if not upstream_token_endpoint:
+        raise ValueError("upstream_token_endpoint is required") 
+    if not upstream_client_id:
+        raise ValueError("upstream_client_id is required")
+    if not upstream_client_secret:
+        raise ValueError("upstream_client_secret is required")
+    if not base_url:
+        raise ValueError("base_url is required")
+
+    # Create the underlying token verifier
+    token_verifier = create_auth_provider(config.token_verifier_config)
+
+    # Ensure it's actually a TokenVerifier
+    if not hasattr(token_verifier, "verify_token"):
+        raise ValueError(f"OAuth proxy requires a TokenVerifier, got {type(token_verifier).__name__}")
+
+    # Update token verifier's required_scopes to match our scopes_supported for consistency
+    # This ensures that token validation uses the same scopes as advertised
+    if config.scopes_supported and hasattr(token_verifier, "required_scopes"):
+        token_verifier.required_scopes = list(config.scopes_supported)
+
+    return OAuthProxy(
+        upstream_authorization_endpoint=upstream_authorization_endpoint,
+        upstream_token_endpoint=upstream_token_endpoint,
+        upstream_client_id=upstream_client_id,
+        upstream_client_secret=upstream_client_secret,
+        upstream_revocation_endpoint=upstream_revocation_endpoint,
+        base_url=base_url,
+        redirect_path=config.redirect_path,
+        token_verifier=token_verifier,
+        scopes_supported=config.scopes_supported,
+    )
+
+
 def create_simple_jwt_provider(
     *,
     jwks_uri: str | None = None,
@@ -324,6 +407,7 @@ def register_builtin_providers() -> None:
     - static: Static token verification (development)
     - oauth_server: Full OAuth authorization server
     - remote: Remote authorization server integration
+    - oauth_proxy: OAuth proxy for non-DCR providers
     """
     registry = get_provider_registry()
 
@@ -332,6 +416,7 @@ def register_builtin_providers() -> None:
     registry.register_factory("static", _create_static_provider)
     registry.register_factory("oauth_server", _create_oauth_server_provider)
     registry.register_factory("remote", _create_remote_provider)
+    registry.register_factory("oauth_proxy", _create_oauth_proxy_provider)
 
 
 # Register built-in providers when module is imported
