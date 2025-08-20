@@ -357,6 +357,7 @@ class OAuthProxy(AuthProvider):
                 })
                 
             tokens = response.json()
+            print(f"Received tokens from upstream: {tokens}")
             
         except Exception as e:
             return self._cors_json_response({
@@ -443,6 +444,7 @@ class OAuthProxy(AuthProvider):
         # Clean up the session
         del self._client_sessions[code]
         
+        print(f"Returning tokens to client: {tokens}")
         return self._cors_json_response(tokens)
         
     async def _handle_refresh_token_grant(self, data: Dict[str, str]) -> Response:
