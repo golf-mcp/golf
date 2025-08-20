@@ -252,12 +252,8 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
 
 def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
     """Create OAuth proxy provider from configuration."""
-    try:
-        from fastmcp.server.auth import OAuthProxy
-    except ImportError as e:
-        raise ImportError(
-            "OAuthProxy not available in this FastMCP version. Please upgrade to FastMCP 2.11.0 or later."
-        ) from e
+    # Use Golf's own OAuth proxy implementation
+    from .oauth_proxy import OAuthProxy
 
     # Resolve runtime values from environment variables
     upstream_authorization_endpoint = config.upstream_authorization_endpoint
