@@ -13,6 +13,8 @@ The proxy acts as a bridge:
 
 import secrets
 import time
+import base64
+import hashlib
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 import httpx
@@ -73,6 +75,17 @@ class OAuthProxy(AuthProvider):
         # In-memory storage for active sessions (in production, use Redis/database)
         self._client_sessions: Dict[str, Dict[str, Any]] = {}
         self._registered_clients: Dict[str, Dict[str, Any]] = {}
+        
+    def _generate_pkce_pair(self) -> tuple[str, str]:
+        """Generate PKCE code_verifier and code_challenge pair."""
+        # Generate a cryptographically secure random code_verifier
+        code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
+        
+        # Generate code_challenge using SHA256
+        challenge_bytes = hashlib.sha256(code_verifier.encode('utf-8')).digest()
+        code_challenge = base64.urlsafe_b64encode(challenge_bytes).decode('utf-8').rstrip('=')
+        
+        return code_verifier, code_challenge
         
     def get_routes(self) -> List[Route]:
         """Get OAuth metadata and flow routes."""
@@ -241,30 +254,33 @@ class OAuthProxy(AuthProvider):
         # Generate state to track this authorization session
         session_state = secrets.token_urlsafe(32)
         
-        # Store session data
+        # Generate proxy's own PKCE pair for upstream provider
+        proxy_code_verifier, proxy_code_challenge = self._generate_pkce_pair()
+        
+        # Store session data with both client and proxy PKCE info
         self._client_sessions[session_state] = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "original_state": params.get("state"),
-            "code_challenge": params.get("code_challenge"),
-            "code_challenge_method": params.get("code_challenge_method"),
+            # Client's PKCE challenge (for later validation)
+            "client_code_challenge": params.get("code_challenge"),
+            "client_code_challenge_method": params.get("code_challenge_method"),
+            # Proxy's PKCE verifier (for upstream exchange)
+            "proxy_code_verifier": proxy_code_verifier,
             "scope": params.get("scope", ""),
             "created_at": int(time.time()),
         }
         
-        # Build upstream authorization URL
+        # Build upstream authorization URL with proxy's own PKCE challenge
         upstream_params = {
             "response_type": "code",
             "client_id": self.upstream_client_id,
             "redirect_uri": self.redirect_uri,
             "scope": params.get("scope", " ".join(self.scopes_supported)),
             "state": session_state,  # Use our session state
+            "code_challenge": proxy_code_challenge,  # Use proxy's PKCE challenge
+            "code_challenge_method": "S256",
         }
-        
-        # Add PKCE if supported
-        if params.get("code_challenge"):
-            upstream_params["code_challenge"] = params["code_challenge"]
-            upstream_params["code_challenge_method"] = params.get("code_challenge_method", "S256")
             
         upstream_url = f"{self.upstream_authorization_endpoint}?{urlencode(upstream_params)}"
         return RedirectResponse(upstream_url)
@@ -311,11 +327,9 @@ class OAuthProxy(AuthProvider):
                 "client_secret": self.upstream_client_secret,
             }
             
-            # Add PKCE verifier if used
-            if session.get("code_challenge"):
-                # Note: We don't store the code_verifier, so PKCE verification 
-                # happens at the upstream provider level
-                pass
+            # Add proxy's PKCE code_verifier for upstream token exchange
+            if session.get("proxy_code_verifier"):
+                token_data["code_verifier"] = session["proxy_code_verifier"]
             
             print(f"Token exchange request to {self.upstream_token_endpoint}: {token_data}")
                 
