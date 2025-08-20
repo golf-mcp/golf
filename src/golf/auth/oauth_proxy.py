@@ -231,7 +231,6 @@ class OAuthProxy(AuthProvider):
             "redirect_uris": data.get("redirect_uris", []),
         }
         
-        print(f"Registration response: {response_data}")
         return self._cors_json_response(response_data)
         
     async def _authorize_endpoint(self, request: Request) -> Response:
@@ -334,8 +333,6 @@ class OAuthProxy(AuthProvider):
             if session.get("proxy_code_verifier"):
                 token_data["code_verifier"] = session["proxy_code_verifier"]
             
-            print(f"Token exchange request to {self.upstream_token_endpoint}: {token_data}")
-                
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.upstream_token_endpoint,
@@ -352,15 +349,12 @@ class OAuthProxy(AuthProvider):
                 except:
                     error_details += f", Text: {response.text}"
                     
-                print(f"Token exchange failed: {error_details}")
-                
                 return self._cors_json_response({
                     "error": "server_error", 
                     "error_description": f"Failed to exchange authorization code: {error_details}"
                 })
                 
             tokens = response.json()
-            print(f"Received tokens from upstream: {tokens}")
             
         except Exception as e:
             return self._cors_json_response({
@@ -427,41 +421,26 @@ class OAuthProxy(AuthProvider):
         client_id = data.get("client_id")
         client_secret = data.get("client_secret")
         
-        print(f"Token exchange - code: {code}, client_id: {client_id}")
-        print(f"Available sessions: {list(self._client_sessions.keys())}")
-        
         # Validate client
-        print(f"Validating client_id: {client_id}")
-        print(f"Registered clients: {list(self._registered_clients.keys())}")
-        
         if not client_id or client_id not in self._registered_clients:
-            print("Client ID validation failed")
             return self._cors_json_response({
                 "error": "invalid_client",
                 "error_description": "Unknown client_id"
             })
             
         stored_client = self._registered_clients[client_id]
-        print(f"Stored client secret: '{stored_client['client_secret']}'")
-        print(f"Received client secret: '{client_secret}'")
         
         # For PKCE flows, client secret is optional (RFC 7636)
         # Only validate client secret if one was provided
         if client_secret is not None and client_secret != "None":
             if stored_client["client_secret"] != client_secret:
-                print("Client secret validation failed")
                 return self._cors_json_response({
                     "error": "invalid_client",
                     "error_description": "Invalid client_secret"
                 })
-        else:
-            print("Skipping client secret validation (PKCE flow)")
-            
-        print("Client validation passed")
             
         # Look up session by code (which is our client code)
         session = self._client_sessions.get(code)
-        print(f"Session lookup result: {session}")
         
         if not session:
             return self._cors_json_response({
@@ -470,7 +449,6 @@ class OAuthProxy(AuthProvider):
             })
             
         if session["client_id"] != client_id:
-            print(f"Client ID mismatch: session={session['client_id']}, request={client_id}")
             return self._cors_json_response({
                 "error": "invalid_grant",
                 "error_description": "Invalid or expired authorization code"
@@ -488,7 +466,6 @@ class OAuthProxy(AuthProvider):
         # Clean up the session
         del self._client_sessions[code]
         
-        print(f"Returning tokens to client: {tokens}")
         return self._cors_json_response(tokens)
         
     async def _handle_refresh_token_grant(self, data: Dict[str, str]) -> Response:
