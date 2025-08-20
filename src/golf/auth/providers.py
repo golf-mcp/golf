@@ -442,5 +442,209 @@ class RemoteAuthConfig(BaseModel):
         return self
 
 
+class OAuthProxyConfig(BaseModel):
+    """Configuration for OAuth proxy provider for non-DCR compliant providers.
+    
+    Use this when you want to bridge MCP clients (expecting DCR) with providers
+    that don't support Dynamic Client Registration like GitHub, Google, Azure.
+    The proxy acts as a DCR-capable authorization server to clients while using
+    your fixed upstream client credentials under the hood.
+    """
+
+    provider_type: Literal["oauth_proxy"] = "oauth_proxy"
+
+    # Upstream provider configuration (your static OAuth app)
+    upstream_authorization_endpoint: str = Field(..., description="Upstream provider's authorization endpoint")
+    upstream_token_endpoint: str = Field(..., description="Upstream provider's token endpoint")
+    upstream_client_id: str = Field(..., description="Your registered client ID with the upstream provider")
+    upstream_client_secret: str = Field(..., description="Your registered client secret with the upstream provider")
+    upstream_revocation_endpoint: str | None = Field(None, description="Optional upstream token revocation endpoint")
+
+    # Proxy server configuration
+    base_url: str = Field(..., description="Public URL of this proxy server (must match registered redirect URI)")
+    redirect_path: str = Field("/oauth/callback", description="Callback path (must match provider registration)")
+
+    # Scopes and token verification
+    scopes_supported: list[str] = Field(
+        default_factory=list, description="Scopes this proxy supports (advertised to MCP clients)"
+    )
+    token_verifier_config: JWTAuthConfig | StaticTokenConfig = Field(
+        ..., description="Configuration for validating upstream tokens"
+    )
+
+    # Environment variable names for runtime configuration
+    upstream_authorization_endpoint_env_var: str | None = Field(
+        None, description="Environment variable name for upstream authorization endpoint"
+    )
+    upstream_token_endpoint_env_var: str | None = Field(
+        None, description="Environment variable name for upstream token endpoint"
+    )
+    upstream_client_id_env_var: str | None = Field(
+        None, description="Environment variable name for upstream client ID"
+    )
+    upstream_client_secret_env_var: str | None = Field(
+        None, description="Environment variable name for upstream client secret"
+    )
+    upstream_revocation_endpoint_env_var: str | None = Field(
+        None, description="Environment variable name for upstream revocation endpoint"
+    )
+    base_url_env_var: str | None = Field(None, description="Environment variable name for proxy base URL")
+
+    @field_validator("upstream_authorization_endpoint", "upstream_token_endpoint", "base_url")
+    @classmethod
+    def validate_required_urls(cls, v: str) -> str:
+        """Validate required URLs for security and format compliance."""
+        if not v or not v.strip():
+            raise ValueError("URL cannot be empty")
+
+        url = v.strip()
+        try:
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError(f"Invalid URL format: '{url}' - must include scheme and netloc")
+
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(f"URL must use http or https scheme: '{url}'")
+
+            # Check for HTTPS requirement in production for OAuth endpoints
+            is_production = (
+                os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
+                or os.environ.get("NODE_ENV", "").lower() == "production"
+                or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+            )
+
+            if is_production and parsed.scheme == "http":
+                import warnings
+                warnings.warn(
+                    f"OAuth URL '{url}' uses HTTP in production. HTTPS is strongly recommended for OAuth security.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            raise ValueError(f"Invalid URL '{url}': {e}") from e
+
+        return url
+
+    @field_validator("upstream_revocation_endpoint")
+    @classmethod
+    def validate_optional_url(cls, v: str | None) -> str | None:
+        """Validate optional revocation endpoint URL."""
+        if not v:
+            return v
+
+        url = v.strip()
+        if not url:
+            return None
+
+        try:
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError(f"Invalid URL format: '{url}' - must include scheme and netloc")
+
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(f"URL must use http or https scheme: '{url}'")
+
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            raise ValueError(f"Invalid revocation URL '{url}': {e}") from e
+
+        return url
+
+    @field_validator("upstream_client_id", "upstream_client_secret")
+    @classmethod
+    def validate_client_credentials(cls, v: str) -> str:
+        """Validate client credentials are not empty."""
+        if not v or not v.strip():
+            raise ValueError("Client credentials cannot be empty")
+        return v.strip()
+
+    @field_validator("redirect_path")
+    @classmethod
+    def validate_redirect_path(cls, v: str) -> str:
+        """Validate redirect path format."""
+        path = v.strip()
+        if not path:
+            raise ValueError("Redirect path cannot be empty")
+        
+        if not path.startswith("/"):
+            path = "/" + path
+            
+        return path
+
+    @field_validator("scopes_supported")
+    @classmethod
+    def validate_scopes_supported(cls, v: list[str]) -> list[str]:
+        """Validate scopes_supported format and security."""
+        if not v:
+            return v
+
+        cleaned_scopes = []
+        for scope in v:
+            scope = scope.strip()
+            if not scope:
+                raise ValueError("Scopes cannot be empty or whitespace-only")
+
+            # OAuth 2.0 scope format validation (RFC 6749)
+            if not all(32 < ord(c) < 127 and c not in ' "\\' for c in scope):
+                raise ValueError(
+                    f"Invalid scope format: '{scope}' - must be ASCII printable without spaces, quotes, or backslashes"
+                )
+
+            # Reasonable length limit to prevent abuse
+            if len(scope) > 128:
+                raise ValueError(f"Scope too long: '{scope}' - maximum 128 characters")
+
+            # Warn about potentially dangerous scope names
+            dangerous_scopes = {"admin", "root", "superuser", "system", "*", "all"}
+            if scope.lower() in dangerous_scopes:
+                import warnings
+                warnings.warn(
+                    f"Potentially dangerous scope detected: '{scope}'. "
+                    "Consider using more specific, principle-of-least-privilege scopes.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
+            cleaned_scopes.append(scope)
+
+        return cleaned_scopes
+
+    @model_validator(mode="after")
+    def validate_oauth_proxy_config(self) -> "OAuthProxyConfig":
+        """Validate OAuth proxy configuration for consistency and security."""
+        # Convenience: if user didn't set scopes_supported, default to verifier.required_scopes
+        if not self.scopes_supported:
+            config = self.token_verifier_config
+            if hasattr(config, "required_scopes") and config.required_scopes:
+                self.scopes_supported = list(config.required_scopes)
+
+        # Validate token verifier config is compatible
+        if not isinstance(self.token_verifier_config, JWTAuthConfig | StaticTokenConfig):
+            raise ValueError(
+                f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, got {type(self.token_verifier_config).__name__}"
+            )
+
+        # For JWT configs, ensure they have the minimum required fields
+        if isinstance(self.token_verifier_config, JWTAuthConfig) and (
+            not self.token_verifier_config.public_key
+            and not self.token_verifier_config.jwks_uri
+            and not self.token_verifier_config.public_key_env_var
+            and not self.token_verifier_config.jwks_uri_env_var
+        ):
+            raise ValueError(
+                "JWT token verifier config must provide public_key, jwks_uri, or their environment variable equivalents"
+            )
+
+        # For static token configs, ensure they have tokens (for development/testing)
+        if isinstance(self.token_verifier_config, StaticTokenConfig) and not self.token_verifier_config.tokens:
+            raise ValueError("Static token verifier config must provide at least one token")
+
+        return self
+
+
 # Union type for all auth configurations
-AuthConfig = JWTAuthConfig | StaticTokenConfig | OAuthServerConfig | RemoteAuthConfig
+AuthConfig = JWTAuthConfig | StaticTokenConfig | OAuthServerConfig | RemoteAuthConfig | OAuthProxyConfig
