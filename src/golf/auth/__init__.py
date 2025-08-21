@@ -206,14 +206,14 @@ def configure_oauth_proxy(
     redirect_path: str = "/oauth/callback",
 ) -> None:
     """Configure OAuth proxy authentication for non-DCR providers.
-    
+
     This sets up an OAuth proxy that bridges MCP clients (expecting DCR) with
     traditional OAuth providers like GitHub, Google, Okta Web Apps that use
     fixed client credentials.
-    
+
     Args:
         upstream_authorization_endpoint: Provider's authorization URL
-        upstream_token_endpoint: Provider's token endpoint URL  
+        upstream_token_endpoint: Provider's token endpoint URL
         upstream_client_id: Your client ID registered with the provider
         upstream_client_secret: Your client secret from the provider
         base_url: This proxy server's public URL
@@ -221,7 +221,7 @@ def configure_oauth_proxy(
         scopes_supported: Scopes to advertise to MCP clients
         upstream_revocation_endpoint: Optional token revocation endpoint
         redirect_path: OAuth callback path (default: /oauth/callback)
-        
+
     Note:
         Requires golf-mcp-enterprise package for implementation.
     """

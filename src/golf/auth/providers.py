@@ -444,37 +444,37 @@ class RemoteAuthConfig(BaseModel):
 
 class OAuthProxyConfig(BaseModel):
     """Configuration for OAuth proxy functionality (requires golf-mcp-enterprise).
-    
+
     This configuration enables bridging MCP clients (which expect Dynamic Client
     Registration) with OAuth providers that use fixed client credentials like
     GitHub Apps, Google Cloud Console apps, Okta Web Applications, etc.
-    
+
     The proxy acts as a DCR-capable authorization server to MCP clients while
     using your fixed upstream client credentials with the actual OAuth provider.
-    
+
     Note: This class provides configuration only. The actual implementation
     requires the golf-mcp-enterprise package.
     """
-    
+
     provider_type: Literal["oauth_proxy"] = "oauth_proxy"
-    
+
     # Upstream OAuth provider configuration
     upstream_authorization_endpoint: str = Field(..., description="Upstream provider's authorization endpoint URL")
     upstream_token_endpoint: str = Field(..., description="Upstream provider's token endpoint URL")
     upstream_client_id: str = Field(..., description="Your registered client ID with the upstream provider")
     upstream_client_secret: str = Field(..., description="Your registered client secret with the upstream provider")
     upstream_revocation_endpoint: str | None = Field(None, description="Optional upstream token revocation endpoint")
-    
+
     # This proxy server configuration
     base_url: str = Field(..., description="Public URL of this OAuth proxy server")
     redirect_path: str = Field("/oauth/callback", description="OAuth callback path (must match provider registration)")
-    
+
     # Scopes and token verification
     scopes_supported: list[str] = Field(default_factory=list, description="Scopes supported by this proxy")
     token_verifier_config: JWTAuthConfig | StaticTokenConfig = Field(
         ..., description="Token verifier configuration for validating upstream tokens"
     )
-    
+
     # Environment variable names for runtime configuration
     upstream_authorization_endpoint_env_var: str | None = Field(
         None, description="Environment variable name for upstream authorization endpoint"
@@ -482,9 +482,7 @@ class OAuthProxyConfig(BaseModel):
     upstream_token_endpoint_env_var: str | None = Field(
         None, description="Environment variable name for upstream token endpoint"
     )
-    upstream_client_id_env_var: str | None = Field(
-        None, description="Environment variable name for upstream client ID"
-    )
+    upstream_client_id_env_var: str | None = Field(None, description="Environment variable name for upstream client ID")
     upstream_client_secret_env_var: str | None = Field(
         None, description="Environment variable name for upstream client secret"
     )
@@ -492,17 +490,18 @@ class OAuthProxyConfig(BaseModel):
         None, description="Environment variable name for upstream revocation endpoint"
     )
     base_url_env_var: str | None = Field(None, description="Environment variable name for base URL")
-    
+
     @field_validator("upstream_authorization_endpoint", "upstream_token_endpoint", "base_url")
     @classmethod
     def validate_required_urls(cls, v: str) -> str:
         """Validate required URLs are properly formatted."""
         if not v or not v.strip():
             raise ValueError("URL cannot be empty")
-            
+
         url = v.strip()
         try:
             from urllib.parse import urlparse
+
             parsed = urlparse(url)
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError(f"Invalid URL format: '{url}' - must include scheme and netloc")
@@ -512,22 +511,23 @@ class OAuthProxyConfig(BaseModel):
             if isinstance(e, ValueError):
                 raise
             raise ValueError(f"Invalid URL '{url}': {e}") from e
-            
+
         return url
-    
+
     @field_validator("upstream_revocation_endpoint")
     @classmethod
     def validate_optional_url(cls, v: str | None) -> str | None:
         """Validate optional URLs are properly formatted."""
         if not v:
             return v
-            
+
         url = v.strip()
         if not url:
             return None
-            
+
         try:
             from urllib.parse import urlparse
+
             parsed = urlparse(url)
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError(f"Invalid URL format: '{url}' - must include scheme and netloc")
@@ -537,36 +537,36 @@ class OAuthProxyConfig(BaseModel):
             if isinstance(e, ValueError):
                 raise
             raise ValueError(f"Invalid URL '{url}': {e}") from e
-            
+
         return url
-    
+
     @field_validator("scopes_supported")
     @classmethod
     def validate_scopes_supported(cls, v: list[str]) -> list[str]:
         """Validate scopes_supported format and security."""
         if not v:
             return v
-            
+
         cleaned_scopes = []
         for scope in v:
             scope = scope.strip()
             if not scope:
                 raise ValueError("Scopes cannot be empty or whitespace-only")
-                
+
             # OAuth 2.0 scope format validation (RFC 6749)
             if not all(32 < ord(c) < 127 and c not in ' "\\' for c in scope):
                 raise ValueError(
                     f"Invalid scope format: '{scope}' - must be ASCII printable without spaces, quotes, or backslashes"
                 )
-                
+
             # Reasonable length limit to prevent abuse
             if len(scope) > 128:
                 raise ValueError(f"Scope too long: '{scope}' - maximum 128 characters")
-                
+
             cleaned_scopes.append(scope)
-            
+
         return cleaned_scopes
-    
+
     @model_validator(mode="after")
     def validate_oauth_proxy_config(self) -> "OAuthProxyConfig":
         """Validate OAuth proxy configuration consistency."""
@@ -575,39 +575,40 @@ class OAuthProxyConfig(BaseModel):
             raise ValueError(
                 f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, got {type(self.token_verifier_config).__name__}"
             )
-            
+
         # Warn about HTTPS requirements in production
         is_production = (
             os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
             or os.environ.get("NODE_ENV", "").lower() == "production"
             or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
         )
-        
+
         if is_production:
             from urllib.parse import urlparse
-            
+
             urls_to_check = [
                 ("base_url", self.base_url),
                 ("upstream_authorization_endpoint", self.upstream_authorization_endpoint),
                 ("upstream_token_endpoint", self.upstream_token_endpoint),
             ]
-            
+
             if self.upstream_revocation_endpoint:
                 urls_to_check.append(("upstream_revocation_endpoint", self.upstream_revocation_endpoint))
-                
+
             for field_name, url in urls_to_check:
                 parsed = urlparse(url)
                 if parsed.scheme == "http":
                     import warnings
+
                     warnings.warn(
                         f"OAuth proxy {field_name} '{url}' uses HTTP in production environment. "
                         "HTTPS is strongly recommended for OAuth endpoints to prevent token interception.",
                         UserWarning,
                         stacklevel=2,
                     )
-                    
+
         return self
 
 
-# Union type for all auth configurations  
+# Union type for all auth configurations
 AuthConfig = JWTAuthConfig | StaticTokenConfig | OAuthServerConfig | RemoteAuthConfig | OAuthProxyConfig

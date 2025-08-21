@@ -258,6 +258,7 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
     try:
         # Try to import from enterprise package
         from golf_enterprise import create_oauth_proxy_provider
+
         return create_oauth_proxy_provider(config)
     except ImportError as e:
         raise ImportError(
@@ -342,7 +343,7 @@ def register_builtin_providers() -> None:
     - static: Static token verification (development)
     - oauth_server: Full OAuth authorization server
     - remote: Remote authorization server integration
-    
+
     Note: oauth_proxy provider is registered by the golf-mcp-enterprise package
     """
     registry = get_provider_registry()
