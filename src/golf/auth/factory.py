@@ -342,7 +342,8 @@ def register_builtin_providers() -> None:
     - static: Static token verification (development)
     - oauth_server: Full OAuth authorization server
     - remote: Remote authorization server integration
-    - oauth_proxy: OAuth proxy for non-DCR providers (requires golf-mcp-enterprise)
+    
+    Note: oauth_proxy provider is registered by the golf-mcp-enterprise package
     """
     registry = get_provider_registry()
 
@@ -351,7 +352,7 @@ def register_builtin_providers() -> None:
     registry.register_factory("static", _create_static_provider)
     registry.register_factory("oauth_server", _create_oauth_server_provider)
     registry.register_factory("remote", _create_remote_provider)
-    registry.register_factory("oauth_proxy", _create_oauth_proxy_provider)
+    # oauth_proxy is registered by golf-mcp-enterprise package when installed
 
 
 # Register built-in providers when module is imported
