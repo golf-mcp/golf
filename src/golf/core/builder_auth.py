@@ -52,7 +52,7 @@ def generate_auth_code(
         "import os",
         "import sys",
         "from golf.auth.factory import create_auth_provider",
-        "from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConfig, OAuthServerConfig",
+        "from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConfig, OAuthServerConfig, OAuthProxyConfig",
     ]
 
     # Embed the auth configuration directly in the generated code
