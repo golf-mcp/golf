@@ -64,7 +64,7 @@ def generate_auth_code(
         f"auth_config = {auth_config_repr}",
         "try:",
         "    auth_provider = create_auth_provider(auth_config)",
-        "    print(f'Authentication configured with {auth_config.provider_type} provider')",
+        "    # Authentication configured with {auth_config.provider_type} provider",
         "except Exception as e:",
         "    print(f'Authentication setup failed: {e}', file=sys.stderr)",
         "    auth_provider = None",
@@ -203,7 +203,7 @@ if auth_provider and hasattr(auth_provider, 'get_routes'):
         # Add routes to FastMCP's additional HTTP routes list
         try:
             mcp._additional_http_routes.extend(auth_routes)
-            print(f"Added {len(auth_routes)} OAuth metadata routes")
+            # Added {len(auth_routes)} OAuth metadata routes
         except Exception as e:
             print(f"Warning: Failed to add OAuth routes: {e}")
 """
