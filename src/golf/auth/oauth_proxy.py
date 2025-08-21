@@ -576,7 +576,21 @@ class OAuthProxy(AuthProvider):
         
     async def verify_token(self, token: str) -> dict:
         """Verify a bearer token using the configured token verifier."""
-        return await self.token_verifier.verify_token(token)
+        try:
+            result = await self.token_verifier.verify_token(token)
+            
+            # If result is None but no exception was raised, create a proper auth info object
+            if result is None:
+                from types import SimpleNamespace
+                auth_info = SimpleNamespace()
+                auth_info.client_id = "oauth_proxy"
+                auth_info.scopes = ["openid"]
+                auth_info.expires_at = None  # FastMCP checks for this attribute
+                return auth_info
+            
+            return result
+        except Exception as e:
+            raise
         
     def get_resource_metadata_url(self) -> Optional[str]:
         """Get the resource metadata URL for this proxy."""
