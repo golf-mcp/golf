@@ -17,6 +17,7 @@ from .providers import (
     StaticTokenConfig,
     OAuthServerConfig,
     RemoteAuthConfig,
+    OAuthProxyConfig,
 )
 from .registry import (
     get_provider_registry,
@@ -55,6 +56,8 @@ def create_auth_provider(config: AuthConfig) -> "AuthProvider":
             return _create_oauth_server_provider(config)
         elif config.provider_type == "remote":
             return _create_remote_provider(config)
+        elif config.provider_type == "oauth_proxy":
+            return _create_oauth_proxy_provider(config)
         else:
             raise ValueError(f"Unknown provider type: {config.provider_type}") from None
 
@@ -250,6 +253,21 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
     )
 
 
+def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
+    """Create OAuth proxy provider - requires enterprise package."""
+    try:
+        # Try to import from enterprise package
+        from golf_enterprise import create_oauth_proxy_provider
+        return create_oauth_proxy_provider(config)
+    except ImportError as e:
+        raise ImportError(
+            "OAuth Proxy requires golf-mcp-enterprise package. "
+            "This feature provides OAuth proxy functionality for non-DCR providers "
+            "(GitHub, Google, Okta Web Apps, etc.). "
+            "Contact sales@golf.dev for enterprise licensing."
+        ) from e
+
+
 def create_simple_jwt_provider(
     *,
     jwks_uri: str | None = None,
@@ -324,6 +342,7 @@ def register_builtin_providers() -> None:
     - static: Static token verification (development)
     - oauth_server: Full OAuth authorization server
     - remote: Remote authorization server integration
+    - oauth_proxy: OAuth proxy for non-DCR providers (requires golf-mcp-enterprise)
     """
     registry = get_provider_registry()
 
@@ -332,6 +351,7 @@ def register_builtin_providers() -> None:
     registry.register_factory("static", _create_static_provider)
     registry.register_factory("oauth_server", _create_oauth_server_provider)
     registry.register_factory("remote", _create_remote_provider)
+    registry.register_factory("oauth_proxy", _create_oauth_proxy_provider)
 
 
 # Register built-in providers when module is imported
