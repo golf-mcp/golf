@@ -19,3 +19,5 @@ dcr/
 src/golf/_endpoints.py
 build.sh
 .claude
+
+*.code-workspace
