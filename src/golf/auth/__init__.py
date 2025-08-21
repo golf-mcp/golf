@@ -197,7 +197,7 @@ def configure_dev_auth(
 def configure_oauth_proxy(
     *,
     upstream_authorization_endpoint: str,
-    upstream_token_endpoint: str, 
+    upstream_token_endpoint: str,
     upstream_client_id: str,
     upstream_client_secret: str,
     base_url: str,

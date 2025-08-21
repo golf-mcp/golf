@@ -444,7 +444,7 @@ class RemoteAuthConfig(BaseModel):
 
 class OAuthProxyConfig(BaseModel):
     """Configuration for OAuth proxy provider for non-DCR compliant providers.
-    
+
     Use this when you want to bridge MCP clients (expecting DCR) with providers
     that don't support Dynamic Client Registration like GitHub, Google, Azure.
     The proxy acts as a DCR-capable authorization server to clients while using
@@ -479,9 +479,7 @@ class OAuthProxyConfig(BaseModel):
     upstream_token_endpoint_env_var: str | None = Field(
         None, description="Environment variable name for upstream token endpoint"
     )
-    upstream_client_id_env_var: str | None = Field(
-        None, description="Environment variable name for upstream client ID"
-    )
+    upstream_client_id_env_var: str | None = Field(None, description="Environment variable name for upstream client ID")
     upstream_client_secret_env_var: str | None = Field(
         None, description="Environment variable name for upstream client secret"
     )
@@ -515,6 +513,7 @@ class OAuthProxyConfig(BaseModel):
 
             if is_production and parsed.scheme == "http":
                 import warnings
+
                 warnings.warn(
                     f"OAuth URL '{url}' uses HTTP in production. HTTPS is strongly recommended for OAuth security.",
                     UserWarning,
@@ -569,10 +568,10 @@ class OAuthProxyConfig(BaseModel):
         path = v.strip()
         if not path:
             raise ValueError("Redirect path cannot be empty")
-        
+
         if not path.startswith("/"):
             path = "/" + path
-            
+
         return path
 
     @field_validator("scopes_supported")
@@ -602,6 +601,7 @@ class OAuthProxyConfig(BaseModel):
             dangerous_scopes = {"admin", "root", "superuser", "system", "*", "all"}
             if scope.lower() in dangerous_scopes:
                 import warnings
+
                 warnings.warn(
                     f"Potentially dangerous scope detected: '{scope}'. "
                     "Consider using more specific, principle-of-least-privilege scopes.",

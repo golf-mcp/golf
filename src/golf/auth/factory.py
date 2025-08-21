@@ -59,6 +59,7 @@ def create_auth_provider(config: AuthConfig) -> "AuthProvider":
         elif config.provider_type == "oauth_proxy":
             return _create_oauth_proxy_provider(config)
 
+
 def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
     """Create JWT token verifier from configuration."""
     # Resolve runtime values from environment variables
@@ -296,7 +297,7 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
     if not upstream_authorization_endpoint:
         raise ValueError("upstream_authorization_endpoint is required")
     if not upstream_token_endpoint:
-        raise ValueError("upstream_token_endpoint is required") 
+        raise ValueError("upstream_token_endpoint is required")
     if not upstream_client_id:
         raise ValueError("upstream_client_id is required")
     if not upstream_client_secret:
