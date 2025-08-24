@@ -1,6 +1,7 @@
 include README.md
 include LICENSE
 include pyproject.toml
+include src/golf/_endpoints.py.in
 graft .docs
 graft src/golf/examples
 
