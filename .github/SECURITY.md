@@ -3,11 +3,11 @@
 ## Supported Versions
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.2.3   | :white_check_mark: |
+| 0.2.4   | :white_check_mark: |
+| 0.2.3   | :x: |
 | 0.2.2   | :white_check_mark: |
 | 0.2.1   | :white_check_mark: |
 | 0.2.0   | :white_check_mark: |
-| 0.1.20  | :white_check_mark: |
 
 
 ## Reporting a Vulnerability
