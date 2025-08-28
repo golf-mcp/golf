@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from .common import weather_client
+from .client import weather_client
 
 # The URI that clients will use to access this resource
 resource_uri = "weather://forecast"
@@ -15,9 +15,9 @@ async def forecast_weather() -> dict[str, Any]:
     This example demonstrates:
     1. Nested resource organization (resources/weather/forecast.py)
     2. Resource without URI parameters
-    3. Using shared client from the common.py file
+    3. Using shared client from the client.py file
     """
-    # Use the shared weather client from common.py
+    # Use the shared weather client from client.py
     forecast_data = await weather_client.get_forecast("New York", days=5)
 
     # Add some additional data

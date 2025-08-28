@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from .common import weather_client
+from .client import weather_client
 
 # The URI template that clients will use to access this resource
 # The {city} parameter makes this a resource template
@@ -16,7 +16,7 @@ async def get_weather_for_city(city: str) -> dict[str, Any]:
     This example demonstrates:
     1. Resource templates with URI parameters ({city})
     2. Dynamic resource access based on parameters
-    3. Using shared client from the common.py file
+    3. Using shared client from the client.py file
     4. FastMCP 2.11+ ResourceTemplate.from_function() usage
 
     Args:
@@ -25,7 +25,7 @@ async def get_weather_for_city(city: str) -> dict[str, Any]:
     Returns:
         Weather data for the specified city
     """
-    # Use the shared weather client from common.py
+    # Use the shared weather client from client.py
     weather_data = await weather_client.get_current(city)
 
     # Add some additional data

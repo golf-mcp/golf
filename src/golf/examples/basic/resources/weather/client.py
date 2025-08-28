@@ -1,7 +1,8 @@
 """Weather shared functionality.
 
-This common.py file demonstrates the recommended pattern for
+This file demonstrates the recommended pattern for
 sharing functionality across multiple resources in a directory.
+Golf automatically discovers and includes shared Python files in builds.
 """
 
 import os
