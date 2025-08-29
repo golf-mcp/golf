@@ -142,6 +142,72 @@ def get_api_key_from_request(request: Request) -> str | None:
     return _current_api_key.get()
 
 
+def get_auth_token() -> str | None:
+    """Get the authorization token from the current request context.
+
+    This function should be used in tools to retrieve the authorization token
+    (typically a JWT or OAuth token) that was sent in the request headers.
+
+    Unlike get_api_key(), this function extracts the raw token from the Authorization
+    header without stripping any prefix, making it suitable for passing through
+    to upstream APIs that expect the full Authorization header value.
+
+    Returns:
+        The authorization token if available, None otherwise
+
+    Example:
+        # In a tool file
+        from golf.auth import get_auth_token
+
+        async def call_upstream_api():
+            auth_token = get_auth_token()
+            if not auth_token:
+                return {"error": "No authorization token provided"}
+
+            # Use the full token in upstream request
+            headers = {"Authorization": f"Bearer {auth_token}"}
+            async with httpx.AsyncClient() as client:
+                response = await client.get("https://api.example.com/data", headers=headers)
+            ...
+    """
+    # Try to get directly from HTTP request if available (FastMCP pattern)
+    try:
+        # This follows the FastMCP pattern for accessing HTTP requests
+        from fastmcp.server.dependencies import get_http_request
+
+        request = get_http_request()
+
+        if request and hasattr(request, "state") and hasattr(request.state, "auth_token"):
+            return request.state.auth_token
+
+        if request:
+            # Extract authorization token from Authorization header
+            auth_header = None
+            for k, v in request.headers.items():
+                if k.lower() == "authorization":
+                    auth_header = v
+                    break
+
+            if auth_header:
+                # Extract the token part (everything after "Bearer ")
+                token = extract_token_from_header(auth_header)
+                if token:
+                    return token
+
+                # If not Bearer format, return the whole header value minus "Bearer " prefix if present
+                if auth_header.lower().startswith("bearer "):
+                    return auth_header[7:]  # Remove "Bearer " prefix
+                return auth_header
+
+    except (ImportError, RuntimeError):
+        # FastMCP not available or not in HTTP context
+        pass
+    except Exception:
+        pass
+
+    return None
+
+
 def debug_api_key_context() -> dict[str, Any]:
     """Debug function to inspect API key context.
 
