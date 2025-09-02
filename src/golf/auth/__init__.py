@@ -35,6 +35,7 @@ from .helpers import (
     debug_api_key_context,
     extract_token_from_header,
     get_api_key,
+    get_auth_token,
     get_provider_token,
     set_api_key,
 )
@@ -72,6 +73,7 @@ __all__ = [
     "debug_api_key_context",
     "extract_token_from_header",
     "get_api_key",
+    "get_auth_token",
     "get_provider_token",
     "set_api_key",
 ]
