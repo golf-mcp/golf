@@ -458,12 +458,12 @@ class OAuthProxyConfig(BaseModel):
 
     provider_type: Literal["oauth_proxy"] = "oauth_proxy"
 
-    # Upstream OAuth provider configuration
-    upstream_authorization_endpoint: str = Field(..., description="Upstream provider's authorization endpoint URL")
-    upstream_token_endpoint: str = Field(..., description="Upstream provider's token endpoint URL")
-    upstream_client_id: str = Field(..., description="Your registered client ID with the upstream provider")
-    upstream_client_secret: str = Field(..., description="Your registered client secret with the upstream provider")
-    upstream_revocation_endpoint: str | None = Field(None, description="Optional upstream token revocation endpoint")
+    # OAuth provider configuration
+    authorization_endpoint: str = Field(..., description="OAuth provider's authorization endpoint URL")
+    token_endpoint: str = Field(..., description="OAuth provider's token endpoint URL")
+    client_id: str = Field(..., description="Your registered client ID with the OAuth provider")
+    client_secret: str = Field(..., description="Your registered client secret with the OAuth provider")
+    revocation_endpoint: str | None = Field(None, description="Optional token revocation endpoint")
 
     # This proxy server configuration
     base_url: str = Field(..., description="Public URL of this OAuth proxy server")
@@ -476,22 +476,22 @@ class OAuthProxyConfig(BaseModel):
     )
 
     # Environment variable names for runtime configuration
-    upstream_authorization_endpoint_env_var: str | None = Field(
-        None, description="Environment variable name for upstream authorization endpoint"
+    authorization_endpoint_env_var: str | None = Field(
+        None, description="Environment variable name for authorization endpoint"
     )
-    upstream_token_endpoint_env_var: str | None = Field(
-        None, description="Environment variable name for upstream token endpoint"
+    token_endpoint_env_var: str | None = Field(
+        None, description="Environment variable name for token endpoint"
     )
-    upstream_client_id_env_var: str | None = Field(None, description="Environment variable name for upstream client ID")
-    upstream_client_secret_env_var: str | None = Field(
-        None, description="Environment variable name for upstream client secret"
+    client_id_env_var: str | None = Field(None, description="Environment variable name for client ID")
+    client_secret_env_var: str | None = Field(
+        None, description="Environment variable name for client secret"
     )
-    upstream_revocation_endpoint_env_var: str | None = Field(
-        None, description="Environment variable name for upstream revocation endpoint"
+    revocation_endpoint_env_var: str | None = Field(
+        None, description="Environment variable name for revocation endpoint"
     )
     base_url_env_var: str | None = Field(None, description="Environment variable name for base URL")
 
-    @field_validator("upstream_authorization_endpoint", "upstream_token_endpoint", "base_url")
+    @field_validator("authorization_endpoint", "token_endpoint", "base_url")
     @classmethod
     def validate_required_urls(cls, v: str) -> str:
         """Validate required URLs are properly formatted."""
@@ -514,7 +514,7 @@ class OAuthProxyConfig(BaseModel):
 
         return url
 
-    @field_validator("upstream_revocation_endpoint")
+    @field_validator("revocation_endpoint")
     @classmethod
     def validate_optional_url(cls, v: str | None) -> str | None:
         """Validate optional URLs are properly formatted."""
@@ -588,12 +588,12 @@ class OAuthProxyConfig(BaseModel):
 
             urls_to_check = [
                 ("base_url", self.base_url),
-                ("upstream_authorization_endpoint", self.upstream_authorization_endpoint),
-                ("upstream_token_endpoint", self.upstream_token_endpoint),
+                ("authorization_endpoint", self.authorization_endpoint),
+                ("token_endpoint", self.token_endpoint),
             ]
 
-            if self.upstream_revocation_endpoint:
-                urls_to_check.append(("upstream_revocation_endpoint", self.upstream_revocation_endpoint))
+            if self.revocation_endpoint:
+                urls_to_check.append(("revocation_endpoint", self.revocation_endpoint))
 
             for field_name, url in urls_to_check:
                 parsed = urlparse(url)
