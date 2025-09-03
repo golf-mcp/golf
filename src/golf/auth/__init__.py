@@ -228,11 +228,11 @@ def configure_oauth_proxy(
         Requires golf-mcp-enterprise package for implementation.
     """
     config = OAuthProxyConfig(
-        upstream_authorization_endpoint=authorization_endpoint,
-        upstream_token_endpoint=token_endpoint,
-        upstream_client_id=client_id,
-        upstream_client_secret=client_secret,
-        upstream_revocation_endpoint=revocation_endpoint,
+        authorization_endpoint=authorization_endpoint,
+        token_endpoint=token_endpoint,
+        client_id=client_id,
+        client_secret=client_secret,
+        revocation_endpoint=revocation_endpoint,
         base_url=base_url,
         redirect_path=redirect_path,
         scopes_supported=scopes_supported or [],
