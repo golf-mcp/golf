@@ -479,13 +479,9 @@ class OAuthProxyConfig(BaseModel):
     authorization_endpoint_env_var: str | None = Field(
         None, description="Environment variable name for authorization endpoint"
     )
-    token_endpoint_env_var: str | None = Field(
-        None, description="Environment variable name for token endpoint"
-    )
+    token_endpoint_env_var: str | None = Field(None, description="Environment variable name for token endpoint")
     client_id_env_var: str | None = Field(None, description="Environment variable name for client ID")
-    client_secret_env_var: str | None = Field(
-        None, description="Environment variable name for client secret"
-    )
+    client_secret_env_var: str | None = Field(None, description="Environment variable name for client secret")
     revocation_endpoint_env_var: str | None = Field(
         None, description="Environment variable name for revocation endpoint"
     )
