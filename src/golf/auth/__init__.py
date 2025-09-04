@@ -197,14 +197,14 @@ def configure_dev_auth(
 
 
 def configure_oauth_proxy(
-    upstream_authorization_endpoint: str,
-    upstream_token_endpoint: str,
-    upstream_client_id: str,
-    upstream_client_secret: str,
+    authorization_endpoint: str,
+    token_endpoint: str,
+    client_id: str,
+    client_secret: str,
     base_url: str,
     token_verifier_config: JWTAuthConfig | StaticTokenConfig,
     scopes_supported: list[str] | None = None,
-    upstream_revocation_endpoint: str | None = None,
+    revocation_endpoint: str | None = None,
     redirect_path: str = "/oauth/callback",
 ) -> None:
     """Configure OAuth proxy authentication for non-DCR providers.
@@ -214,25 +214,25 @@ def configure_oauth_proxy(
     fixed client credentials.
 
     Args:
-        upstream_authorization_endpoint: Provider's authorization URL
-        upstream_token_endpoint: Provider's token endpoint URL
-        upstream_client_id: Your client ID registered with the provider
-        upstream_client_secret: Your client secret from the provider
+        authorization_endpoint: Provider's authorization URL
+        token_endpoint: Provider's token endpoint URL
+        client_id: Your client ID registered with the provider
+        client_secret: Your client secret from the provider
         base_url: This proxy server's public URL
         token_verifier_config: JWT or static token config for token verification
         scopes_supported: Scopes to advertise to MCP clients
-        upstream_revocation_endpoint: Optional token revocation endpoint
+        revocation_endpoint: Optional token revocation endpoint
         redirect_path: OAuth callback path (default: /oauth/callback)
 
     Note:
         Requires golf-mcp-enterprise package for implementation.
     """
     config = OAuthProxyConfig(
-        upstream_authorization_endpoint=upstream_authorization_endpoint,
-        upstream_token_endpoint=upstream_token_endpoint,
-        upstream_client_id=upstream_client_id,
-        upstream_client_secret=upstream_client_secret,
-        upstream_revocation_endpoint=upstream_revocation_endpoint,
+        authorization_endpoint=authorization_endpoint,
+        token_endpoint=token_endpoint,
+        client_id=client_id,
+        client_secret=client_secret,
+        revocation_endpoint=revocation_endpoint,
         base_url=base_url,
         redirect_path=redirect_path,
         scopes_supported=scopes_supported or [],
