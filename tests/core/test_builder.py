@@ -1508,7 +1508,7 @@ class TestFastMCPVersionDetection:
 
     def test_get_fastmcp_version_success(self, sample_project: Path) -> None:
         """Test that FastMCP version is correctly retrieved."""
-        with patch('fastmcp.__version__', '2.11.5'):
+        with patch("fastmcp.__version__", "2.11.5"):
             settings = load_settings(sample_project)
             builder = ManifestBuilder(sample_project, settings)
             assert builder._get_fastmcp_version() == "2.11.5"
@@ -1517,9 +1517,9 @@ class TestFastMCPVersionDetection:
         """Test fallback when FastMCP import fails."""
         settings = load_settings(sample_project)
         builder = ManifestBuilder(sample_project, settings)
-        
+
         # Mock the fastmcp import to raise ImportError
-        with patch.object(builder, '_get_fastmcp_version') as mock_version:
+        with patch.object(builder, "_get_fastmcp_version") as mock_version:
             mock_version.side_effect = ImportError
             try:
                 result = builder._get_fastmcp_version()
@@ -1531,9 +1531,9 @@ class TestFastMCPVersionDetection:
         """Test fallback when FastMCP has no __version__ attribute."""
         settings = load_settings(sample_project)
         builder = ManifestBuilder(sample_project, settings)
-        
+
         # Simply test the AttributeError case by patching the method
-        with patch.object(builder, '_get_fastmcp_version') as mock_method:
+        with patch.object(builder, "_get_fastmcp_version") as mock_method:
             # Simulate AttributeError being caught and None returned
             mock_method.side_effect = lambda: None  # Simulate the try/except returning None
             result = builder._get_fastmcp_version()
@@ -1541,7 +1541,7 @@ class TestFastMCPVersionDetection:
 
     def test_is_fastmcp_version_gte_with_2_11(self, sample_project: Path) -> None:
         """Test version comparison for FastMCP 2.11.x."""
-        with patch('fastmcp.__version__', '2.11.5'):
+        with patch("fastmcp.__version__", "2.11.5"):
             settings = load_settings(sample_project)
             builder = ManifestBuilder(sample_project, settings)
             assert not builder._is_fastmcp_version_gte("2.12.0")
@@ -1550,7 +1550,7 @@ class TestFastMCPVersionDetection:
 
     def test_is_fastmcp_version_gte_with_2_12(self, sample_project: Path) -> None:
         """Test version comparison for FastMCP 2.12.0+."""
-        with patch('fastmcp.__version__', '2.12.0'):
+        with patch("fastmcp.__version__", "2.12.0"):
             settings = load_settings(sample_project)
             builder = ManifestBuilder(sample_project, settings)
             assert builder._is_fastmcp_version_gte("2.12.0")
@@ -1561,14 +1561,14 @@ class TestFastMCPVersionDetection:
         """Test fallback behavior when version detection fails."""
         settings = load_settings(sample_project)
         builder = ManifestBuilder(sample_project, settings)
-        
+
         # Mock _get_fastmcp_version to return None (simulating version detection failure)
-        with patch.object(builder, '_get_fastmcp_version', return_value=None):
+        with patch.object(builder, "_get_fastmcp_version", return_value=None):
             assert not builder._is_fastmcp_version_gte("2.12.0")  # Safe fallback
 
     def test_is_fastmcp_version_gte_with_no_version(self, sample_project: Path) -> None:
         """Test fallback when version is None."""
-        with patch.object(ManifestBuilder, '_get_fastmcp_version', return_value=None):
+        with patch.object(ManifestBuilder, "_get_fastmcp_version", return_value=None):
             settings = load_settings(sample_project)
             builder = ManifestBuilder(sample_project, settings)
             assert not builder._is_fastmcp_version_gte("2.12.0")  # Safe fallback
@@ -1577,9 +1577,9 @@ class TestFastMCPVersionDetection:
         """Test that CodeGenerator also has version detection methods."""
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
-        
+
         # Test that methods exist and work
-        with patch('fastmcp.__version__', '2.12.0'):
+        with patch("fastmcp.__version__", "2.12.0"):
             assert generator._get_fastmcp_version() == "2.12.0"
             assert generator._is_fastmcp_version_gte("2.12.0")
             assert not generator._is_fastmcp_version_gte("2.13.0")
@@ -1590,7 +1590,7 @@ class TestVersionBasedCodeGeneration:
 
     def test_sse_transport_without_path_for_fastmcp_2_12(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that SSE transport omits path parameter for FastMCP 2.12+."""
-        with patch('fastmcp.__version__', '2.12.0'):
+        with patch("fastmcp.__version__", "2.12.0"):
             # Update project config for SSE transport
             config_file = sample_project / "golf.json"
             config = {
@@ -1630,11 +1630,11 @@ export = simple_tool
             # Verify path parameter is omitted for FastMCP 2.12+
             assert 'path="/sse"' not in server_content
             assert 'transport="sse"' in server_content
-            assert 'mcp.run(' in server_content
+            assert "mcp.run(" in server_content
 
     def test_sse_transport_with_path_for_fastmcp_2_11(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that SSE transport includes path parameter for FastMCP 2.11.x."""
-        with patch('fastmcp.__version__', '2.11.5'):
+        with patch("fastmcp.__version__", "2.11.5"):
             # Update project config for SSE transport
             config_file = sample_project / "golf.json"
             config = {
@@ -1674,11 +1674,11 @@ export = simple_tool
             # Verify path parameter is included for FastMCP 2.11.x
             assert 'path="/sse"' in server_content
             assert 'transport="sse"' in server_content
-            assert 'mcp.run(' in server_content
+            assert "mcp.run(" in server_content
 
     def test_http_transport_without_path_for_fastmcp_2_12(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that HTTP transport omits path parameter for FastMCP 2.12+."""
-        with patch('fastmcp.__version__', '2.12.0'):
+        with patch("fastmcp.__version__", "2.12.0"):
             # Update project config for HTTP transport
             config_file = sample_project / "golf.json"
             config = {
@@ -1718,11 +1718,11 @@ export = simple_tool
             # Verify path parameter is omitted for FastMCP 2.12+
             assert 'path="/mcp/"' not in server_content
             assert 'transport="streamable-http"' in server_content
-            assert 'mcp.run(' in server_content
+            assert "mcp.run(" in server_content
 
     def test_http_transport_with_path_for_fastmcp_2_11(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that HTTP transport includes path parameter for FastMCP 2.11.x."""
-        with patch('fastmcp.__version__', '2.11.5'):
+        with patch("fastmcp.__version__", "2.11.5"):
             # Update project config for HTTP transport
             config_file = sample_project / "golf.json"
             config = {
@@ -1762,12 +1762,12 @@ export = simple_tool
             # Verify path parameter is included for FastMCP 2.11.x
             assert 'path="/mcp/"' in server_content
             assert 'transport="streamable-http"' in server_content
-            assert 'mcp.run(' in server_content
+            assert "mcp.run(" in server_content
 
     def test_stdio_transport_unchanged_for_all_versions(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that stdio transport behavior is unchanged for all versions."""
         # Test with FastMCP 2.11.x
-        with patch('fastmcp.__version__', '2.11.5'):
+        with patch("fastmcp.__version__", "2.11.5"):
             # Update project config for stdio transport
             config_file = sample_project / "golf.json"
             config = {
@@ -1803,18 +1803,18 @@ export = simple_tool
             server_content = server_file.read_text()
 
             # stdio should never have path parameter
-            assert 'path=' not in server_content
+            assert "path=" not in server_content
             assert 'transport="stdio"' in server_content
-            assert 'mcp.run(' in server_content
+            assert "mcp.run(" in server_content
 
         # Test with FastMCP 2.12.0 - should be identical
-        with patch('fastmcp.__version__', '2.12.0'):
+        with patch("fastmcp.__version__", "2.12.0"):
             # Generate again with same config
             generator.generate()
 
             server_content_212 = server_file.read_text()
 
             # Should be identical behavior for stdio
-            assert 'path=' not in server_content_212
+            assert "path=" not in server_content_212
             assert 'transport="stdio"' in server_content_212
-            assert 'mcp.run(' in server_content_212
+            assert "mcp.run(" in server_content_212

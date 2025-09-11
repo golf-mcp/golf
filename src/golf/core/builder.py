@@ -172,33 +172,34 @@ class ManifestBuilder:
 
     def _get_fastmcp_version(self) -> str | None:
         """Get the installed FastMCP version.
-        
+
         Returns:
             FastMCP version string (e.g., "2.12.0") or None if not available
         """
         try:
             import fastmcp
+
             return fastmcp.__version__
         except (ImportError, AttributeError):
             return None
 
     def _is_fastmcp_version_gte(self, target_version: str) -> bool:
         """Check if installed FastMCP version is >= target version.
-        
+
         Args:
             target_version: Version string to compare against (e.g., "2.12.0")
-            
+
         Returns:
             True if FastMCP version >= target_version, False otherwise
         """
         try:
             from packaging import version
-            
+
             current_version = self._get_fastmcp_version()
             if current_version is None:
                 # Default to older behavior for safety
                 return False
-                
+
             return version.parse(current_version) >= version.parse(target_version)
         except (ImportError, ValueError):
             # Default to older behavior for safety
@@ -547,33 +548,34 @@ class CodeGenerator:
 
     def _get_fastmcp_version(self) -> str | None:
         """Get the installed FastMCP version.
-        
+
         Returns:
             FastMCP version string (e.g., "2.12.0") or None if not available
         """
         try:
             import fastmcp
+
             return fastmcp.__version__
         except (ImportError, AttributeError):
             return None
 
     def _is_fastmcp_version_gte(self, target_version: str) -> bool:
         """Check if installed FastMCP version is >= target version.
-        
+
         Args:
             target_version: Version string to compare against (e.g., "2.12.0")
-            
+
         Returns:
             True if FastMCP version >= target_version, False otherwise
         """
         try:
             from packaging import version
-            
+
             current_version = self._get_fastmcp_version()
             if current_version is None:
                 # Default to older behavior for safety
                 return False
-                
+
             return version.parse(current_version) >= version.parse(target_version)
         except (ImportError, ValueError):
             # Default to older behavior for safety
@@ -1046,8 +1048,7 @@ class CodeGenerator:
                     main_code.extend(
                         [
                             "    # Run SSE server using FastMCP's run method",
-                            '    mcp.run(transport="sse", host=host, port=port, '
-                            'log_level="info", show_banner=False)',
+                            '    mcp.run(transport="sse", host=host, port=port, log_level="info", show_banner=False)',
                         ]
                     )
                 else:
