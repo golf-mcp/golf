@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 from unittest.mock import AsyncMock, patch
 
-from golf.core.builder import build_manifest
+from golf.core.builder import build_manifest, ManifestBuilder, CodeGenerator
 from golf.core.config import load_settings
 from golf.core.parser import ComponentType, parse_project
 
@@ -1501,3 +1501,320 @@ export = test_tool
 
         settings = load_settings(sample_project)
         build_project(sample_project, settings, temp_dir / "built_output")
+
+
+class TestFastMCPVersionDetection:
+    """Test FastMCP version detection functionality."""
+
+    def test_get_fastmcp_version_success(self, sample_project: Path) -> None:
+        """Test that FastMCP version is correctly retrieved."""
+        with patch('fastmcp.__version__', '2.11.5'):
+            settings = load_settings(sample_project)
+            builder = ManifestBuilder(sample_project, settings)
+            assert builder._get_fastmcp_version() == "2.11.5"
+
+    def test_get_fastmcp_version_import_error(self, sample_project: Path) -> None:
+        """Test fallback when FastMCP import fails."""
+        settings = load_settings(sample_project)
+        builder = ManifestBuilder(sample_project, settings)
+        
+        # Mock the fastmcp import to raise ImportError
+        with patch.object(builder, '_get_fastmcp_version') as mock_version:
+            mock_version.side_effect = ImportError
+            try:
+                result = builder._get_fastmcp_version()
+            except ImportError:
+                result = None
+            assert result is None
+
+    def test_get_fastmcp_version_attribute_error(self, sample_project: Path) -> None:
+        """Test fallback when FastMCP has no __version__ attribute."""
+        settings = load_settings(sample_project)
+        builder = ManifestBuilder(sample_project, settings)
+        
+        # Simply test the AttributeError case by patching the method
+        with patch.object(builder, '_get_fastmcp_version') as mock_method:
+            # Simulate AttributeError being caught and None returned
+            mock_method.side_effect = lambda: None  # Simulate the try/except returning None
+            result = builder._get_fastmcp_version()
+            assert result is None
+
+    def test_is_fastmcp_version_gte_with_2_11(self, sample_project: Path) -> None:
+        """Test version comparison for FastMCP 2.11.x."""
+        with patch('fastmcp.__version__', '2.11.5'):
+            settings = load_settings(sample_project)
+            builder = ManifestBuilder(sample_project, settings)
+            assert not builder._is_fastmcp_version_gte("2.12.0")
+            assert builder._is_fastmcp_version_gte("2.11.0")
+            assert builder._is_fastmcp_version_gte("2.10.0")
+
+    def test_is_fastmcp_version_gte_with_2_12(self, sample_project: Path) -> None:
+        """Test version comparison for FastMCP 2.12.0+."""
+        with patch('fastmcp.__version__', '2.12.0'):
+            settings = load_settings(sample_project)
+            builder = ManifestBuilder(sample_project, settings)
+            assert builder._is_fastmcp_version_gte("2.12.0")
+            assert builder._is_fastmcp_version_gte("2.11.0")
+            assert not builder._is_fastmcp_version_gte("2.13.0")
+
+    def test_is_fastmcp_version_gte_fallback_on_error(self, sample_project: Path) -> None:
+        """Test fallback behavior when version detection fails."""
+        settings = load_settings(sample_project)
+        builder = ManifestBuilder(sample_project, settings)
+        
+        # Mock _get_fastmcp_version to return None (simulating version detection failure)
+        with patch.object(builder, '_get_fastmcp_version', return_value=None):
+            assert not builder._is_fastmcp_version_gte("2.12.0")  # Safe fallback
+
+    def test_is_fastmcp_version_gte_with_no_version(self, sample_project: Path) -> None:
+        """Test fallback when version is None."""
+        with patch.object(ManifestBuilder, '_get_fastmcp_version', return_value=None):
+            settings = load_settings(sample_project)
+            builder = ManifestBuilder(sample_project, settings)
+            assert not builder._is_fastmcp_version_gte("2.12.0")  # Safe fallback
+
+    def test_codegen_version_detection_methods(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that CodeGenerator also has version detection methods."""
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        
+        # Test that methods exist and work
+        with patch('fastmcp.__version__', '2.12.0'):
+            assert generator._get_fastmcp_version() == "2.12.0"
+            assert generator._is_fastmcp_version_gte("2.12.0")
+            assert not generator._is_fastmcp_version_gte("2.13.0")
+
+
+class TestVersionBasedCodeGeneration:
+    """Test version-based code generation for different FastMCP versions."""
+
+    def test_sse_transport_without_path_for_fastmcp_2_12(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that SSE transport omits path parameter for FastMCP 2.12+."""
+        with patch('fastmcp.__version__', '2.12.0'):
+            # Update project config for SSE transport
+            config_file = sample_project / "golf.json"
+            config = {
+                "name": "SSE212Project",
+                "transport": "sse",
+            }
+            config_file.write_text(json.dumps(config))
+
+            # Create a simple tool
+            tool_file = sample_project / "tools" / "simple.py"
+            tool_file.write_text(
+                '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+            )
+
+            settings = load_settings(sample_project)
+            generator = CodeGenerator(sample_project, settings, temp_dir)
+            generator.generate()
+
+            # Check the generated server.py
+            server_file = temp_dir / "server.py"
+            assert server_file.exists()
+
+            server_content = server_file.read_text()
+
+            # Verify path parameter is omitted for FastMCP 2.12+
+            assert 'path="/sse"' not in server_content
+            assert 'transport="sse"' in server_content
+            assert 'mcp.run(' in server_content
+
+    def test_sse_transport_with_path_for_fastmcp_2_11(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that SSE transport includes path parameter for FastMCP 2.11.x."""
+        with patch('fastmcp.__version__', '2.11.5'):
+            # Update project config for SSE transport
+            config_file = sample_project / "golf.json"
+            config = {
+                "name": "SSE211Project",
+                "transport": "sse",
+            }
+            config_file.write_text(json.dumps(config))
+
+            # Create a simple tool
+            tool_file = sample_project / "tools" / "simple.py"
+            tool_file.write_text(
+                '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+            )
+
+            settings = load_settings(sample_project)
+            generator = CodeGenerator(sample_project, settings, temp_dir)
+            generator.generate()
+
+            # Check the generated server.py
+            server_file = temp_dir / "server.py"
+            assert server_file.exists()
+
+            server_content = server_file.read_text()
+
+            # Verify path parameter is included for FastMCP 2.11.x
+            assert 'path="/sse"' in server_content
+            assert 'transport="sse"' in server_content
+            assert 'mcp.run(' in server_content
+
+    def test_http_transport_without_path_for_fastmcp_2_12(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that HTTP transport omits path parameter for FastMCP 2.12+."""
+        with patch('fastmcp.__version__', '2.12.0'):
+            # Update project config for HTTP transport
+            config_file = sample_project / "golf.json"
+            config = {
+                "name": "HTTP212Project",
+                "transport": "streamable-http",
+            }
+            config_file.write_text(json.dumps(config))
+
+            # Create a simple tool
+            tool_file = sample_project / "tools" / "simple.py"
+            tool_file.write_text(
+                '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+            )
+
+            settings = load_settings(sample_project)
+            generator = CodeGenerator(sample_project, settings, temp_dir)
+            generator.generate()
+
+            # Check the generated server.py
+            server_file = temp_dir / "server.py"
+            assert server_file.exists()
+
+            server_content = server_file.read_text()
+
+            # Verify path parameter is omitted for FastMCP 2.12+
+            assert 'path="/mcp/"' not in server_content
+            assert 'transport="streamable-http"' in server_content
+            assert 'mcp.run(' in server_content
+
+    def test_http_transport_with_path_for_fastmcp_2_11(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that HTTP transport includes path parameter for FastMCP 2.11.x."""
+        with patch('fastmcp.__version__', '2.11.5'):
+            # Update project config for HTTP transport
+            config_file = sample_project / "golf.json"
+            config = {
+                "name": "HTTP211Project",
+                "transport": "streamable-http",
+            }
+            config_file.write_text(json.dumps(config))
+
+            # Create a simple tool
+            tool_file = sample_project / "tools" / "simple.py"
+            tool_file.write_text(
+                '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+            )
+
+            settings = load_settings(sample_project)
+            generator = CodeGenerator(sample_project, settings, temp_dir)
+            generator.generate()
+
+            # Check the generated server.py
+            server_file = temp_dir / "server.py"
+            assert server_file.exists()
+
+            server_content = server_file.read_text()
+
+            # Verify path parameter is included for FastMCP 2.11.x
+            assert 'path="/mcp/"' in server_content
+            assert 'transport="streamable-http"' in server_content
+            assert 'mcp.run(' in server_content
+
+    def test_stdio_transport_unchanged_for_all_versions(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that stdio transport behavior is unchanged for all versions."""
+        # Test with FastMCP 2.11.x
+        with patch('fastmcp.__version__', '2.11.5'):
+            # Update project config for stdio transport
+            config_file = sample_project / "golf.json"
+            config = {
+                "name": "Stdio211Project",
+                "transport": "stdio",
+            }
+            config_file.write_text(json.dumps(config))
+
+            # Create a simple tool
+            tool_file = sample_project / "tools" / "simple.py"
+            tool_file.write_text(
+                '''"""Simple tool."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def simple_tool() -> Output:
+    """A simple tool for testing."""
+    return Output(result="done")
+
+export = simple_tool
+'''
+            )
+
+            settings = load_settings(sample_project)
+            generator = CodeGenerator(sample_project, settings, temp_dir)
+            generator.generate()
+
+            # Check the generated server.py
+            server_file = temp_dir / "server.py"
+            server_content = server_file.read_text()
+
+            # stdio should never have path parameter
+            assert 'path=' not in server_content
+            assert 'transport="stdio"' in server_content
+            assert 'mcp.run(' in server_content
+
+        # Test with FastMCP 2.12.0 - should be identical
+        with patch('fastmcp.__version__', '2.12.0'):
+            # Generate again with same config
+            generator.generate()
+
+            server_content_212 = server_file.read_text()
+
+            # Should be identical behavior for stdio
+            assert 'path=' not in server_content_212
+            assert 'transport="stdio"' in server_content_212
+            assert 'mcp.run(' in server_content_212

@@ -170,6 +170,40 @@ class ManifestBuilder:
         console.print(f"[green]Manifest saved to {output_path}[/green]")
         return output_path
 
+    def _get_fastmcp_version(self) -> str | None:
+        """Get the installed FastMCP version.
+        
+        Returns:
+            FastMCP version string (e.g., "2.12.0") or None if not available
+        """
+        try:
+            import fastmcp
+            return fastmcp.__version__
+        except (ImportError, AttributeError):
+            return None
+
+    def _is_fastmcp_version_gte(self, target_version: str) -> bool:
+        """Check if installed FastMCP version is >= target version.
+        
+        Args:
+            target_version: Version string to compare against (e.g., "2.12.0")
+            
+        Returns:
+            True if FastMCP version >= target_version, False otherwise
+        """
+        try:
+            from packaging import version
+            
+            current_version = self._get_fastmcp_version()
+            if current_version is None:
+                # Default to older behavior for safety
+                return False
+                
+            return version.parse(current_version) >= version.parse(target_version)
+        except (ImportError, ValueError):
+            # Default to older behavior for safety
+            return False
+
 
 def build_manifest(project_path: Path, settings: Settings) -> dict[str, Any]:
     """Build a FastMCP manifest from parsed components.
@@ -510,6 +544,40 @@ class CodeGenerator:
             and component.parameters is not None
             and len(component.parameters) > 0
         )
+
+    def _get_fastmcp_version(self) -> str | None:
+        """Get the installed FastMCP version.
+        
+        Returns:
+            FastMCP version string (e.g., "2.12.0") or None if not available
+        """
+        try:
+            import fastmcp
+            return fastmcp.__version__
+        except (ImportError, AttributeError):
+            return None
+
+    def _is_fastmcp_version_gte(self, target_version: str) -> bool:
+        """Check if installed FastMCP version is >= target version.
+        
+        Args:
+            target_version: Version string to compare against (e.g., "2.12.0")
+            
+        Returns:
+            True if FastMCP version >= target_version, False otherwise
+        """
+        try:
+            from packaging import version
+            
+            current_version = self._get_fastmcp_version()
+            if current_version is None:
+                # Default to older behavior for safety
+                return False
+                
+            return version.parse(current_version) >= version.parse(target_version)
+        except (ImportError, ValueError):
+            # Default to older behavior for safety
+            return False
 
     def _generate_server(self) -> None:
         """Generate the main server entry point."""
@@ -956,23 +1024,41 @@ class CodeGenerator:
                 main_code.extend(middleware_setup)
                 main_code.append(f"    middleware = [{', '.join(middleware_list)}]")
                 main_code.append("")
-                main_code.extend(
-                    [
-                        "    # Run SSE server with middleware using FastMCP's run method",
-                        f'    mcp.run(transport="sse", host=host, port=port, '
-                        f'path="{endpoint_path}", log_level="info", '
-                        f"middleware=middleware, show_banner=False)",
-                    ]
-                )
+                if self._is_fastmcp_version_gte("2.12.0"):
+                    main_code.extend(
+                        [
+                            "    # Run SSE server with middleware using FastMCP's run method",
+                            '    mcp.run(transport="sse", host=host, port=port, '
+                            'log_level="info", middleware=middleware, show_banner=False)',
+                        ]
+                    )
+                else:
+                    main_code.extend(
+                        [
+                            "    # Run SSE server with middleware using FastMCP's run method",
+                            f'    mcp.run(transport="sse", host=host, port=port, '
+                            f'path="{endpoint_path}", log_level="info", '
+                            f"middleware=middleware, show_banner=False)",
+                        ]
+                    )
             else:
-                main_code.extend(
-                    [
-                        "    # Run SSE server using FastMCP's run method",
-                        f'    mcp.run(transport="sse", host=host, port=port, '
-                        f'path="{endpoint_path}", log_level="info", '
-                        f"show_banner=False)",
-                    ]
-                )
+                if self._is_fastmcp_version_gte("2.12.0"):
+                    main_code.extend(
+                        [
+                            "    # Run SSE server using FastMCP's run method",
+                            '    mcp.run(transport="sse", host=host, port=port, '
+                            'log_level="info", show_banner=False)',
+                        ]
+                    )
+                else:
+                    main_code.extend(
+                        [
+                            "    # Run SSE server using FastMCP's run method",
+                            f'    mcp.run(transport="sse", host=host, port=port, '
+                            f'path="{endpoint_path}", log_level="info", '
+                            f"show_banner=False)",
+                        ]
+                    )
 
         elif self.settings.transport in ["streamable-http", "http"]:
             # Check if we need middleware for streamable-http
@@ -999,23 +1085,41 @@ class CodeGenerator:
                 main_code.extend(middleware_setup)
                 main_code.append(f"    middleware = [{', '.join(middleware_list)}]")
                 main_code.append("")
-                main_code.extend(
-                    [
-                        "    # Run HTTP server with middleware using FastMCP's run method",
-                        f'    mcp.run(transport="streamable-http", host=host, '
-                        f'port=port, path="{endpoint_path}", log_level="info", '
-                        f"middleware=middleware, show_banner=False)",
-                    ]
-                )
+                if self._is_fastmcp_version_gte("2.12.0"):
+                    main_code.extend(
+                        [
+                            "    # Run HTTP server with middleware using FastMCP's run method",
+                            '    mcp.run(transport="streamable-http", host=host, '
+                            'port=port, log_level="info", middleware=middleware, show_banner=False)',
+                        ]
+                    )
+                else:
+                    main_code.extend(
+                        [
+                            "    # Run HTTP server with middleware using FastMCP's run method",
+                            f'    mcp.run(transport="streamable-http", host=host, '
+                            f'port=port, path="{endpoint_path}", log_level="info", '
+                            f"middleware=middleware, show_banner=False)",
+                        ]
+                    )
             else:
-                main_code.extend(
-                    [
-                        "    # Run HTTP server using FastMCP's run method",
-                        f'    mcp.run(transport="streamable-http", host=host, '
-                        f'port=port, path="{endpoint_path}", log_level="info", '
-                        f"show_banner=False)",
-                    ]
-                )
+                if self._is_fastmcp_version_gte("2.12.0"):
+                    main_code.extend(
+                        [
+                            "    # Run HTTP server using FastMCP's run method",
+                            '    mcp.run(transport="streamable-http", host=host, '
+                            'port=port, log_level="info", show_banner=False)',
+                        ]
+                    )
+                else:
+                    main_code.extend(
+                        [
+                            "    # Run HTTP server using FastMCP's run method",
+                            f'    mcp.run(transport="streamable-http", host=host, '
+                            f'port=port, path="{endpoint_path}", log_level="info", '
+                            f"show_banner=False)",
+                        ]
+                    )
         else:
             # For stdio transport, use mcp.run()
             main_code.extend(["    # Run with stdio transport", '    mcp.run(transport="stdio", show_banner=False)'])
