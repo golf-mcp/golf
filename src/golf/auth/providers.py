@@ -538,7 +538,6 @@ class OAuthProxyConfig(BaseModel):
 
         return url
 
-
     @model_validator(mode="after")
     def validate_oauth_proxy_config(self) -> "OAuthProxyConfig":
         """Validate OAuth proxy configuration consistency."""
