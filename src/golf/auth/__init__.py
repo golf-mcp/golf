@@ -235,7 +235,7 @@ def configure_oauth_proxy(
         revocation_endpoint=revocation_endpoint,
         base_url=base_url,
         redirect_path=redirect_path,
-        scopes_supported=scopes_supported or [],
+        scopes_supported=scopes_supported,
         token_verifier_config=token_verifier_config,
     )
     configure_auth(config)
