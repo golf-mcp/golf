@@ -470,7 +470,9 @@ class OAuthProxyConfig(BaseModel):
     redirect_path: str = Field("/oauth/callback", description="OAuth callback path (must match provider registration)")
 
     # Scopes and token verification
-    scopes_supported: list[str] = Field(default_factory=list, description="Scopes supported by this proxy")
+    scopes_supported: list[str] | None = Field(
+        None, description="Scopes supported by this proxy (optional, can be empty for intelligent fallback)"
+    )
     token_verifier_config: JWTAuthConfig | StaticTokenConfig = Field(
         ..., description="Token verifier configuration for validating upstream tokens"
     )
@@ -536,32 +538,6 @@ class OAuthProxyConfig(BaseModel):
 
         return url
 
-    @field_validator("scopes_supported")
-    @classmethod
-    def validate_scopes_supported(cls, v: list[str]) -> list[str]:
-        """Validate scopes_supported format and security."""
-        if not v:
-            return v
-
-        cleaned_scopes = []
-        for scope in v:
-            scope = scope.strip()
-            if not scope:
-                raise ValueError("Scopes cannot be empty or whitespace-only")
-
-            # OAuth 2.0 scope format validation (RFC 6749)
-            if not all(32 < ord(c) < 127 and c not in ' "\\' for c in scope):
-                raise ValueError(
-                    f"Invalid scope format: '{scope}' - must be ASCII printable without spaces, quotes, or backslashes"
-                )
-
-            # Reasonable length limit to prevent abuse
-            if len(scope) > 128:
-                raise ValueError(f"Scope too long: '{scope}' - maximum 128 characters")
-
-            cleaned_scopes.append(scope)
-
-        return cleaned_scopes
 
     @model_validator(mode="after")
     def validate_oauth_proxy_config(self) -> "OAuthProxyConfig":
@@ -569,7 +545,8 @@ class OAuthProxyConfig(BaseModel):
         # Validate token verifier config is compatible
         if not isinstance(self.token_verifier_config, JWTAuthConfig | StaticTokenConfig):
             raise ValueError(
-                f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, got {type(self.token_verifier_config).__name__}"
+                f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, "
+                f"got {type(self.token_verifier_config).__name__}"
             )
 
         # Warn about HTTPS requirements in production
