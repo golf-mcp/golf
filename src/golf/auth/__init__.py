@@ -206,6 +206,7 @@ def configure_oauth_proxy(
     scopes_supported: list[str] | None = None,
     revocation_endpoint: str | None = None,
     redirect_path: str = "/oauth/callback",
+    **env_vars: str,
 ) -> None:
     """Configure OAuth proxy authentication for non-DCR providers.
 
@@ -223,6 +224,9 @@ def configure_oauth_proxy(
         scopes_supported: Scopes to advertise to MCP clients
         revocation_endpoint: Optional token revocation endpoint
         redirect_path: OAuth callback path (default: /oauth/callback)
+        **env_vars: Environment variable names (authorization_endpoint_env_var,
+            token_endpoint_env_var, client_id_env_var, client_secret_env_var,
+            base_url_env_var, revocation_endpoint_env_var)
 
     Note:
         Requires golf-mcp-enterprise package for implementation.
@@ -237,6 +241,7 @@ def configure_oauth_proxy(
         redirect_path=redirect_path,
         scopes_supported=scopes_supported,
         token_verifier_config=token_verifier_config,
+        **env_vars,
     )
     configure_auth(config)
 
