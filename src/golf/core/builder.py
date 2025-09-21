@@ -581,6 +581,70 @@ class CodeGenerator:
             # Default to older behavior for safety
             return False
 
+    def _generate_startup_section(self, project_path: Path) -> list[str]:
+        """Generate code section for startup.py execution during server runtime."""
+        startup_path = project_path / "startup.py"
+
+        if not startup_path.exists():
+            return []
+
+        return [
+            "",
+            "# Execute startup script for loading secrets and initialization",
+            "import importlib.util",
+            "import sys",
+            "import os",
+            "from pathlib import Path",
+            "",
+            "# Look for startup.py in the same directory as this server.py",
+            "startup_path = Path(__file__).parent / 'startup.py'",
+            "if startup_path.exists():",
+            "    try:",
+            "        # Save original environment for restoration",
+            "        try:",
+            "            original_dir = os.getcwd()",
+            "        except (FileNotFoundError, OSError):",
+            "            # Use server directory as fallback",
+            "            original_dir = str(Path(__file__).parent)",
+            "            os.chdir(original_dir)",
+            "        original_path = sys.path.copy()",
+            "        ",
+            "        # Set context for startup script execution",
+            "        script_dir = str(startup_path.parent)",
+            "        os.chdir(script_dir)",
+            "        sys.path.insert(0, script_dir)",
+            "        ",
+            "        # Debug output for startup script development",
+            "        if os.environ.get('GOLF_DEBUG'):",
+            "            print(f'Executing startup script: {startup_path}')",
+            "            print(f'Working directory: {os.getcwd()}')",
+            "            print(f'Python path: {sys.path[:3]}...')",  # Show first 3 entries
+            "        ",
+            "        # Load and execute startup script",
+            "        spec = importlib.util.spec_from_file_location('startup', startup_path)",
+            "        if spec and spec.loader:",
+            "            startup_module = importlib.util.module_from_spec(spec)",
+            "            spec.loader.exec_module(startup_module)",
+            "        else:",
+            "            print('Warning: Could not load startup.py', file=sys.stderr)",
+            "        ",
+            "    except Exception as e:",
+            "        import traceback",
+            "        print(f'Warning: Startup script execution failed: {e}', file=sys.stderr)",
+            "        print(traceback.format_exc(), file=sys.stderr)",
+            "        # Continue server startup despite script failure",
+            "        ",
+            "    finally:",
+            "        # Always restore original environment",
+            "        try:",
+            "            os.chdir(original_dir)",
+            "            sys.path[:] = original_path",
+            "        except Exception:",
+            "            # If directory restoration fails, at least fix the path",
+            "            sys.path[:] = original_path",
+            "",
+        ]
+
     def _generate_server(self) -> None:
         """Generate the main server entry point."""
         server_file = self.output_dir / "server.py"
@@ -935,6 +999,9 @@ class CodeGenerator:
             "",
         ]
 
+        # Generate startup section
+        startup_section = self._generate_startup_section(self.project_path)
+
         # OpenTelemetry setup code will be handled through imports and lifespan
 
         # Add auth setup code if auth is configured
@@ -1145,12 +1212,13 @@ class CodeGenerator:
             ]
 
         # Combine all sections
-        # Order: imports, env_section, auth_setup, server_code (mcp init),
+        # Order: imports, env_section, startup_section, auth_setup, server_code (mcp init),
         # early_telemetry_init, early_metrics_init, component_registrations,
         # metrics_route_code, health_check_code, main_code (run block)
         code = "\n".join(
             imports
             + env_section
+            + startup_section
             + auth_setup_code
             + server_code_lines
             + early_telemetry_init
@@ -1351,6 +1419,13 @@ def build_project(
     # Generate the code
     generator = CodeGenerator(project_path, settings, output_dir, build_env=build_env, copy_env=copy_env)
     generator.generate()
+
+    # Copy startup.py to output directory if it exists (after server generation)
+    startup_path = project_path / "startup.py"
+    if startup_path.exists():
+        dest_path = output_dir / "startup.py"
+        shutil.copy2(startup_path, dest_path)
+        console.print(get_status_text("success", "Startup script copied to build directory"))
 
     # Platform registration (only for prod builds)
     if build_env == "prod":
