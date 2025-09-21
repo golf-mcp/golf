@@ -625,7 +625,6 @@ class CodeGenerator:
             "        if spec and spec.loader:",
             "            startup_module = importlib.util.module_from_spec(spec)",
             "            spec.loader.exec_module(startup_module)",
-            "            print('Startup script executed successfully')",
             "        else:",
             "            print('Warning: Could not load startup.py', file=sys.stderr)",
             "        ",
