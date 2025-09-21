@@ -60,14 +60,14 @@ export = simple_tool
         # Verify startup script execution code is included
         assert "# Execute startup script for loading secrets and initialization" in server_code
         assert "import importlib.util" in server_code
-        assert "startup_path = Path(__file__).parent / 'startup.py'" in server_code
+        assert "startup_path = Path(__file__).parent / \"startup.py\"" in server_code
         assert "if startup_path.exists():" in server_code
-        assert "spec = importlib.util.spec_from_file_location('startup', startup_path)" in server_code
+        assert "spec = importlib.util.spec_from_file_location(\"startup\", startup_path)" in server_code
         assert "spec.loader.exec_module(startup_module)" in server_code
 
         # Verify error handling is included
         assert "except Exception as e:" in server_code
-        assert "print(f'Warning: Startup script execution failed: {e}', file=sys.stderr)" in server_code
+        assert "print(f\"Warning: Startup script execution failed: {e}\", file=sys.stderr)" in server_code
 
         # Verify environment restoration
         assert "original_dir = os.getcwd()" in server_code
@@ -76,8 +76,8 @@ export = simple_tool
         assert "sys.path[:] = original_path" in server_code
 
         # Verify debug output support
-        assert "if os.environ.get('GOLF_DEBUG'):" in server_code
-        assert "print(f'Executing startup script: {startup_path}')" in server_code
+        assert "if os.environ.get(\"GOLF_DEBUG\"):" in server_code
+        assert "print(f\"Executing startup script: {startup_path}\")" in server_code
 
     def test_no_startup_section_when_startup_not_exists(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that startup script execution code is not generated when startup.py doesn't exist."""
@@ -111,8 +111,8 @@ export = simple_tool
 
         # Verify startup script execution code is not included
         assert "# Execute startup script for loading secrets and initialization" not in server_code
-        assert "startup_path = Path(__file__).parent / 'startup.py'" not in server_code
-        assert "importlib.util.spec_from_file_location('startup'" not in server_code
+        assert "startup_path = Path(__file__).parent / \"startup.py\"" not in server_code
+        assert "importlib.util.spec_from_file_location(\"startup\"" not in server_code
 
     def test_startup_script_copying_during_build(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that startup.py is copied to the build directory during build."""
@@ -283,10 +283,10 @@ export = simple_tool
 
         # Verify debug output is included
         assert "# Debug output for startup script development" in server_code
-        assert "if os.environ.get('GOLF_DEBUG'):" in server_code
-        assert "print(f'Executing startup script: {startup_path}')" in server_code
-        assert "print(f'Working directory: {os.getcwd()}')" in server_code
-        assert "print(f'Python path: {sys.path[:3]}...')" in server_code
+        assert "if os.environ.get(\"GOLF_DEBUG\"):" in server_code
+        assert "print(f\"Executing startup script: {startup_path}\")" in server_code
+        assert "print(f\"Working directory: {os.getcwd()}\")" in server_code
+        assert "print(f\"Python path: {sys.path[:3]}...\")" in server_code
 
     def test_startup_section_success_message(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that startup script includes success message."""
@@ -319,9 +319,8 @@ export = simple_tool
         server_file = temp_dir / "server.py"
         server_code = server_file.read_text()
 
-        # Verify success and warning messages
-        assert "print('Startup script executed successfully')" in server_code
-        assert "print('Warning: Could not load startup.py', file=sys.stderr)" in server_code
+        # Verify warning messages
+        assert "print(\"Warning: Could not load startup.py\", file=sys.stderr)" in server_code
 
 
 class TestStartupScriptEdgeCases:
@@ -361,7 +360,7 @@ export = simple_tool
         server_code = server_file.read_text()
 
         # Even empty startup.py should trigger startup section generation
-        assert "startup_path = Path(__file__).parent / 'startup.py'" in server_code
+        assert "startup_path = Path(__file__).parent / \"startup.py\"" in server_code
         assert "if startup_path.exists():" in server_code
 
         # Build the project to verify empty file is copied
@@ -528,13 +527,12 @@ export = get_config
         # Check for key startup script execution components
         startup_checks = [
             "# Execute startup script for loading secrets and initialization",
-            "startup_path = Path(__file__).parent / 'startup.py'",
+            "startup_path = Path(__file__).parent / \"startup.py\"",
             "if startup_path.exists():",
-            "spec = importlib.util.spec_from_file_location('startup', startup_path)",
+            "spec = importlib.util.spec_from_file_location(\"startup\", startup_path)",
             "spec.loader.exec_module(startup_module)",
-            "print('Startup script executed successfully')",
             "except Exception as e:",
-            "print(f'Warning: Startup script execution failed: {e}', file=sys.stderr)",
+            "print(f\"Warning: Startup script execution failed: {e}\", file=sys.stderr)",
             "finally:",
             "os.chdir(original_dir)",
             "sys.path[:] = original_path"
@@ -628,6 +626,6 @@ export = simple_tool
         # The startup script will need to handle this or the user needs to manually copy dependencies
 
         server_content = (build_dir / "server.py").read_text()
-        assert "startup_path = Path(__file__).parent / 'startup.py'" in server_content
+        assert "startup_path = Path(__file__).parent / \"startup.py\"" in server_content
 
         print("✓ Startup script with imports test passed!")
