@@ -645,6 +645,129 @@ class CodeGenerator:
             "",
         ]
 
+    def _generate_readiness_section(self, project_path: Path) -> list[str]:
+        """Generate code section for readiness.py execution during server runtime."""
+        readiness_path = project_path / "readiness.py"
+        
+        if not readiness_path.exists():
+            return [
+                "# Default readiness check - no custom readiness.py found",
+                "@mcp.custom_route('/ready', methods=[\"GET\"])",
+                "async def readiness_check(request: Request) -> JSONResponse:",
+                '    """Readiness check endpoint for Kubernetes and load balancers."""',
+                '    return JSONResponse({"status": "pass"}, status_code=200)',
+                "",
+            ]
+        
+        return [
+            "# Custom readiness check from readiness.py",
+            "@mcp.custom_route('/ready', methods=[\"GET\"])",
+            "async def readiness_check(request: Request) -> JSONResponse:",
+            '    """Readiness check endpoint for Kubernetes and load balancers."""',
+            "    return await _call_check_function('readiness')",
+            "",
+        ]
+
+    def _generate_health_section(self, project_path: Path) -> list[str]:
+        """Generate code section for health.py execution during server runtime."""  
+        health_path = project_path / "health.py"
+        
+        if not health_path.exists():
+            # Check if legacy health configuration is used
+            if self.settings.health_check_enabled:
+                return [
+                    "# Legacy health check configuration (deprecated)",
+                    "@mcp.custom_route('" + self.settings.health_check_path + "', methods=[\"GET\"])",
+                    "async def health_check(request: Request) -> PlainTextResponse:",
+                    '    """Health check endpoint for Kubernetes and load balancers."""',
+                    f'    return PlainTextResponse("{self.settings.health_check_response}")',
+                    "",
+                ]
+            else:
+                return [
+                    "# Default health check - no custom health.py found",
+                    "@mcp.custom_route('/health', methods=[\"GET\"])",
+                    "async def health_check(request: Request) -> JSONResponse:",
+                    '    """Health check endpoint for Kubernetes and load balancers."""',
+                    '    return JSONResponse({"status": "pass"}, status_code=200)',
+                    "",
+                ]
+        
+        return [
+            "# Custom health check from health.py", 
+            "@mcp.custom_route('/health', methods=[\"GET\"])",
+            "async def health_check(request: Request) -> JSONResponse:",
+            '    """Health check endpoint for Kubernetes and load balancers."""',
+            "    return await _call_check_function('health')",
+            "",
+        ]
+
+    def _generate_check_function_helper(self) -> list[str]:
+        """Generate helper function to call custom check functions."""
+        return [
+            "# Helper function to call custom check functions",
+            "async def _call_check_function(check_type: str) -> JSONResponse:",
+            '    """Call custom check function and handle errors gracefully."""',
+            "    import importlib.util",
+            "    import traceback",
+            "    from pathlib import Path",
+            "    from datetime import datetime",
+            "    ",
+            "    try:",
+            "        # Load the custom check module",
+            "        module_path = Path(__file__).parent / f'{check_type}.py'",
+            "        if not module_path.exists():",
+            '            return JSONResponse({"status": "pass"}, status_code=200)',
+            "        ",
+            "        spec = importlib.util.spec_from_file_location(f'{check_type}_check', module_path)",
+            "        if spec and spec.loader:",
+            "            module = importlib.util.module_from_spec(spec)",
+            "            spec.loader.exec_module(module)",
+            "            ",
+            "            # Call the check function if it exists",
+            "            if hasattr(module, 'check'):",
+            "                result = module.check()",
+            "                ",
+            "                # Handle different return types",
+            "                if isinstance(result, dict):",
+            "                    # User returned structured response",
+            "                    status_code = result.get('status_code', 200)",
+            "                    response_data = {k: v for k, v in result.items() if k != 'status_code'}",
+            "                elif isinstance(result, bool):",
+            "                    # User returned simple boolean",
+            "                    status_code = 200 if result else 503",
+            "                    response_data = {",
+            '                        "status": "pass" if result else "fail",',
+            '                        "timestamp": datetime.utcnow().isoformat()',
+            "                    }",
+            "                elif result is None:",
+            "                    # User returned nothing - assume success",
+            "                    status_code = 200",
+            '                    response_data = {"status": "pass"}',
+            "                else:",
+            "                    # User returned something else - treat as success message",
+            "                    status_code = 200",
+            "                    response_data = {",
+            '                        "status": "pass",',
+            '                        "message": str(result)',
+            "                    }",
+            "                ",
+            "                return JSONResponse(response_data, status_code=status_code)",
+            "            else:",
+            '                return JSONResponse({"status": "fail", "error": f"No check() function found in {check_type}.py"}, status_code=503)',
+            "    ",
+            "    except Exception as e:",
+            "        # Log error and return failure response",
+            "        import sys",
+            '        print(f"Error calling {check_type} check function: {e}", file=sys.stderr)',
+            "        print(traceback.format_exc(), file=sys.stderr)",
+            "        return JSONResponse({",
+            '            "status": "fail",',
+            '            "error": f"Error calling {check_type} check function: {str(e)}"',
+            '        }, status_code=503)',
+            "",
+        ]
+
     def _generate_server(self) -> None:
         """Generate the main server entry point."""
         server_file = self.output_dir / "server.py"
@@ -700,14 +823,14 @@ class CodeGenerator:
             imports.extend(generate_metrics_instrumentation())
             imports.extend(generate_session_tracking())
 
-        # Add health check imports if enabled
-        if self.settings.health_check_enabled:
-            imports.extend(
-                [
-                    "from starlette.requests import Request",
-                    "from starlette.responses import PlainTextResponse",
-                ]
-            )
+        # Add health check imports if enabled or if custom check files exist
+        readiness_exists = (self.project_path / "readiness.py").exists()
+        health_exists = (self.project_path / "health.py").exists()
+        if readiness_exists or health_exists or self.settings.health_check_enabled:
+            imports.extend([
+                "from starlette.requests import Request", 
+                "from starlette.responses import JSONResponse, PlainTextResponse",
+            ])
 
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
@@ -1199,22 +1322,15 @@ class CodeGenerator:
 
             metrics_route_code = generate_metrics_route(self.settings.metrics_path)
 
-        # Add health check route if enabled
-        health_check_code = []
-        if self.settings.health_check_enabled:
-            health_check_code = [
-                "# Add health check route",
-                "@mcp.custom_route('" + self.settings.health_check_path + '\', methods=["GET"])',
-                "async def health_check(request: Request) -> PlainTextResponse:",
-                '    """Health check endpoint for Kubernetes and load balancers."""',
-                (f'    return PlainTextResponse("{self.settings.health_check_response}")'),
-                "",
-            ]
+        # Generate readiness and health check sections
+        readiness_section = self._generate_readiness_section(self.project_path)
+        health_section = self._generate_health_section(self.project_path) 
+        check_helper_section = self._generate_check_function_helper()
 
         # Combine all sections
         # Order: imports, env_section, startup_section, auth_setup, server_code (mcp init),
         # early_telemetry_init, early_metrics_init, component_registrations,
-        # metrics_route_code, health_check_code, main_code (run block)
+        # metrics_route_code, check_helper_section, readiness_section, health_section, main_code (run block)
         code = "\n".join(
             imports
             + env_section
@@ -1225,7 +1341,9 @@ class CodeGenerator:
             + early_metrics_init
             + component_registrations
             + metrics_route_code
-            + health_check_code
+            + check_helper_section
+            + readiness_section
+            + health_section
             + main_code
         )
 
@@ -1426,6 +1544,17 @@ def build_project(
         dest_path = output_dir / "startup.py"
         shutil.copy2(startup_path, dest_path)
         console.print(get_status_text("success", "Startup script copied to build directory"))
+
+    # Copy optional check files to build directory
+    readiness_path = project_path / "readiness.py"
+    if readiness_path.exists():
+        shutil.copy2(readiness_path, output_dir)
+        console.print(get_status_text("success", "Readiness script copied to build directory"))
+
+    health_path = project_path / "health.py"  
+    if health_path.exists():
+        shutil.copy2(health_path, output_dir)
+        console.print(get_status_text("success", "Health script copied to build directory"))
 
     # Platform registration (only for prod builds)
     if build_env == "prod":
