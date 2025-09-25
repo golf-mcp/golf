@@ -485,12 +485,12 @@ export = simple_tool
         """Test default readiness endpoint when no readiness.py exists."""
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
-        
+
         generator = CodeGenerator(sample_project, settings, output_dir)
-        
+
         # Test readiness section generation
         readiness_section = generator._generate_readiness_section(sample_project)
-        
+
         # Should contain default readiness endpoint
         readiness_code = "\n".join(readiness_section)
         assert "# Default readiness check" in readiness_code
@@ -503,15 +503,15 @@ export = simple_tool
         # Create readiness.py file
         readiness_file = sample_project / "readiness.py"
         readiness_file.write_text("def check():\n    return True")
-        
+
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
-        
+
         generator = CodeGenerator(sample_project, settings, output_dir)
-        
+
         # Test readiness section generation
         readiness_section = generator._generate_readiness_section(sample_project)
-        
+
         # Should contain custom readiness endpoint
         readiness_code = "\n".join(readiness_section)
         assert "# Custom readiness check from readiness.py" in readiness_code
@@ -524,15 +524,15 @@ export = simple_tool
         # Create health.py file
         health_file = sample_project / "health.py"
         health_file.write_text("def check():\n    return True")
-        
+
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
-        
+
         generator = CodeGenerator(sample_project, settings, output_dir)
-        
+
         # Test health section generation
         health_section = generator._generate_health_section(sample_project)
-        
+
         # Should contain custom health endpoint
         health_code = "\n".join(health_section)
         assert "# Custom health check from health.py" in health_code
@@ -544,12 +544,12 @@ export = simple_tool
         """Test helper function generation."""
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
-        
+
         generator = CodeGenerator(sample_project, settings, output_dir)
-        
+
         # Test helper function generation
         helper_section = generator._generate_check_function_helper()
-        
+
         # Should contain helper function
         helper_code = "\n".join(helper_section)
         assert "async def _call_check_function(check_type: str)" in helper_code
@@ -561,22 +561,26 @@ export = simple_tool
     def test_full_build_with_readiness_and_health_files(self, sample_project: Path, temp_dir: Path) -> None:
         """Test complete build process with custom readiness and health files."""
         # Create custom readiness.py
-        (sample_project / "readiness.py").write_text("""
+        (sample_project / "readiness.py").write_text(
+            """
 def check():
     return {
         "status": "pass",
         "services": ["service-a", "service-b"]
     }
-""")
-        
+"""
+        )
+
         # Create custom health.py
-        (sample_project / "health.py").write_text("""
+        (sample_project / "health.py").write_text(
+            """
 def check():
     return {
         "status": "pass",
         "uptime": "5 minutes"
     }
-""")
+"""
+        )
 
         # Create a simple tool to ensure we have components
         tool_file = sample_project / "tools" / "simple.py"
@@ -597,30 +601,30 @@ export = simple_tool
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
-        
+
         generator = CodeGenerator(sample_project, settings, output_dir)
         generator.generate()
-        
+
         # Check generated server.py
         server_file = output_dir / "server.py"
         assert server_file.exists()
-        
+
         server_content = server_file.read_text()
-        
+
         # Should have custom readiness endpoint
         assert "# Custom readiness check from readiness.py" in server_content
         assert '_call_check_function("readiness")' in server_content
-        
+
         # Should have custom health endpoint
         assert "# Custom health check from health.py" in server_content
         assert '_call_check_function("health")' in server_content
-        
+
         # Should have helper function
         assert "async def _call_check_function(check_type: str)" in server_content
-        
+
         # Should have required imports
         assert "from starlette.responses import JSONResponse" in server_content
-        
+
         # Check that custom files were copied (they should exist if copy logic runs during generate())
         readiness_copied = (output_dir / "readiness.py").exists()
         health_copied = (output_dir / "health.py").exists()
