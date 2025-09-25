@@ -305,7 +305,7 @@ export = simple_tool
 
         # Should contain health check imports
         assert "from starlette.requests import Request" in server_code
-        assert "from starlette.responses import PlainTextResponse" in server_code
+        assert "from starlette.responses import JSONResponse, PlainTextResponse" in server_code
 
         # Should contain health check route definition
         assert '@mcp.custom_route("/health", methods=["GET"])' in server_code
@@ -482,7 +482,12 @@ export = simple_tool
         assert '"""Health check endpoint for Kubernetes and load balancers."""' in server_code
 
     def test_default_readiness_endpoint_generation(self, sample_project: Path, temp_dir: Path) -> None:
-        """Test default readiness endpoint when no readiness.py exists."""
+        """Test default readiness endpoint when no readiness.py exists and health checks are enabled."""
+        # Enable health checks to trigger default readiness generation
+        config_file = sample_project / "golf.json"
+        config = {"name": "TestProject", "health_check_enabled": True}
+        config_file.write_text(json.dumps(config))
+        
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
 
