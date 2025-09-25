@@ -664,10 +664,11 @@ class CodeGenerator:
 
         return [
             "# Custom readiness check from readiness.py",
+            "from readiness import check as readiness_check_func",
             "@mcp.custom_route('/ready', methods=[\"GET\"])",
-            "async def readiness_check(request: Request) -> JSONResponse:",
+            "async def readiness_check(request: Request):",
             '    """Readiness check endpoint for Kubernetes and load balancers."""',
-            "    return await _call_check_function('readiness')",
+            "    return readiness_check_func()",
             "",
         ]
 
@@ -692,10 +693,11 @@ class CodeGenerator:
 
         return [
             "# Custom health check from health.py",
+            "from health import check as health_check_func",
             "@mcp.custom_route('/health', methods=[\"GET\"])",
-            "async def health_check(request: Request) -> JSONResponse:",
+            "async def health_check(request: Request):",
             '    """Health check endpoint for Kubernetes and load balancers."""',
-            "    return await _call_check_function('health')",
+            "    return health_check_func()",
             "",
         ]
 
@@ -843,6 +845,10 @@ class CodeGenerator:
 
             if response_types:
                 imports.append(f"from starlette.responses import {', '.join(response_types)}")
+        
+        # Import Request for custom check routes (they still need the request parameter)
+        elif readiness_exists or health_exists:
+            imports.append("from starlette.requests import Request")
 
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
@@ -1338,13 +1344,8 @@ class CodeGenerator:
         readiness_section = self._generate_readiness_section(self.project_path)
         health_section = self._generate_health_section(self.project_path)
 
-        # Only generate check helper if we have custom check files
-        readiness_exists = (self.project_path / "readiness.py").exists()
-        health_exists = (self.project_path / "health.py").exists()
-        if readiness_exists or health_exists:
-            check_helper_section = self._generate_check_function_helper()
-        else:
-            check_helper_section = []
+        # No longer need the check helper function since we use direct imports
+        check_helper_section = []
 
         # Combine all sections
         # Order: imports, env_section, startup_section, auth_setup, server_code (mcp init),
