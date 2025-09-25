@@ -522,7 +522,8 @@ export = simple_tool
         assert "# Custom readiness check from readiness.py" in readiness_code
         assert "@mcp.custom_route('/ready', methods=[\"GET\"])" in readiness_code
         assert "async def readiness_check" in readiness_code
-        assert "_call_check_function('readiness')" in readiness_code
+        assert "from readiness import check as readiness_check_func" in readiness_code
+        assert "return readiness_check_func()" in readiness_code
 
     def test_custom_health_endpoint_generation(self, sample_project: Path, temp_dir: Path) -> None:
         """Test custom health endpoint when health.py exists."""
@@ -543,7 +544,8 @@ export = simple_tool
         assert "# Custom health check from health.py" in health_code
         assert "@mcp.custom_route('/health', methods=[\"GET\"])" in health_code
         assert "async def health_check" in health_code
-        assert "_call_check_function('health')" in health_code
+        assert "from health import check as health_check_func" in health_code
+        assert "return health_check_func()" in health_code
 
     def test_check_function_helper_generation(self, sample_project: Path, temp_dir: Path) -> None:
         """Test helper function generation."""
@@ -618,17 +620,20 @@ export = simple_tool
 
         # Should have custom readiness endpoint
         assert "# Custom readiness check from readiness.py" in server_content
-        assert '_call_check_function("readiness")' in server_content
+        assert "from readiness import check as readiness_check_func" in server_content
+        assert "return readiness_check_func()" in server_content
 
         # Should have custom health endpoint
         assert "# Custom health check from health.py" in server_content
-        assert '_call_check_function("health")' in server_content
+        assert "from health import check as health_check_func" in server_content
+        assert "return health_check_func()" in server_content
 
-        # Should have helper function
-        assert "async def _call_check_function(check_type: str)" in server_content
+        # Should NOT have helper function (using direct imports now)
+        assert "async def _call_check_function(check_type: str)" not in server_content
 
-        # Should have required imports
-        assert "from starlette.responses import JSONResponse" in server_content
+        # Should only have Request import (users handle their own response types)
+        assert "from starlette.requests import Request" in server_content
+        assert "from starlette.responses import JSONResponse" not in server_content
 
         # Check that custom files were copied (they should exist if copy logic runs during generate())
         readiness_copied = (output_dir / "readiness.py").exists()
