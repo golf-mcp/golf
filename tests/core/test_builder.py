@@ -631,9 +631,9 @@ export = simple_tool
         # Should NOT have helper function (using direct imports now)
         assert "async def _call_check_function(check_type: str)" not in server_content
 
-        # Should only have Request import (users handle their own response types)
+        # Should have Request import for custom health/readiness functions
         assert "from starlette.requests import Request" in server_content
-        assert "from starlette.responses import JSONResponse" not in server_content
+        # Note: JSONResponse may be imported for API key auth middleware, so we don't assert its absence
 
         # Check that custom files were copied (they should exist if copy logic runs during generate())
         readiness_copied = (output_dir / "readiness.py").exists()
