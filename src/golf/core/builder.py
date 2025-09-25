@@ -650,6 +650,9 @@ class CodeGenerator:
         readiness_path = project_path / "readiness.py"
 
         if not readiness_path.exists():
+            # Only generate default readiness if health checks are explicitly enabled
+            if not self.settings.health_check_enabled:
+                return []
             return [
                 "# Default readiness check - no custom readiness.py found",
                 "@mcp.custom_route('/ready', methods=[\"GET\"])",
@@ -684,14 +687,8 @@ class CodeGenerator:
                     "",
                 ]
             else:
-                return [
-                    "# Default health check - no custom health.py found",
-                    "@mcp.custom_route('/health', methods=[\"GET\"])",
-                    "async def health_check(request: Request) -> JSONResponse:",
-                    '    """Health check endpoint for Kubernetes and load balancers."""',
-                    '    return JSONResponse({"status": "pass"}, status_code=200)',
-                    "",
-                ]
+                # If health checks are disabled, return empty (no default health check)
+                return []
 
         return [
             "# Custom health check from health.py",
@@ -826,16 +823,26 @@ class CodeGenerator:
             imports.extend(generate_metrics_instrumentation())
             imports.extend(generate_session_tracking())
 
-        # Add health check imports if enabled or if custom check files exist
+        # Add health check imports only when we generate default endpoints
         readiness_exists = (self.project_path / "readiness.py").exists()
         health_exists = (self.project_path / "health.py").exists()
-        if readiness_exists or health_exists or self.settings.health_check_enabled:
-            imports.extend(
-                [
-                    "from starlette.requests import Request",
-                    "from starlette.responses import JSONResponse, PlainTextResponse",
-                ]
-            )
+        
+        # Only import starlette when we generate default endpoints (not when custom files exist)
+        will_generate_default_readiness = not readiness_exists and self.settings.health_check_enabled
+        will_generate_default_health = not health_exists and self.settings.health_check_enabled
+        
+        if will_generate_default_readiness or will_generate_default_health:
+            imports.append("from starlette.requests import Request")
+            
+            # Determine response types needed for default endpoints
+            response_types = []
+            if will_generate_default_readiness:
+                response_types.append("JSONResponse")
+            if will_generate_default_health:
+                response_types.append("PlainTextResponse")
+                
+            if response_types:
+                imports.append(f"from starlette.responses import {', '.join(response_types)}")
 
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
@@ -1330,7 +1337,14 @@ class CodeGenerator:
         # Generate readiness and health check sections
         readiness_section = self._generate_readiness_section(self.project_path)
         health_section = self._generate_health_section(self.project_path)
-        check_helper_section = self._generate_check_function_helper()
+        
+        # Only generate check helper if we have custom check files
+        readiness_exists = (self.project_path / "readiness.py").exists()
+        health_exists = (self.project_path / "health.py").exists()
+        if readiness_exists or health_exists:
+            check_helper_section = self._generate_check_function_helper()
+        else:
+            check_helper_section = []
 
         # Combine all sections
         # Order: imports, env_section, startup_section, auth_setup, server_code (mcp init),
