@@ -648,7 +648,7 @@ class CodeGenerator:
     def _generate_readiness_section(self, project_path: Path) -> list[str]:
         """Generate code section for readiness.py execution during server runtime."""
         readiness_path = project_path / "readiness.py"
-        
+
         if not readiness_path.exists():
             return [
                 "# Default readiness check - no custom readiness.py found",
@@ -658,7 +658,7 @@ class CodeGenerator:
                 '    return JSONResponse({"status": "pass"}, status_code=200)',
                 "",
             ]
-        
+
         return [
             "# Custom readiness check from readiness.py",
             "@mcp.custom_route('/ready', methods=[\"GET\"])",
@@ -669,15 +669,15 @@ class CodeGenerator:
         ]
 
     def _generate_health_section(self, project_path: Path) -> list[str]:
-        """Generate code section for health.py execution during server runtime."""  
+        """Generate code section for health.py execution during server runtime."""
         health_path = project_path / "health.py"
-        
+
         if not health_path.exists():
             # Check if legacy health configuration is used
             if self.settings.health_check_enabled:
                 return [
                     "# Legacy health check configuration (deprecated)",
-                    "@mcp.custom_route('" + self.settings.health_check_path + "', methods=[\"GET\"])",
+                    "@mcp.custom_route('" + self.settings.health_check_path + '\', methods=["GET"])',
                     "async def health_check(request: Request) -> PlainTextResponse:",
                     '    """Health check endpoint for Kubernetes and load balancers."""',
                     f'    return PlainTextResponse("{self.settings.health_check_response}")',
@@ -692,9 +692,9 @@ class CodeGenerator:
                     '    return JSONResponse({"status": "pass"}, status_code=200)',
                     "",
                 ]
-        
+
         return [
-            "# Custom health check from health.py", 
+            "# Custom health check from health.py",
             "@mcp.custom_route('/health', methods=[\"GET\"])",
             "async def health_check(request: Request) -> JSONResponse:",
             '    """Health check endpoint for Kubernetes and load balancers."""',
@@ -754,7 +754,10 @@ class CodeGenerator:
             "                ",
             "                return JSONResponse(response_data, status_code=status_code)",
             "            else:",
-            '                return JSONResponse({"status": "fail", "error": f"No check() function found in {check_type}.py"}, status_code=503)',
+            '                return JSONResponse(',
+            '                    {"status": "fail", "error": f"No check() function found in {check_type}.py"},',
+            '                    status_code=503',
+            '                )',
             "    ",
             "    except Exception as e:",
             "        # Log error and return failure response",
@@ -764,7 +767,7 @@ class CodeGenerator:
             "        return JSONResponse({",
             '            "status": "fail",',
             '            "error": f"Error calling {check_type} check function: {str(e)}"',
-            '        }, status_code=503)',
+            "        }, status_code=503)",
             "",
         ]
 
@@ -827,10 +830,12 @@ class CodeGenerator:
         readiness_exists = (self.project_path / "readiness.py").exists()
         health_exists = (self.project_path / "health.py").exists()
         if readiness_exists or health_exists or self.settings.health_check_enabled:
-            imports.extend([
-                "from starlette.requests import Request", 
-                "from starlette.responses import JSONResponse, PlainTextResponse",
-            ])
+            imports.extend(
+                [
+                    "from starlette.requests import Request",
+                    "from starlette.responses import JSONResponse, PlainTextResponse",
+                ]
+            )
 
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
@@ -1324,7 +1329,7 @@ class CodeGenerator:
 
         # Generate readiness and health check sections
         readiness_section = self._generate_readiness_section(self.project_path)
-        health_section = self._generate_health_section(self.project_path) 
+        health_section = self._generate_health_section(self.project_path)
         check_helper_section = self._generate_check_function_helper()
 
         # Combine all sections
@@ -1551,7 +1556,7 @@ def build_project(
         shutil.copy2(readiness_path, output_dir)
         console.print(get_status_text("success", "Readiness script copied to build directory"))
 
-    health_path = project_path / "health.py"  
+    health_path = project_path / "health.py"
     if health_path.exists():
         shutil.copy2(health_path, output_dir)
         console.print(get_status_text("success", "Health script copied to build directory"))
