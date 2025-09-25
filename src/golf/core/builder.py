@@ -826,21 +826,21 @@ class CodeGenerator:
         # Add health check imports only when we generate default endpoints
         readiness_exists = (self.project_path / "readiness.py").exists()
         health_exists = (self.project_path / "health.py").exists()
-        
+
         # Only import starlette when we generate default endpoints (not when custom files exist)
         will_generate_default_readiness = not readiness_exists and self.settings.health_check_enabled
         will_generate_default_health = not health_exists and self.settings.health_check_enabled
-        
+
         if will_generate_default_readiness or will_generate_default_health:
             imports.append("from starlette.requests import Request")
-            
+
             # Determine response types needed for default endpoints
             response_types = []
             if will_generate_default_readiness:
                 response_types.append("JSONResponse")
             if will_generate_default_health:
                 response_types.append("PlainTextResponse")
-                
+
             if response_types:
                 imports.append(f"from starlette.responses import {', '.join(response_types)}")
 
@@ -1337,7 +1337,7 @@ class CodeGenerator:
         # Generate readiness and health check sections
         readiness_section = self._generate_readiness_section(self.project_path)
         health_section = self._generate_health_section(self.project_path)
-        
+
         # Only generate check helper if we have custom check files
         readiness_exists = (self.project_path / "readiness.py").exists()
         health_exists = (self.project_path / "health.py").exists()
