@@ -487,7 +487,7 @@ export = simple_tool
         config_file = sample_project / "golf.json"
         config = {"name": "TestProject", "health_check_enabled": True}
         config_file.write_text(json.dumps(config))
-        
+
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
 
