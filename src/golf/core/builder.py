@@ -845,7 +845,7 @@ class CodeGenerator:
 
             if response_types:
                 imports.append(f"from starlette.responses import {', '.join(response_types)}")
-        
+
         # Import Request for custom check routes (they still need the request parameter)
         elif readiness_exists or health_exists:
             imports.append("from starlette.requests import Request")
