@@ -523,7 +523,9 @@ export = simple_tool
         assert "@mcp.custom_route('/ready', methods=[\"GET\"])" in readiness_code
         assert "async def readiness_check" in readiness_code
         assert "from readiness import check as readiness_check_func" in readiness_code
-        assert "return readiness_check_func()" in readiness_code
+        assert "result = readiness_check_func()" in readiness_code
+        assert "if isinstance(result, dict):" in readiness_code
+        assert "return JSONResponse(result)" in readiness_code
 
     def test_custom_health_endpoint_generation(self, sample_project: Path, temp_dir: Path) -> None:
         """Test custom health endpoint when health.py exists."""
@@ -545,7 +547,9 @@ export = simple_tool
         assert "@mcp.custom_route('/health', methods=[\"GET\"])" in health_code
         assert "async def health_check" in health_code
         assert "from health import check as health_check_func" in health_code
-        assert "return health_check_func()" in health_code
+        assert "result = health_check_func()" in health_code
+        assert "if isinstance(result, dict):" in health_code
+        assert "return JSONResponse(result)" in health_code
 
     def test_check_function_helper_generation(self, sample_project: Path, temp_dir: Path) -> None:
         """Test helper function generation."""
@@ -621,12 +625,14 @@ export = simple_tool
         # Should have custom readiness endpoint
         assert "# Custom readiness check from readiness.py" in server_content
         assert "from readiness import check as readiness_check_func" in server_content
-        assert "return readiness_check_func()" in server_content
+        assert "result = readiness_check_func()" in server_content
+        assert "if isinstance(result, dict):" in server_content
+        assert "return JSONResponse(result)" in server_content
 
         # Should have custom health endpoint
         assert "# Custom health check from health.py" in server_content
         assert "from health import check as health_check_func" in server_content
-        assert "return health_check_func()" in server_content
+        assert "result = health_check_func()" in server_content
 
         # Should NOT have helper function (using direct imports now)
         assert "async def _call_check_function(check_type: str)" not in server_content
