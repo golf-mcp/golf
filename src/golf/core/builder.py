@@ -668,7 +668,10 @@ class CodeGenerator:
             "@mcp.custom_route('/ready', methods=[\"GET\"])",
             "async def readiness_check(request: Request):",
             '    """Readiness check endpoint for Kubernetes and load balancers."""',
-            "    return readiness_check_func()",
+            "    result = readiness_check_func()",
+            "    if isinstance(result, dict):",
+            "        return JSONResponse(result)",
+            "    return result",
             "",
         ]
 
@@ -697,7 +700,10 @@ class CodeGenerator:
             "@mcp.custom_route('/health', methods=[\"GET\"])",
             "async def health_check(request: Request):",
             '    """Health check endpoint for Kubernetes and load balancers."""',
-            "    return health_check_func()",
+            "    result = health_check_func()",
+            "    if isinstance(result, dict):",
+            "        return JSONResponse(result)",
+            "    return result",
             "",
         ]
 
@@ -846,9 +852,10 @@ class CodeGenerator:
             if response_types:
                 imports.append(f"from starlette.responses import {', '.join(response_types)}")
 
-        # Import Request for custom check routes (they still need the request parameter)
+        # Import Request and JSONResponse for custom check routes (they need both)
         elif readiness_exists or health_exists:
             imports.append("from starlette.requests import Request")
+            imports.append("from starlette.responses import JSONResponse")
 
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
