@@ -645,6 +645,137 @@ class CodeGenerator:
             "",
         ]
 
+    def _generate_readiness_section(self, project_path: Path) -> list[str]:
+        """Generate code section for readiness.py execution during server runtime."""
+        readiness_path = project_path / "readiness.py"
+
+        if not readiness_path.exists():
+            # Only generate default readiness if health checks are explicitly enabled
+            if not self.settings.health_check_enabled:
+                return []
+            return [
+                "# Default readiness check - no custom readiness.py found",
+                "@mcp.custom_route('/ready', methods=[\"GET\"])",
+                "async def readiness_check(request: Request) -> JSONResponse:",
+                '    """Readiness check endpoint for Kubernetes and load balancers."""',
+                '    return JSONResponse({"status": "pass"}, status_code=200)',
+                "",
+            ]
+
+        return [
+            "# Custom readiness check from readiness.py",
+            "from readiness import check as readiness_check_func",
+            "@mcp.custom_route('/ready', methods=[\"GET\"])",
+            "async def readiness_check(request: Request):",
+            '    """Readiness check endpoint for Kubernetes and load balancers."""',
+            "    result = readiness_check_func()",
+            "    if isinstance(result, dict):",
+            "        return JSONResponse(result)",
+            "    return result",
+            "",
+        ]
+
+    def _generate_health_section(self, project_path: Path) -> list[str]:
+        """Generate code section for health.py execution during server runtime."""
+        health_path = project_path / "health.py"
+
+        if not health_path.exists():
+            # Check if legacy health configuration is used
+            if self.settings.health_check_enabled:
+                return [
+                    "# Legacy health check configuration (deprecated)",
+                    "@mcp.custom_route('" + self.settings.health_check_path + '\', methods=["GET"])',
+                    "async def health_check(request: Request) -> PlainTextResponse:",
+                    '    """Health check endpoint for Kubernetes and load balancers."""',
+                    f'    return PlainTextResponse("{self.settings.health_check_response}")',
+                    "",
+                ]
+            else:
+                # If health checks are disabled, return empty (no default health check)
+                return []
+
+        return [
+            "# Custom health check from health.py",
+            "from health import check as health_check_func",
+            "@mcp.custom_route('/health', methods=[\"GET\"])",
+            "async def health_check(request: Request):",
+            '    """Health check endpoint for Kubernetes and load balancers."""',
+            "    result = health_check_func()",
+            "    if isinstance(result, dict):",
+            "        return JSONResponse(result)",
+            "    return result",
+            "",
+        ]
+
+    def _generate_check_function_helper(self) -> list[str]:
+        """Generate helper function to call custom check functions."""
+        return [
+            "# Helper function to call custom check functions",
+            "async def _call_check_function(check_type: str) -> JSONResponse:",
+            '    """Call custom check function and handle errors gracefully."""',
+            "    import importlib.util",
+            "    import traceback",
+            "    from pathlib import Path",
+            "    from datetime import datetime",
+            "    ",
+            "    try:",
+            "        # Load the custom check module",
+            "        module_path = Path(__file__).parent / f'{check_type}.py'",
+            "        if not module_path.exists():",
+            '            return JSONResponse({"status": "pass"}, status_code=200)',
+            "        ",
+            "        spec = importlib.util.spec_from_file_location(f'{check_type}_check', module_path)",
+            "        if spec and spec.loader:",
+            "            module = importlib.util.module_from_spec(spec)",
+            "            spec.loader.exec_module(module)",
+            "            ",
+            "            # Call the check function if it exists",
+            "            if hasattr(module, 'check'):",
+            "                result = module.check()",
+            "                ",
+            "                # Handle different return types",
+            "                if isinstance(result, dict):",
+            "                    # User returned structured response",
+            "                    status_code = result.get('status_code', 200)",
+            "                    response_data = {k: v for k, v in result.items() if k != 'status_code'}",
+            "                elif isinstance(result, bool):",
+            "                    # User returned simple boolean",
+            "                    status_code = 200 if result else 503",
+            "                    response_data = {",
+            '                        "status": "pass" if result else "fail",',
+            '                        "timestamp": datetime.utcnow().isoformat()',
+            "                    }",
+            "                elif result is None:",
+            "                    # User returned nothing - assume success",
+            "                    status_code = 200",
+            '                    response_data = {"status": "pass"}',
+            "                else:",
+            "                    # User returned something else - treat as success message",
+            "                    status_code = 200",
+            "                    response_data = {",
+            '                        "status": "pass",',
+            '                        "message": str(result)',
+            "                    }",
+            "                ",
+            "                return JSONResponse(response_data, status_code=status_code)",
+            "            else:",
+            "                return JSONResponse(",
+            '                    {"status": "fail", "error": f"No check() function found in {check_type}.py"},',
+            "                    status_code=503",
+            "                )",
+            "    ",
+            "    except Exception as e:",
+            "        # Log error and return failure response",
+            "        import sys",
+            '        print(f"Error calling {check_type} check function: {e}", file=sys.stderr)',
+            "        print(traceback.format_exc(), file=sys.stderr)",
+            "        return JSONResponse({",
+            '            "status": "fail",',
+            '            "error": f"Error calling {check_type} check function: {str(e)}"',
+            "        }, status_code=503)",
+            "",
+        ]
+
     def _generate_server(self) -> None:
         """Generate the main server entry point."""
         server_file = self.output_dir / "server.py"
@@ -700,14 +831,31 @@ class CodeGenerator:
             imports.extend(generate_metrics_instrumentation())
             imports.extend(generate_session_tracking())
 
-        # Add health check imports if enabled
-        if self.settings.health_check_enabled:
-            imports.extend(
-                [
-                    "from starlette.requests import Request",
-                    "from starlette.responses import PlainTextResponse",
-                ]
-            )
+        # Add health check imports only when we generate default endpoints
+        readiness_exists = (self.project_path / "readiness.py").exists()
+        health_exists = (self.project_path / "health.py").exists()
+
+        # Only import starlette when we generate default endpoints (not when custom files exist)
+        will_generate_default_readiness = not readiness_exists and self.settings.health_check_enabled
+        will_generate_default_health = not health_exists and self.settings.health_check_enabled
+
+        if will_generate_default_readiness or will_generate_default_health:
+            imports.append("from starlette.requests import Request")
+
+            # Determine response types needed for default endpoints
+            response_types = []
+            if will_generate_default_readiness:
+                response_types.append("JSONResponse")
+            if will_generate_default_health:
+                response_types.append("PlainTextResponse")
+
+            if response_types:
+                imports.append(f"from starlette.responses import {', '.join(response_types)}")
+
+        # Import Request and JSONResponse for custom check routes (they need both)
+        elif readiness_exists or health_exists:
+            imports.append("from starlette.requests import Request")
+            imports.append("from starlette.responses import JSONResponse")
 
         # Get transport-specific configuration
         transport_config = self._get_transport_config(self.settings.transport)
@@ -1199,22 +1347,17 @@ class CodeGenerator:
 
             metrics_route_code = generate_metrics_route(self.settings.metrics_path)
 
-        # Add health check route if enabled
-        health_check_code = []
-        if self.settings.health_check_enabled:
-            health_check_code = [
-                "# Add health check route",
-                "@mcp.custom_route('" + self.settings.health_check_path + '\', methods=["GET"])',
-                "async def health_check(request: Request) -> PlainTextResponse:",
-                '    """Health check endpoint for Kubernetes and load balancers."""',
-                (f'    return PlainTextResponse("{self.settings.health_check_response}")'),
-                "",
-            ]
+        # Generate readiness and health check sections
+        readiness_section = self._generate_readiness_section(self.project_path)
+        health_section = self._generate_health_section(self.project_path)
+
+        # No longer need the check helper function since we use direct imports
+        check_helper_section = []
 
         # Combine all sections
         # Order: imports, env_section, startup_section, auth_setup, server_code (mcp init),
         # early_telemetry_init, early_metrics_init, component_registrations,
-        # metrics_route_code, health_check_code, main_code (run block)
+        # metrics_route_code, check_helper_section, readiness_section, health_section, main_code (run block)
         code = "\n".join(
             imports
             + env_section
@@ -1225,7 +1368,9 @@ class CodeGenerator:
             + early_metrics_init
             + component_registrations
             + metrics_route_code
-            + health_check_code
+            + check_helper_section
+            + readiness_section
+            + health_section
             + main_code
         )
 
@@ -1426,6 +1571,17 @@ def build_project(
         dest_path = output_dir / "startup.py"
         shutil.copy2(startup_path, dest_path)
         console.print(get_status_text("success", "Startup script copied to build directory"))
+
+    # Copy optional check files to build directory
+    readiness_path = project_path / "readiness.py"
+    if readiness_path.exists():
+        shutil.copy2(readiness_path, output_dir)
+        console.print(get_status_text("success", "Readiness script copied to build directory"))
+
+    health_path = project_path / "health.py"
+    if health_path.exists():
+        shutil.copy2(health_path, output_dir)
+        console.print(get_status_text("success", "Health script copied to build directory"))
 
     # Platform registration (only for prod builds)
     if build_env == "prod":

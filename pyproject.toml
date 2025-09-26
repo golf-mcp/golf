@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "golf-mcp"
-version = "0.2.10"
+version = "0.2.11"
 description = "Framework for building MCP servers"
 authors = [
     {name = "Antoni Gmitruk", email = "antoni@golf.dev"}
@@ -66,7 +66,7 @@ golf = ["examples/**/*"]
 
 [tool.poetry]
 name = "golf-mcp"
-version = "0.2.10"
+version = "0.2.11"
 description = "Framework for building MCP servers with zero boilerplate"
 authors = ["Antoni Gmitruk <antoni@golf.dev>"]
 license = "Apache-2.0"
@@ -79,9 +79,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12"
 ]
