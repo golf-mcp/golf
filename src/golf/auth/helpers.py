@@ -1,24 +1,10 @@
 """Helper functions for working with authentication in MCP context."""
 
 from contextvars import ContextVar
-from typing import Any
 
-from starlette.requests import Request
 
 # Context variable to store the current request's API key
 _current_api_key: ContextVar[str | None] = ContextVar("current_api_key", default=None)
-
-
-def get_provider_token() -> str | None:
-    """
-    Get a provider token (legacy function - no longer supported in Golf 0.2.x).
-
-    In Golf 0.2.x, use FastMCP's built-in auth providers for OAuth flows.
-    This function returns None and is kept for backwards compatibility.
-    """
-    # Legacy OAuth provider support removed in Golf 0.2.x
-    # Use FastMCP 2.11+ auth providers instead
-    return None
 
 
 def extract_token_from_header(auth_header: str) -> str | None:
@@ -123,25 +109,6 @@ def get_api_key() -> str | None:
     return None
 
 
-def get_api_key_from_request(request: Request) -> str | None:
-    """Get the API key from a specific request object.
-
-    This is useful when you have direct access to the request object.
-
-    Args:
-        request: The Starlette Request object
-
-    Returns:
-        The API key if available, None otherwise
-    """
-    # Check request state first (set by our middleware)
-    if hasattr(request, "state") and hasattr(request.state, "api_key"):
-        return request.state.api_key
-
-    # Fall back to context variable
-    return _current_api_key.get()
-
-
 def get_auth_token() -> str | None:
     """Get the authorization token from the current request context.
 
@@ -206,52 +173,3 @@ def get_auth_token() -> str | None:
         pass
 
     return None
-
-
-def debug_api_key_context() -> dict[str, Any]:
-    """Debug function to inspect API key context.
-
-    Returns a dictionary with debugging information about the current
-    API key context. Useful for troubleshooting authentication issues.
-
-    Returns:
-        Dictionary with debug information
-    """
-    import asyncio
-    import os
-    import sys
-
-    debug_info = {
-        "context_var_value": _current_api_key.get(),
-        "has_async_task": False,
-        "task_id": None,
-        "main_module_has_storage": False,
-        "main_module_has_context": False,
-        "request_id_from_context": None,
-        "env_vars": {
-            "API_KEY": bool(os.environ.get("API_KEY")),
-            "GOLF_API_KEY_DEBUG": os.environ.get("GOLF_API_KEY_DEBUG", "false"),
-        },
-    }
-
-    try:
-        task = asyncio.current_task()
-        if task:
-            debug_info["has_async_task"] = True
-            debug_info["task_id"] = id(task)
-    except Exception:
-        pass
-
-    try:
-        main_module = sys.modules.get("__main__")
-        if main_module:
-            debug_info["main_module_has_storage"] = hasattr(main_module, "api_key_storage")
-            debug_info["main_module_has_context"] = hasattr(main_module, "request_id_context")
-
-            if hasattr(main_module, "request_id_context"):
-                request_id_context = main_module.request_id_context
-                debug_info["request_id_from_context"] = request_id_context.get()
-    except Exception:
-        pass
-
-    return debug_info
