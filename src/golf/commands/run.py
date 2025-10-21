@@ -67,7 +67,7 @@ def run_server(
 
     # Add telemetry status indicator
     if settings.opentelemetry_enabled:
-        telemetry_line = Text("📊 Golf telemetry enabled", style=f"dim {GOLF_BLUE}")
+        telemetry_line = Text("📊 OpenTelemetry enabled", style=f"dim {GOLF_BLUE}")
         content_lines.append(Align.center(telemetry_line))
 
     # Add empty line and stop instruction
