@@ -16,7 +16,7 @@ from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.core.builder_telemetry import (
     generate_telemetry_imports,
 )
-from golf.cli.branding import create_build_header, get_status_text, STATUS_ICONS, GOLF_BLUE
+from golf.cli.branding import create_build_header, get_status_text
 from golf.core.config import Settings
 from golf.core.parser import (
     ComponentType,
@@ -1401,20 +1401,12 @@ def build_project(
         build_env: Build environment ('dev' or 'prod')
         copy_env: Whether to copy environment variables to the built app
     """
-    # Load Golf credentials from .env for build operations (platform registration, etc.)
-    # This happens regardless of copy_env setting to ensure build process works
+    # Load environment variables from .env for build operations
     from dotenv import load_dotenv
 
     project_env_file = project_path / ".env"
     if project_env_file.exists():
-        # Load GOLF_* variables for build process
         load_dotenv(project_env_file, override=False)
-
-        # Only log if we actually found the specific Golf platform credentials
-        has_api_key = "GOLF_API_KEY" in os.environ
-        has_server_id = "GOLF_SERVER_ID" in os.environ
-        if has_api_key and has_server_id:
-            console.print("[dim]Loaded Golf credentials for build operations[/dim]")
 
     # Execute auth.py if it exists (for authentication configuration)
     # Also support legacy pre_build.py for backward compatibility
