@@ -33,7 +33,6 @@ STATUS_ICONS = {
     "building": "🔨",
     "generating": "⚙️",
     "packaging": "📦",
-    "platform": "⛳",
     "server": "🚀",
     "loading": "⭕",
 }
@@ -163,7 +162,7 @@ def get_status_text(status: str, message: str, style: str = "") -> Text:
     elif status == "warning":
         text.append("⚡ ", style=f"bold {GOLF_ORANGE}")
         text.append(f"{icon} {message}", style=f"bold {GOLF_ORANGE}")
-    elif status in ["building", "generating", "packaging", "platform"]:
+    elif status in ["building", "generating", "packaging"]:
         text.append("🔥 ", style=f"bold {GOLF_ORANGE}")
         text.append(f"{icon} {message}", style=f"bold {GOLF_BLUE}")
     else:

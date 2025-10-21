@@ -157,9 +157,10 @@ from golf.utils import elicit, sample, get_context
 ```
 
 ```bash
-# Automatic telemetry with Golf Platform
-export GOLF_API_KEY="your-key"
-golf run  # ✅ Telemetry enabled automatically
+# Enable OpenTelemetry tracing
+export OTEL_TRACES_EXPORTER="otlp_http"
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318/v1/traces"
+golf run  # ✅ Telemetry enabled
 ```
 
 **[📚 Complete Documentation →](https://docs.golf.dev)**
@@ -180,7 +181,7 @@ Basic configuration in `golf.json`:
 ```
 
 - **`transport`**: Choose `"sse"`, `"streamable-http"`, or `"stdio"`
-- **`opentelemetry_enabled`**: Auto-enabled with `GOLF_API_KEY`
+- **`opentelemetry_enabled`**: Enable OpenTelemetry tracing
 - **`detailed_tracing`**: Capture input/output (use carefully with sensitive data)
 
 

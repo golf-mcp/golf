@@ -167,11 +167,9 @@ def build_prod(
 ) -> None:
     """Build a production version for deployment.
 
-    Golf credentials (GOLF_*) are always loaded from .env for build operations
-    (platform registration, resource updates). App environment variables are
-    NOT copied for security - provide them in your deployment environment.
-
-    Your production deployment must include GOLF_* vars for runtime telemetry.
+    Environment variables from .env are loaded for build operations.
+    App environment variables are NOT copied for security - provide them
+    in your deployment environment.
     """
     # Find project root directory
     project_root, config_path = find_project_root()
