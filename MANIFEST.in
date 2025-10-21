@@ -1,7 +1,6 @@
 include README.md
 include LICENSE
 include pyproject.toml
-include src/golf/_endpoints.py.in
 graft .docs
 graft src/golf/examples
 
@@ -15,4 +14,25 @@ prune dist
 prune .eggs
 prune *.egg-info
 prune .env
-prune .venv 
+prune .venv
+
+# Exclude development and cache directories
+prune .claude
+prune htmlcov
+prune thoughts
+prune new
+prune tests
+prune .pytest_cache
+prune .ruff_cache
+prune .git
+prune .github
+
+# Exclude development files
+exclude build.sh
+exclude setup.py
+exclude CLAUDE.md
+exclude Makefile
+exclude .coverage
+exclude .DS_Store
+exclude *.code-workspace
+exclude golf-banner.png 

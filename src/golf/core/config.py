@@ -172,23 +172,10 @@ def load_settings(project_path: str | Path) -> Settings:
     if env_file.exists():
         settings = Settings(_env_file=env_file)
 
-        # Auto-enable OpenTelemetry if GOLF_API_KEY is present (from .env file)
-        import os
-
-        if os.environ.get("GOLF_API_KEY"):
-            settings.opentelemetry_enabled = True
-
     # Try to load JSON config file first
     json_config_path = project_path / "golf.json"
     if json_config_path.exists():
         return _load_json_settings(json_config_path, settings)
-
-    # No config file found, use defaults
-    # Auto-enable OpenTelemetry if GOLF_API_KEY is present
-    import os
-
-    if os.environ.get("GOLF_API_KEY"):
-        settings.opentelemetry_enabled = True
 
     return settings
 
@@ -205,12 +192,6 @@ def _load_json_settings(path: Path, settings: Settings) -> Settings:
         for key, value in config_data.items():
             if hasattr(settings, key):
                 setattr(settings, key, value)
-
-        # Auto-enable OpenTelemetry if GOLF_API_KEY is present and telemetry wasn't explicitly configured
-        import os
-
-        if os.environ.get("GOLF_API_KEY") and "opentelemetry_enabled" not in config_data:
-            settings.opentelemetry_enabled = True
 
         return settings
     except Exception as e:

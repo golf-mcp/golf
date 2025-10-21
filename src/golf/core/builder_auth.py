@@ -121,7 +121,7 @@ def generate_api_key_auth_components(
         "class ApiKeyMiddleware(BaseHTTPMiddleware):",
         "    async def dispatch(self, request: Request, call_next):",
         "        # Debug mode from environment",
-        "        debug = os.environ.get('GOLF_API_KEY_DEBUG', '').lower() == 'true'",
+        "        debug = os.environ.get('API_KEY_DEBUG', '').lower() == 'true'",
         "        ",
         "        # Skip auth for monitoring endpoints",
         "        path = request.url.path",

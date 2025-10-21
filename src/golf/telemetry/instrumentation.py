@@ -14,13 +14,6 @@ from collections import OrderedDict
 
 from opentelemetry import baggage, trace
 
-# Import endpoints with fallback for dev mode
-try:
-    # In built wheels, this exists (generated from _endpoints.py.in)
-    from golf import _endpoints  # type: ignore
-except ImportError:
-    # In editable/dev installs, fall back to env-based values
-    from golf import _endpoints_fallback as _endpoints  # type: ignore
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -69,28 +62,6 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
     """
     global _provider
 
-    # Check for Golf platform integration first
-    golf_api_key = os.environ.get("GOLF_API_KEY")
-    if golf_api_key:
-        # Auto-configure for Golf platform - always use OTLP when Golf API
-        # key is present
-        os.environ["OTEL_TRACES_EXPORTER"] = "otlp_http"
-
-        # Only set endpoint if not already configured (allow user override)
-        if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
-            os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = _endpoints.OTEL_ENDPOINT
-
-        # Set Golf platform headers (append to existing if present)
-        existing_headers = os.environ.get("OTEL_EXPORTER_OTLP_HEADERS", "")
-        golf_header = f"X-Golf-Key={golf_api_key}"
-
-        if existing_headers:
-            # Check if Golf key is already in headers
-            if "X-Golf-Key=" not in existing_headers:
-                os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"{existing_headers},{golf_header}"
-        else:
-            os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = golf_header
-
     # Check for required environment variables based on exporter type
     exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "console").lower()
 
@@ -110,13 +81,6 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         "service.version": os.environ.get("SERVICE_VERSION", "1.0.0"),
         "service.instance.id": os.environ.get("SERVICE_INSTANCE_ID", "default"),
     }
-
-    # Add Golf-specific attributes if available
-    if golf_api_key:
-        golf_server_id = os.environ.get("GOLF_SERVER_ID")
-        if golf_server_id:
-            resource_attributes["golf.server.id"] = golf_server_id
-        resource_attributes["golf.platform.enabled"] = "true"
 
     resource = Resource.create(resource_attributes)
 

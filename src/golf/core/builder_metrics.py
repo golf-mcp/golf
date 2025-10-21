@@ -59,17 +59,6 @@ def generate_metrics_route(metrics_path: str) -> list[str]:
     ]
 
 
-def get_metrics_dependencies() -> list[str]:
-    """Get list of metrics dependencies to add to pyproject.toml.
-
-    Returns:
-        List of package requirements strings
-    """
-    return [
-        "prometheus-client>=0.19.0",
-    ]
-
-
 def generate_metrics_instrumentation() -> list[str]:
     """Generate metrics instrumentation wrapper functions.
 
