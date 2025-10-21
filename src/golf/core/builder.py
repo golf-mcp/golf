@@ -1583,33 +1583,6 @@ def build_project(
         shutil.copy2(health_path, output_dir)
         console.print(get_status_text("success", "Health script copied to build directory"))
 
-    # Platform registration (only for prod builds)
-    if build_env == "prod":
-        console.print()
-        status_msg = f"[{GOLF_BLUE}]{STATUS_ICONS['platform']} Registering with Golf platform and updating resources...[/{GOLF_BLUE}]"
-        with console.status(status_msg):
-            import asyncio
-
-            try:
-                from golf.core.platform import register_project_with_platform
-
-                success = asyncio.run(
-                    register_project_with_platform(
-                        project_path=project_path,
-                        settings=settings,
-                        components=generator.components,
-                    )
-                )
-
-                if success:
-                    console.print(get_status_text("success", "Platform registration completed"))
-                # If success is False, the platform module already printed appropriate warnings
-            except ImportError:
-                console.print(get_status_text("warning", "Platform registration module not available"))
-            except Exception as e:
-                console.print(get_status_text("warning", f"Platform registration failed: {e}"))
-                console.print("[dim]Tip: Ensure GOLF_API_KEY and GOLF_SERVER_ID are available in your .env file[/dim]")
-
     # Create a simple README
     readme_content = f"""# {settings.name}
 
