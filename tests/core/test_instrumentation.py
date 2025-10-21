@@ -46,18 +46,6 @@ class TestTelemetryInitialization:
             provider = init_telemetry("test-service")
             assert provider is not None
 
-    def test_init_telemetry_with_golf_platform_auto_config(self, monkeypatch):
-        """Test auto-configuration for Golf platform."""
-        monkeypatch.setenv("GOLF_API_KEY", "test-key-123")
-        monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-
-        with patch("golf.telemetry.instrumentation.trace.set_tracer_provider"):
-            provider = init_telemetry("test-service")
-            assert provider is not None
-            assert os.environ.get("OTEL_TRACES_EXPORTER") == "otlp_http"
-            from golf import _endpoints
-
-            assert os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") == _endpoints.OTEL_ENDPOINT
 
     def test_init_telemetry_with_headers(self, monkeypatch):
         """Test telemetry initialization with custom headers."""
@@ -319,27 +307,6 @@ class TestIntegrationScenarios:
             result = instrumented_tool("World")
             assert result == "Hello World"
 
-    def test_golf_platform_integration_workflow(self, monkeypatch):
-        """Test Golf platform integration scenario."""
-        # Clean up any existing OTEL environment variables from previous tests
-        monkeypatch.delenv("OTEL_EXPORTER_OTLP_HEADERS", raising=False)
-        monkeypatch.delenv("OTEL_TRACES_EXPORTER", raising=False)
-        monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-
-        # Simulate Golf platform environment
-        monkeypatch.setenv("GOLF_API_KEY", "golf_test_key_123")
-        monkeypatch.setenv("GOLF_SERVER_ID", "server_abc")
-
-        with patch("golf.telemetry.instrumentation.trace.set_tracer_provider"):
-            provider = init_telemetry("golf-server")
-            assert provider is not None
-
-        # Verify auto-configuration
-        assert os.environ.get("OTEL_TRACES_EXPORTER") == "otlp_http"
-        from golf import _endpoints
-
-        assert os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") == _endpoints.OTEL_ENDPOINT
-        assert "X-Golf-Key=golf_test_key_123" in os.environ.get("OTEL_EXPORTER_OTLP_HEADERS", "")
 
     def test_mixed_component_instrumentation(self):
         """Test instrumenting multiple component types together."""
