@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.align import Align
 from rich.text import Text
@@ -53,23 +53,33 @@ def run_server(
     server_host = host or settings.host or "localhost"
     server_port = port or settings.port or 3000
 
-    server_content = Text()
-    server_content.append("🚀 ", style=f"bold {GOLF_ORANGE}")
-    server_content.append(f"{STATUS_ICONS['server']} Server starting on ", style=f"bold {GOLF_BLUE}")
-    server_content.append(f"http://{server_host}:{server_port}", style=f"bold {GOLF_GREEN}")
-    server_content.append(" 🚀", style=f"bold {GOLF_ORANGE}")
-    server_content.append("\n")
-
+    # Create server URL line
+    server_line = Text()
+    server_line.append("🚀 ", style=f"bold {GOLF_ORANGE}")
+    server_line.append(f"{STATUS_ICONS['server']} Server starting on ", style=f"bold {GOLF_BLUE}")
+    server_line.append(f"http://{server_host}:{server_port}", style=f"bold {GOLF_GREEN}")
+    
+    # Create content with proper alignment
+    content_lines = [
+        "",  # Empty line at top
+        Align.center(server_line),
+    ]
+    
     # Add telemetry status indicator
     if settings.opentelemetry_enabled:
-        server_content.append("📊 Golf telemetry enabled", style=f"dim {GOLF_BLUE}")
-        server_content.append("\n")
-
-    server_content.append("⚡ Press Ctrl+C to stop ⚡", style=f"dim {GOLF_ORANGE}")
+        telemetry_line = Text("📊 Golf telemetry enabled", style=f"dim {GOLF_BLUE}")
+        content_lines.append(Align.center(telemetry_line))
+    
+    # Add empty line and stop instruction
+    content_lines.extend([
+        "",  # Empty line before stop instruction
+        Align.center(Text("⚡ Press Ctrl+C to stop ⚡", style=f"dim {GOLF_ORANGE}")),
+        "",  # Empty line at bottom
+    ])
 
     console.print(
         Panel(
-            Align.center(server_content),
+            Group(*content_lines),
             border_style=GOLF_BLUE,
             padding=(1, 2),
             title="[bold]🌐 SERVER READY 🌐[/bold]",
