@@ -1,7 +1,6 @@
 """Tests for OpenTelemetry instrumentation functionality."""
 
 import asyncio
-import os
 from unittest.mock import Mock, patch
 
 import pytest
@@ -45,7 +44,6 @@ class TestTelemetryInitialization:
         with patch("golf.telemetry.instrumentation.trace.set_tracer_provider"):
             provider = init_telemetry("test-service")
             assert provider is not None
-
 
     def test_init_telemetry_with_headers(self, monkeypatch):
         """Test telemetry initialization with custom headers."""
@@ -306,7 +304,6 @@ class TestIntegrationScenarios:
             instrumented_tool = instrument_tool(test_tool, "greeting-tool")
             result = instrumented_tool("World")
             assert result == "Hello World"
-
 
     def test_mixed_component_instrumentation(self):
         """Test instrumenting multiple component types together."""

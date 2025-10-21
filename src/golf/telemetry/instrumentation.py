@@ -62,7 +62,6 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
     """
     global _provider
 
-
     # Check for required environment variables based on exporter type
     exporter_type = os.environ.get("OTEL_TRACES_EXPORTER", "console").lower()
 
@@ -82,7 +81,6 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         "service.version": os.environ.get("SERVICE_VERSION", "1.0.0"),
         "service.instance.id": os.environ.get("SERVICE_INSTANCE_ID", "default"),
     }
-
 
     resource = Resource.create(resource_attributes)
 

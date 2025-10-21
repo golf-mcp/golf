@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 from golf.core.builder import build_manifest, ManifestBuilder, CodeGenerator
 from golf.core.config import load_settings
@@ -1004,6 +1004,7 @@ export = ordered_tool
             "openWorldHint",
         }
         assert set(tool_component.annotations.keys()) == expected_keys
+
 
 class TestStatelessHttpGeneration:
     """Test stateless HTTP configuration generation."""

@@ -58,24 +58,26 @@ def run_server(
     server_line.append("🚀 ", style=f"bold {GOLF_ORANGE}")
     server_line.append(f"{STATUS_ICONS['server']} Server starting on ", style=f"bold {GOLF_BLUE}")
     server_line.append(f"http://{server_host}:{server_port}", style=f"bold {GOLF_GREEN}")
-    
+
     # Create content with proper alignment
     content_lines = [
         "",  # Empty line at top
         Align.center(server_line),
     ]
-    
+
     # Add telemetry status indicator
     if settings.opentelemetry_enabled:
         telemetry_line = Text("📊 Golf telemetry enabled", style=f"dim {GOLF_BLUE}")
         content_lines.append(Align.center(telemetry_line))
-    
+
     # Add empty line and stop instruction
-    content_lines.extend([
-        "",  # Empty line before stop instruction
-        Align.center(Text("⚡ Press Ctrl+C to stop ⚡", style=f"dim {GOLF_ORANGE}")),
-        "",  # Empty line at bottom
-    ])
+    content_lines.extend(
+        [
+            "",  # Empty line before stop instruction
+            Align.center(Text("⚡ Press Ctrl+C to stop ⚡", style=f"dim {GOLF_ORANGE}")),
+            "",  # Empty line at bottom
+        ]
+    )
 
     console.print(
         Panel(
