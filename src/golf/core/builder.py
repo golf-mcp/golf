@@ -387,16 +387,16 @@ class CodeGenerator:
         """Generate import statements for automatically discovered root files."""
         root_file_imports = []
         discovered_files = discover_root_files(self.project_path)
-        
+
         if discovered_files:
             root_file_imports.append("# Import root-level Python files")
-            
+
             for filename in sorted(discovered_files.keys()):
                 module_name = Path(filename).stem  # env.py -> env
                 root_file_imports.append(f"import {module_name}")
-                
+
             root_file_imports.append("")  # Blank line
-            
+
         return root_file_imports
 
     def _create_directory_structure(self) -> None:
@@ -1598,11 +1598,11 @@ def build_project(
 
     # Copy any additional Python files from project root
     discovered_root_files = discover_root_files(project_path)
-    
+
     for filename, file_path in discovered_root_files.items():
         dest_path = output_dir / filename
         try:
-            shutil.copy2(file_path, dest_path) 
+            shutil.copy2(file_path, dest_path)
             console.print(get_status_text("success", f"Root file {filename} copied to build directory"))
         except (OSError, shutil.Error) as e:
             console.print(f"[red]Error copying {filename}: {e}[/red]")
@@ -1708,76 +1708,81 @@ from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConf
 
 def discover_root_files(project_path: Path) -> dict[str, Path]:
     """Automatically discover all Python files in the project root directory.
-    
+
     This function finds all .py files in the project root, excluding:
     - Special Golf files (startup.py, health.py, readiness.py, auth.py, server.py)
     - Component directories (tools/, resources/, prompts/)
     - Hidden files and common exclusions (__pycache__, .git, etc.)
-    
+
     Args:
         project_path: Path to the project root directory
-        
+
     Returns:
         Dictionary mapping filenames to their full paths
     """
     import ast
-    
+
     discovered_files = {}
-    
+
     # Files that are handled specially by Golf and should not be auto-copied
     reserved_files = {
-        'startup.py', 'health.py', 'readiness.py', 'auth.py', 'server.py',
-        'pre_build.py',  # Legacy auth file
-        'golf.json', 'golf.toml',  # Config files
-        '__init__.py'  # Package files
+        "startup.py",
+        "health.py",
+        "readiness.py",
+        "auth.py",
+        "server.py",
+        "pre_build.py",  # Legacy auth file
+        "golf.json",
+        "golf.toml",  # Config files
+        "__init__.py",  # Package files
     }
-    
+
     # Find all .py files in the project root (not in subdirectories)
     try:
         for file_path in project_path.iterdir():
             if not file_path.is_file():
                 continue
-                
+
             filename = file_path.name
-            
+
             # Skip non-Python files
-            if not filename.endswith('.py'):
+            if not filename.endswith(".py"):
                 continue
-                
+
             # Skip reserved/special files
             if filename in reserved_files:
                 continue
-                
+
             # Skip hidden files and temporary files
-            if filename.startswith('.') or filename.startswith('_') or filename.endswith('~'):
+            if filename.startswith(".") or filename.startswith("_") or filename.endswith("~"):
                 continue
-                
+
             # Validate it's a readable Python file
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding="utf-8") as f:
                     # Read first 200 chars to validate it's a proper Python file
                     content = f.read(200)
-                    
+
                 # Basic Python syntax validation
                 try:
                     ast.parse(content + "\n# truncated for validation")
                 except SyntaxError:
                     # Still include files with syntax errors, but warn
                     console.print(f"[yellow]Warning: {filename} has syntax issues but will be included[/yellow]")
-                    
+
             except (OSError, UnicodeDecodeError) as e:
                 console.print(f"[yellow]Warning: Cannot read {filename}, skipping: {e}[/yellow]")
                 continue
-                
+
             discovered_files[filename] = file_path
-            
+
     except OSError as e:
         console.print(f"[yellow]Warning: Error scanning project directory: {e}[/yellow]")
-        
+
     if discovered_files:
         file_list = ", ".join(sorted(discovered_files.keys()))
         console.print(f"[dim]Found root Python files: {file_list}[/dim]")
-    
+
     return discovered_files
 
 
