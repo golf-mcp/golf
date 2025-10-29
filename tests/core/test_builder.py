@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 from unittest.mock import patch
 
-from golf.core.builder import build_manifest, ManifestBuilder, CodeGenerator
+from golf.core.builder import build_manifest, ManifestBuilder, CodeGenerator, discover_root_files, build_project
 from golf.core.config import load_settings
 from golf.core.parser import ComponentType, parse_project
 
@@ -1837,3 +1837,139 @@ export = simple_tool
             assert "path=" not in server_content_212
             assert 'transport="stdio"' in server_content_212
             assert "mcp.run(" in server_content_212
+
+
+class TestAutomaticRootFileDiscovery:
+    """Test automatic discovery and inclusion of root-level Python files."""
+    
+    def test_discover_root_files_finds_custom_files(self, sample_project: Path) -> None:
+        """Test that discover_root_files finds custom Python files in project root."""
+        # Create some custom root files
+        (sample_project / "env.py").write_text("API_KEY = 'test'")
+        (sample_project / "config.py").write_text("DEBUG = True")
+        (sample_project / "utils.py").write_text("def helper(): pass")
+        
+        discovered = discover_root_files(sample_project)
+        
+        assert "env.py" in discovered
+        assert "config.py" in discovered
+        assert "utils.py" in discovered
+        assert discovered["env.py"] == sample_project / "env.py"
+        
+    def test_discover_root_files_excludes_reserved_files(self, sample_project: Path) -> None:
+        """Test that reserved/special files are excluded from discovery."""
+        # Create reserved files that should be excluded
+        (sample_project / "startup.py").write_text("print('startup')")
+        (sample_project / "auth.py").write_text("# auth config")
+        (sample_project / "server.py").write_text("# should not be included")
+        (sample_project / "__init__.py").write_text("# package file")
+        
+        # Create files that should be included
+        (sample_project / "custom.py").write_text("# custom file")
+        
+        discovered = discover_root_files(sample_project)
+        
+        # Should exclude reserved files
+        assert "startup.py" not in discovered
+        assert "auth.py" not in discovered
+        assert "server.py" not in discovered
+        assert "__init__.py" not in discovered
+        
+        # Should include custom files
+        assert "custom.py" in discovered
+        
+    def test_discover_root_files_excludes_hidden_and_temp_files(self, sample_project: Path) -> None:
+        """Test that hidden and temporary files are excluded."""
+        # Create files that should be excluded
+        (sample_project / ".hidden.py").write_text("# hidden")
+        (sample_project / "_private.py").write_text("# private")
+        (sample_project / "backup.py~").write_text("# backup")
+        
+        # Create file that should be included
+        (sample_project / "visible.py").write_text("# visible")
+        
+        discovered = discover_root_files(sample_project)
+        
+        # Should exclude hidden/temp files
+        assert ".hidden.py" not in discovered
+        assert "_private.py" not in discovered
+        assert "backup.py~" not in discovered
+        
+        # Should include visible file
+        assert "visible.py" in discovered
+
+    def test_root_files_automatically_copied_during_build(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that discovered root files are automatically copied during build."""
+        # Create custom root files
+        (sample_project / "constants.py").write_text("API_URL = 'https://api.example.com'")
+        (sample_project / "helpers.py").write_text("def format_date(): pass")
+        
+        # Build project  
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+        build_project(sample_project, settings, output_dir)
+        
+        # Verify files were automatically copied
+        assert (output_dir / "constants.py").exists()
+        assert (output_dir / "helpers.py").exists()
+        assert (output_dir / "constants.py").read_text() == "API_URL = 'https://api.example.com'"
+
+    def test_root_files_automatically_imported_in_server(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that discovered root files are automatically imported in generated server.py."""
+        # Create root files
+        (sample_project / "environment.py").write_text("ENV = 'production'")
+        (sample_project / "settings.py").write_text("DEBUG = False")
+        
+        # Generate server
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+        
+        # Verify imports in generated server.py
+        server_content = (temp_dir / "server.py").read_text()
+        assert "import environment" in server_content
+        assert "import settings" in server_content
+        assert "# Import root-level Python files" in server_content
+
+    def test_components_can_use_auto_discovered_root_files(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that components can import and use automatically discovered root files."""
+        # Create root file with shared constants
+        (sample_project / "shared.py").write_text('''
+API_ENDPOINT = "https://api.service.com"
+TIMEOUT = 30
+VERSION = "1.0"
+''')
+        
+        # Create component that uses the shared constants
+        tool_code = '''"""Tool that uses shared constants."""
+import shared
+
+def run():
+    return f"Connecting to {shared.API_ENDPOINT} v{shared.VERSION} with {shared.TIMEOUT}s timeout"
+
+export = run
+'''
+        (sample_project / "tools" / "api_tool.py").write_text(tool_code)
+        
+        # Build project
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build_output"
+        build_project(sample_project, settings, output_dir)
+        
+        # Verify shared.py was copied
+        shared_file = output_dir / "shared.py"  
+        assert shared_file.exists()
+        assert "API_ENDPOINT" in shared_file.read_text()
+        
+        # Verify the import is in the server file
+        server_content = (output_dir / "server.py").read_text()
+        assert "import shared" in server_content
+
+    def test_handles_syntax_errors_gracefully(self, sample_project: Path) -> None:
+        """Test that files with syntax errors are still included but generate warnings."""
+        # Create file with syntax error
+        (sample_project / "broken.py").write_text("invalid python syntax +++")
+        
+        # Should still discover the file
+        discovered = discover_root_files(sample_project)
+        assert "broken.py" in discovered
