@@ -2011,9 +2011,18 @@ export = run
         component_content = component_file.read_text()
         
         # The imports should be transformed to use relative imports from the component's perspective
-        # Components are in components/tools/, root files are in build root
-        # So: import config -> from ...config import config (or similar transformation)
         assert "..." in component_content  # Should contain relative imports
         
-        # Should not contain direct imports to root files anymore
-        assert "import config\n" not in component_content or "from ...config" in component_content
+        # Direct imports should be converted to from-imports 
+        # Check that the original "import config" line is not present (use regex to be precise)
+        import re
+        direct_import_pattern = r'^import config$'
+        assert not re.search(direct_import_pattern, component_content, re.MULTILINE)  # No direct imports remain
+        assert "from ...config import config" in component_content  # Converted to from-import
+        
+        # From-imports should also be transformed
+        assert "from ...config import API_URL, TIMEOUT" in component_content
+        
+        # Validate the generated code is syntactically correct
+        import ast
+        ast.parse(component_content)  # Should not raise SyntaxError
