@@ -1965,11 +1965,55 @@ export = run
         server_content = (output_dir / "server.py").read_text()
         assert "import shared" in server_content
 
-    def test_handles_syntax_errors_gracefully(self, sample_project: Path) -> None:
-        """Test that files with syntax errors are still included but generate warnings."""
-        # Create file with syntax error
-        (sample_project / "broken.py").write_text("invalid python syntax +++")
+    def test_includes_any_readable_python_file(self, sample_project: Path) -> None:
+        """Test that any readable Python file is included without syntax validation."""
+        # Create file that would have syntax errors but is still a readable text file
+        (sample_project / "template.py").write_text("# This is a template file\nAPI_URL = {api_url}\nAPI_KEY = {api_key}")
         
-        # Should still discover the file
+        # Should discover and include the file without validation
         discovered = discover_root_files(sample_project)
-        assert "broken.py" in discovered
+        assert "template.py" in discovered
+
+    def test_root_file_imports_transformed_correctly(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test that imports from root files are correctly transformed in components."""
+        # Create a root file
+        (sample_project / "config.py").write_text('''
+API_URL = "https://api.example.com"
+TIMEOUT = 30
+''')
+        
+        # Create a tool that imports from the root file using different import styles
+        tool_code = '''"""Test tool with root file imports."""
+import config
+from config import API_URL, TIMEOUT
+
+def run() -> dict:
+    """Tool that uses root file imports."""
+    return {
+        "url": config.API_URL,
+        "direct_url": API_URL,
+        "timeout": TIMEOUT
+    }
+
+export = run
+'''
+        (sample_project / "tools" / "import_test.py").write_text(tool_code)
+        
+        # Build the project
+        settings = load_settings(sample_project)
+        generator = CodeGenerator(sample_project, settings, temp_dir)
+        generator.generate()
+        
+        # Check the transformed component file
+        component_file = temp_dir / "components" / "tools" / "import_test.py"
+        assert component_file.exists()
+        
+        component_content = component_file.read_text()
+        
+        # The imports should be transformed to use relative imports from the component's perspective
+        # Components are in components/tools/, root files are in build root
+        # So: import config -> from ...config import config (or similar transformation)
+        assert "..." in component_content  # Should contain relative imports
+        
+        # Should not contain direct imports to root files anymore
+        assert "import config\n" not in component_content or "from ...config" in component_content

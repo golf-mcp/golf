@@ -20,6 +20,7 @@ class ImportTransformer(ast.NodeTransformer):
         target_path: Path,
         import_map: dict[str, str],
         project_root: Path,
+        root_file_modules: set[str] | None = None,
     ) -> None:
         """Initialize the import transformer.
 
@@ -28,20 +29,45 @@ class ImportTransformer(ast.NodeTransformer):
             target_path: Path to the target file
             import_map: Mapping of original module paths to generated paths
             project_root: Root path of the project
+            root_file_modules: Set of root file module names (without .py extension)
         """
         self.original_path = original_path
         self.target_path = target_path
         self.import_map = import_map
         self.project_root = project_root
+        self.root_file_modules = root_file_modules or set()
 
     def visit_Import(self, node: ast.Import) -> Any:
         """Transform import statements."""
+        # Check if any of the imported names are root file modules
+        new_names = []
+        for alias in node.names:
+            module_name = alias.name
+
+            # If this is a root file module, we need to adjust the import path
+            if module_name in self.root_file_modules:
+                # Components are in components/tools/, components/resources/, etc.
+                # Root files are in the build root, so we need to go up directories
+                # to reach them: ../../module_name
+                new_names.append(ast.alias(name=f"...{module_name}", asname=alias.asname))
+            else:
+                new_names.append(alias)
+
+        # If we made any changes, return a new node
+        if any(alias.name != orig_alias.name for alias, orig_alias in zip(new_names, node.names, strict=False)):
+            return ast.Import(names=new_names)
+
         return node
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
         """Transform import from statements."""
         if node.module is None:
             return node
+
+        # Check if this is importing from a root file module
+        if node.level == 0 and node.module in self.root_file_modules:
+            # Convert to relative import: from env import API_KEY -> from ...env import API_KEY
+            return ast.ImportFrom(module=node.module, names=node.names, level=3)
 
         # Handle relative imports
         if node.level > 0:
@@ -98,6 +124,7 @@ def transform_component(
     project_path: Path,
     import_map: dict[str, str],
     source_file: Path | None = None,
+    root_file_modules: set[str] | None = None,
 ) -> str:
     """Transform a GolfMCP component into a standalone FastMCP component.
 
@@ -107,6 +134,7 @@ def transform_component(
         project_path: Path to the project root
         import_map: Mapping of original module paths to generated paths
         source_file: Optional path to source file (for shared files)
+        root_file_modules: Set of root file module names (without .py extension)
 
     Returns:
         Generated component code
@@ -126,7 +154,7 @@ def transform_component(
     tree = ast.parse(source_code)
 
     # Transform imports
-    transformer = ImportTransformer(file_path, output_file, import_map, project_path)
+    transformer = ImportTransformer(file_path, output_file, import_map, project_path, root_file_modules)
     tree = transformer.visit(tree)
 
     # Get all imports and docstring

@@ -399,6 +399,11 @@ class CodeGenerator:
 
         return root_file_imports
 
+    def _get_root_file_modules(self) -> set[str]:
+        """Get set of root file module names for import transformation."""
+        discovered_files = discover_root_files(self.project_path)
+        return {Path(filename).stem for filename in discovered_files.keys()}
+
     def _create_directory_structure(self) -> None:
         """Create the output directory structure"""
         # Create main directories
@@ -444,12 +449,14 @@ class CodeGenerator:
             target_file = target_dir / shared_file.name
 
             # Use transformer to process the file
+            root_file_modules = self._get_root_file_modules()
             transform_component(
                 component=None,
                 output_file=target_file,
                 project_path=self.project_path,
                 import_map=self.import_map,
                 source_file=shared_file,
+                root_file_modules=root_file_modules,
             )
 
     def _generate_tools(self) -> None:
@@ -474,7 +481,10 @@ class CodeGenerator:
 
             # Create the tool file
             output_file = tool_dir / rel_path.name
-            transform_component(tool, output_file, self.project_path, self.import_map)
+            root_file_modules = self._get_root_file_modules()
+            transform_component(
+                tool, output_file, self.project_path, self.import_map, root_file_modules=root_file_modules
+            )
 
     def _generate_resources(self) -> None:
         """Generate code for all resources."""
@@ -498,7 +508,10 @@ class CodeGenerator:
 
             # Create the resource file
             output_file = resource_dir / rel_path.name
-            transform_component(resource, output_file, self.project_path, self.import_map)
+            root_file_modules = self._get_root_file_modules()
+            transform_component(
+                resource, output_file, self.project_path, self.import_map, root_file_modules=root_file_modules
+            )
 
     def _generate_prompts(self) -> None:
         """Generate code for all prompts."""
@@ -522,7 +535,10 @@ class CodeGenerator:
 
             # Create the prompt file
             output_file = prompt_dir / rel_path.name
-            transform_component(prompt, output_file, self.project_path, self.import_map)
+            root_file_modules = self._get_root_file_modules()
+            transform_component(
+                prompt, output_file, self.project_path, self.import_map, root_file_modules=root_file_modules
+            )
 
     def _get_transport_config(self, transport_type: str) -> dict:
         """Get transport-specific configuration (primarily for endpoint path display).
@@ -1720,8 +1736,6 @@ def discover_root_files(project_path: Path) -> dict[str, Path]:
     Returns:
         Dictionary mapping filenames to their full paths
     """
-    import ast
-
     discovered_files = {}
 
     # Files that are handled specially by Golf and should not be auto-copied
@@ -1757,19 +1771,11 @@ def discover_root_files(project_path: Path) -> dict[str, Path]:
             if filename.startswith(".") or filename.startswith("_") or filename.endswith("~"):
                 continue
 
-            # Validate it's a readable Python file
+            # Just verify it's a readable file
             try:
                 with open(file_path, encoding="utf-8") as f:
-                    # Read first 200 chars to validate it's a proper Python file
-                    content = f.read(200)
-
-                # Basic Python syntax validation
-                try:
-                    ast.parse(content + "\n# truncated for validation")
-                except SyntaxError:
-                    # Still include files with syntax errors, but warn
-                    console.print(f"[yellow]Warning: {filename} has syntax issues but will be included[/yellow]")
-
+                    # Just check if file is readable - don't validate syntax
+                    f.read(1)  # Read one character to verify readability
             except (OSError, UnicodeDecodeError) as e:
                 console.print(f"[yellow]Warning: Cannot read {filename}, skipping: {e}[/yellow]")
                 continue
