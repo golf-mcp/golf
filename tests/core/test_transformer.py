@@ -2,7 +2,6 @@
 
 import ast
 from pathlib import Path
-import pytest
 
 from golf.core.transformer import ImportTransformer
 

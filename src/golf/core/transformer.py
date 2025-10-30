@@ -42,12 +42,12 @@ class ImportTransformer(ast.NodeTransformer):
         try:
             # Get component path relative to project root
             relative_path = self.target_path.relative_to(self.project_root)
-            
+
             # Count directory levels: components/tools/weather.py = 2 levels, needs level=2
             # components/tools/api/handler.py = 3 levels, needs level=3
             # Build root contains the root files, so depth = number of path parts
             return len(relative_path.parts) - 1  # Subtract 1 for the filename itself
-            
+
         except ValueError:
             # Fallback to level=3 if path calculation fails
             return 3
@@ -55,14 +55,14 @@ class ImportTransformer(ast.NodeTransformer):
     def visit_Import(self, node: ast.Import) -> Any:
         """Transform import statements."""
         new_names = []
-        
+
         for alias in node.names:
             module_name = alias.name
-            
+
             if module_name in self.root_file_modules:
                 # Calculate dynamic depth based on component location
                 depth = self._calculate_import_depth()
-                
+
                 # Convert to from-import: import config -> from ...config import config
                 # Or if there's an asname: import config as cfg -> from ...config import config as cfg
                 if alias.asname:
@@ -71,18 +71,16 @@ class ImportTransformer(ast.NodeTransformer):
                     asname = alias.asname
                 else:
                     # import config -> from ...config import config
-                    import_name = module_name  
+                    import_name = module_name
                     asname = None
-                
+
                 # Return a from-import instead of continuing with import
                 return ast.ImportFrom(
-                    module=module_name,
-                    names=[ast.alias(name=import_name, asname=asname)],
-                    level=depth
+                    module=module_name, names=[ast.alias(name=import_name, asname=asname)], level=depth
                 )
             else:
                 new_names.append(alias)
-        
+
         # If no root modules, return original or modified import
         if new_names != list(node.names):
             return ast.Import(names=new_names)
@@ -207,7 +205,7 @@ def transform_component(
 
     # Build full transformed code - start with docstring first (Python convention)
     transformed_code = ""
-    
+
     # Add docstring first if present, using proper triple quotes for multi-line docstrings
     if docstring:
         # Check if docstring contains newlines
