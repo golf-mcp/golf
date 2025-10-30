@@ -341,6 +341,13 @@ class CodeGenerator:
         self.manifest = {}
         self.shared_files = {}
         self.import_map = {}
+        self._root_files_cache = None  # Cache for discovered root files
+
+    def _get_cached_root_files(self) -> dict[str, Path]:
+        """Get cached root files, discovering them only once."""
+        if self._root_files_cache is None:
+            self._root_files_cache = discover_root_files(self.project_path)
+        return self._root_files_cache
 
     def generate(self) -> None:
         """Generate the FastMCP application code."""
@@ -386,7 +393,7 @@ class CodeGenerator:
     def _generate_root_file_imports(self) -> list[str]:
         """Generate import statements for automatically discovered root files."""
         root_file_imports = []
-        discovered_files = discover_root_files(self.project_path)
+        discovered_files = self._get_cached_root_files()
 
         if discovered_files:
             root_file_imports.append("# Import root-level Python files")
@@ -401,7 +408,7 @@ class CodeGenerator:
 
     def _get_root_file_modules(self) -> set[str]:
         """Get set of root file module names for import transformation."""
-        discovered_files = discover_root_files(self.project_path)
+        discovered_files = self._get_cached_root_files()
         return {Path(filename).stem for filename in discovered_files.keys()}
 
     def _create_directory_structure(self) -> None:
@@ -1612,8 +1619,8 @@ def build_project(
         shutil.copy2(health_path, output_dir)
         console.print(get_status_text("success", "Health script copied to build directory"))
 
-    # Copy any additional Python files from project root
-    discovered_root_files = discover_root_files(project_path)
+    # Copy any additional Python files from project root (reuse cached discovery from generator)
+    discovered_root_files = generator._get_cached_root_files()
 
     for filename, file_path in discovered_root_files.items():
         dest_path = output_dir / filename

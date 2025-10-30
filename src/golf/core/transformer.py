@@ -37,26 +37,53 @@ class ImportTransformer(ast.NodeTransformer):
         self.project_root = project_root
         self.root_file_modules = root_file_modules or set()
 
+    def _calculate_import_depth(self) -> int:
+        """Calculate the relative import depth needed to reach build root from component location."""
+        try:
+            # Get component path relative to project root
+            relative_path = self.target_path.relative_to(self.project_root)
+
+            # Count directory levels: components/tools/weather.py = 2 levels, needs level=2
+            # components/tools/api/handler.py = 3 levels, needs level=3
+            # Build root contains the root files, so depth = number of path parts
+            return len(relative_path.parts) - 1  # Subtract 1 for the filename itself
+
+        except ValueError:
+            # Fallback to level=3 if path calculation fails
+            return 3
+
     def visit_Import(self, node: ast.Import) -> Any:
         """Transform import statements."""
-        # Check if any of the imported names are root file modules
         new_names = []
+
         for alias in node.names:
             module_name = alias.name
 
-            # If this is a root file module, we need to adjust the import path
             if module_name in self.root_file_modules:
-                # Components are in components/tools/, components/resources/, etc.
-                # Root files are in the build root, so we need to go up directories
-                # to reach them: ../../module_name
-                new_names.append(ast.alias(name=f"...{module_name}", asname=alias.asname))
+                # Calculate dynamic depth based on component location
+                depth = self._calculate_import_depth()
+
+                # Convert to from-import: import config -> from ...config import config
+                # Or if there's an asname: import config as cfg -> from ...config import config as cfg
+                if alias.asname:
+                    # import config as cfg -> from ...config import config as cfg
+                    import_name = module_name
+                    asname = alias.asname
+                else:
+                    # import config -> from ...config import config
+                    import_name = module_name
+                    asname = None
+
+                # Return a from-import instead of continuing with import
+                return ast.ImportFrom(
+                    module=module_name, names=[ast.alias(name=import_name, asname=asname)], level=depth
+                )
             else:
                 new_names.append(alias)
 
-        # If we made any changes, return a new node
-        if any(alias.name != orig_alias.name for alias, orig_alias in zip(new_names, node.names, strict=False)):
+        # If no root modules, return original or modified import
+        if new_names != list(node.names):
             return ast.Import(names=new_names)
-
         return node
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
@@ -66,8 +93,9 @@ class ImportTransformer(ast.NodeTransformer):
 
         # Check if this is importing from a root file module
         if node.level == 0 and node.module in self.root_file_modules:
-            # Convert to relative import: from env import API_KEY -> from ...env import API_KEY
-            return ast.ImportFrom(module=node.module, names=node.names, level=3)
+            # Calculate dynamic depth instead of using hardcoded level=3
+            depth = self._calculate_import_depth()
+            return ast.ImportFrom(module=node.module, names=node.names, level=depth)
 
         # Handle relative imports
         if node.level > 0:
@@ -175,13 +203,10 @@ def transform_component(
         if isinstance(node, ast.Import | ast.ImportFrom):
             imports.append(node)
 
-    # Generate the transformed code
-    transformed_imports = ast.unparse(ast.Module(body=imports, type_ignores=[]))
+    # Build full transformed code - start with docstring first (Python convention)
+    transformed_code = ""
 
-    # Build full transformed code
-    transformed_code = transformed_imports + "\n\n"
-
-    # Add docstring if present, using proper triple quotes for multi-line docstrings
+    # Add docstring first if present, using proper triple quotes for multi-line docstrings
     if docstring:
         # Check if docstring contains newlines
         if "\n" in docstring:
@@ -190,6 +215,11 @@ def transform_component(
         else:
             # Use single quotes for single-line docstrings
             transformed_code += f'"{docstring}"\n\n'
+
+    # Add transformed imports after docstring
+    if imports:
+        transformed_imports = ast.unparse(ast.Module(body=imports, type_ignores=[]))
+        transformed_code += transformed_imports + "\n\n"
 
     # Add the rest of the code except imports and the original docstring
     remaining_nodes = []
