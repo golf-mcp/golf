@@ -105,11 +105,6 @@ class AstParser:
         except SyntaxError as e:
             raise ValueError(f"Syntax error in {file_path}: {e}")
 
-        # Extract module docstring
-        module_docstring = ast.get_docstring(tree)
-        if not module_docstring:
-            raise ValueError(f"Missing module docstring in {file_path}")
-
         # Find the entry function - look for "export = function_name" pattern,
         # or any top-level function (like "run") as a fallback
         entry_function = None
@@ -149,13 +144,16 @@ class AstParser:
         if not entry_function:
             return []
 
+        # Extract component description prioritizing function over module docstring
+        description = self._extract_component_description(tree, entry_function, file_path)
+
         # Create component
         component = ParsedComponent(
             name="",  # Will be set later
             type=component_type,
             file_path=file_path,
             module_path=file_path.relative_to(self.project_root).as_posix(),
-            docstring=module_docstring,
+            docstring=description,
             entry_function=export_target or "run",  # Store the name of the entry function
         )
 
@@ -180,6 +178,41 @@ class AstParser:
                 component.parent_module = ".".join(parent_parts)
 
         return [component]
+
+    def _extract_component_description(
+        self, tree: ast.Module, entry_function: ast.FunctionDef | ast.AsyncFunctionDef, file_path: Path
+    ) -> str:
+        """Extract component description prioritizing function over module docstring.
+        
+        Args:
+            tree: The AST module
+            entry_function: The entry function node
+            file_path: Path to the file being parsed
+            
+        Returns:
+            The description string from function or module docstring
+            
+        Raises:
+            ValueError: If neither function nor module docstring is found
+        """
+        function_docstring = None
+        module_docstring = ast.get_docstring(tree)
+        
+        # Extract function docstring if entry function exists
+        if entry_function:
+            function_docstring = ast.get_docstring(entry_function)
+        
+        # Prefer function docstring, fall back to module docstring
+        description = function_docstring or module_docstring
+        
+        if not description:
+            raise ValueError(
+                f"Missing docstring in {file_path}. "
+                f"Add either a function docstring to your exported function "
+                f"or a module docstring at the top of the file."
+            )
+        
+        return description
 
     def _process_entry_function(
         self,
