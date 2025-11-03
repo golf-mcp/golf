@@ -684,6 +684,25 @@ class CodeGenerator:
             "",
         ]
 
+    def _generate_syspath_section(self) -> list[str]:
+        """Generate sys.path setup for absolute root file imports."""
+        discovered_files = self._get_cached_root_files()
+        if not discovered_files:
+            return []
+        
+        return [
+            "",
+            "# Enable absolute imports for root files", 
+            "import sys",
+            "from pathlib import Path",
+            "",
+            "# Add build root to Python path for global root file access",
+            "_build_root = str(Path(__file__).parent)",
+            "if _build_root not in sys.path:",
+            "    sys.path.insert(0, _build_root)",
+            "",
+        ]
+
     def _generate_readiness_section(self, project_path: Path) -> list[str]:
         """Generate code section for readiness.py execution during server runtime."""
         readiness_path = project_path / "readiness.py"
@@ -1191,6 +1210,9 @@ class CodeGenerator:
             "",
         ]
 
+        # Generate syspath section  
+        syspath_section = self._generate_syspath_section()
+
         # Generate startup section
         startup_section = self._generate_startup_section(self.project_path)
 
@@ -1399,12 +1421,13 @@ class CodeGenerator:
         check_helper_section = []
 
         # Combine all sections
-        # Order: imports, env_section, startup_section, auth_setup, server_code (mcp init),
+        # Order: imports, env_section, syspath_section, startup_section, auth_setup, server_code (mcp init),
         # early_telemetry_init, early_metrics_init, component_registrations,
         # metrics_route_code, check_helper_section, readiness_section, health_section, main_code (run block)
         code = "\n".join(
             imports
             + env_section
+            + syspath_section
             + startup_section
             + auth_setup_code
             + server_code_lines
