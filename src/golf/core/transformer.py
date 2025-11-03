@@ -60,24 +60,9 @@ class ImportTransformer(ast.NodeTransformer):
             module_name = alias.name
 
             if module_name in self.root_file_modules:
-                # Calculate dynamic depth based on component location
-                depth = self._calculate_import_depth()
-
-                # Convert to from-import: import config -> from ...config import config
-                # Or if there's an asname: import config as cfg -> from ...config import config as cfg
-                if alias.asname:
-                    # import config as cfg -> from ...config import config as cfg
-                    import_name = module_name
-                    asname = alias.asname
-                else:
-                    # import config -> from ...config import config
-                    import_name = module_name
-                    asname = None
-
-                # Return a from-import instead of continuing with import
-                return ast.ImportFrom(
-                    module=module_name, names=[ast.alias(name=import_name, asname=asname)], level=depth
-                )
+                # Keep original import unchanged - sys.path will handle resolution
+                new_names.append(alias)
+                continue
             else:
                 new_names.append(alias)
 
@@ -93,9 +78,8 @@ class ImportTransformer(ast.NodeTransformer):
 
         # Check if this is importing from a root file module
         if node.level == 0 and node.module in self.root_file_modules:
-            # Calculate dynamic depth instead of using hardcoded level=3
-            depth = self._calculate_import_depth()
-            return ast.ImportFrom(module=node.module, names=node.names, level=depth)
+            # Keep unchanged - sys.path will handle resolution
+            return node
 
         # Handle relative imports
         if node.level > 0:
