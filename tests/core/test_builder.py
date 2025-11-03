@@ -2026,3 +2026,154 @@ export = run
         # Validate the generated code is syntactically correct
         import ast
         ast.parse(component_content)  # Should not raise SyntaxError
+
+
+class TestFunctionDocstringBuilderIntegration:
+    """Test builder integration with function docstring extraction."""
+    
+    def test_builder_uses_function_docstring_in_tool_manifest(self, sample_project: Path) -> None:
+        """Test that builder includes function docstrings in tool manifest."""
+        # Create tool with function docstring taking priority
+        tool_file = sample_project / "tools" / "function_doc_tool.py"
+        tool_file.write_text('''"""Module docstring."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def test_action() -> Output:
+    """Execute test action with detailed function description."""
+    return Output(result="success")
+
+export = test_action
+''')
+        
+        settings = load_settings(sample_project)
+        manifest = build_manifest(sample_project, settings)
+        
+        assert len(manifest["tools"]) == 1
+        tool = manifest["tools"][0]
+        
+        # Verify function docstring is used, not module docstring
+        assert tool["description"] == "Execute test action with detailed function description."
+        assert tool["name"] == "function_doc_tool"
+    
+    def test_builder_uses_module_docstring_fallback(self, sample_project: Path) -> None:
+        """Test that builder falls back to module docstring when function docstring missing."""
+        tool_file = sample_project / "tools" / "module_fallback_tool.py"
+        tool_file.write_text('''"""Module docstring used as fallback."""
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def test_action() -> Output:
+    # No function docstring
+    return Output(result="success")
+
+export = test_action
+''')
+        
+        settings = load_settings(sample_project)
+        manifest = build_manifest(sample_project, settings)
+        
+        assert len(manifest["tools"]) == 1
+        tool = manifest["tools"][0]
+        
+        # Verify module docstring is used as fallback
+        assert tool["description"] == "Module docstring used as fallback."
+        
+    def test_builder_uses_function_docstring_for_resource(self, sample_project: Path) -> None:
+        """Test that builder uses function docstring for resources."""
+        resource_file = sample_project / "resources" / "function_doc_resource.py"
+        resource_file.write_text('''"""Module docstring."""
+
+resource_uri = "test://data/{id}"
+
+def get_resource(id: str) -> dict:
+    """Get resource with detailed function description."""
+    return {"id": id, "data": "value"}
+
+export = get_resource
+''')
+        
+        settings = load_settings(sample_project)
+        manifest = build_manifest(sample_project, settings)
+        
+        assert len(manifest["resources"]) == 1
+        resource = manifest["resources"][0]
+        
+        # Verify function docstring is used for resource
+        assert resource["description"] == "Get resource with detailed function description."
+        assert resource["name"] == "function_doc_resource"
+        
+    def test_builder_uses_function_docstring_for_prompt(self, sample_project: Path) -> None:
+        """Test that builder uses function docstring for prompts."""
+        prompt_file = sample_project / "prompts" / "function_doc_prompt.py"
+        prompt_file.write_text('''"""Module docstring."""
+
+def generate_prompt(name: str) -> list:
+    """Generate greeting prompt with detailed function description."""
+    return [
+        {"role": "system", "content": "You are helpful"},
+        {"role": "user", "content": f"Hello {name}"}
+    ]
+
+export = generate_prompt
+''')
+        
+        settings = load_settings(sample_project)
+        manifest = build_manifest(sample_project, settings)
+        
+        assert len(manifest["prompts"]) == 1
+        prompt = manifest["prompts"][0]
+        
+        # Verify function docstring is used for prompt
+        assert prompt["description"] == "Generate greeting prompt with detailed function description."
+        assert prompt["name"] == "function_doc_prompt"
+
+
+class TestAbsoluteImportsIntegration:
+    """Integration tests for absolute imports functionality."""
+
+    def test_absolute_imports_end_to_end(self, sample_project: Path, temp_dir: Path) -> None:
+        """Test complete build process with absolute imports for root files."""
+        # Create root file
+        (sample_project / "testfile.py").write_text('API_KEY = "test-key"')
+        
+        # Create nested component that imports root file
+        nested_dir = sample_project / "tools" / "api" / "v1"
+        nested_dir.mkdir(parents=True)
+        (nested_dir / "handler.py").write_text('''"""Handler tool."""
+import testfile
+from testfile import API_KEY
+
+from pydantic import BaseModel
+
+class Output(BaseModel):
+    result: str
+
+def handle() -> Output:
+    """Handle request using API key."""
+    return Output(result=f"Using {testfile.API_KEY}")
+
+export = handle
+''')
+        
+        # Build project
+        builder = CodeGenerator(sample_project, load_settings(sample_project), temp_dir)
+        builder.generate()
+        
+        # Verify server.py has sys.path setup
+        server_file = temp_dir / "server.py"
+        server_content = server_file.read_text()
+        assert "sys.path.insert(0, _build_root)" in server_content
+        
+        # Verify component uses direct imports (not transformed)
+        component_file = temp_dir / "components" / "tools" / "api" / "v1" / "handler.py"
+        component_content = component_file.read_text()
+        assert "import testfile" in component_content  # Direct import preserved
+        assert "from testfile import API_KEY" in component_content  # From-import preserved
+        assert "from ...." not in component_content  # No relative imports
