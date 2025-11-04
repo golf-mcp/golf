@@ -684,6 +684,25 @@ class CodeGenerator:
             "",
         ]
 
+    def _generate_syspath_section(self) -> list[str]:
+        """Generate sys.path setup for absolute root file imports."""
+        discovered_files = self._get_cached_root_files()
+        if not discovered_files:
+            return []
+
+        return [
+            "",
+            "# Enable absolute imports for root files",
+            "import sys",
+            "from pathlib import Path",
+            "",
+            "# Add build root to Python path for global root file access",
+            "_build_root = str(Path(__file__).parent)",
+            "if _build_root not in sys.path:",
+            "    sys.path.insert(0, _build_root)",
+            "",
+        ]
+
     def _generate_readiness_section(self, project_path: Path) -> list[str]:
         """Generate code section for readiness.py execution during server runtime."""
         readiness_path = project_path / "readiness.py"
@@ -988,7 +1007,7 @@ class CodeGenerator:
                         registration += (
                             f"\n_tool = Tool.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f"description={repr(component.docstring or '')})"
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
@@ -999,21 +1018,21 @@ class CodeGenerator:
                             registration += (
                                 f"\n_template = ResourceTemplate.from_function(_wrapped_func, "
                                 f'uri_template="{component.uri_template}", name="{component.name}", '
-                                f'description="{component.docstring or ""}")\n'
+                                f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_template(_template)"
                             )
                         else:
                             registration += (
                                 f"\n_resource = Resource.from_function(_wrapped_func, "
                                 f'uri="{component.uri_template}", name="{component.name}", '
-                                f'description="{component.docstring or ""}")\n'
+                                f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_resource(_resource)"
                             )
                     else:  # PROMPT
                         registration += (
                             f"\n_prompt = Prompt.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f'description="{component.docstring or ""}")\n'
+                            f"description={repr(component.docstring or '')})\n"
                             f"mcp.add_prompt(_prompt)"
                         )
                 elif self.settings.metrics_enabled:
@@ -1034,7 +1053,7 @@ class CodeGenerator:
                         registration += (
                             f"\n_tool = Tool.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f'description="{component.docstring or ""}")'
+                            f"description={repr(component.docstring or '')})"
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
@@ -1045,21 +1064,21 @@ class CodeGenerator:
                             registration += (
                                 f"\n_template = ResourceTemplate.from_function(_wrapped_func, "
                                 f'uri_template="{component.uri_template}", name="{component.name}", '
-                                f'description="{component.docstring or ""}")\n'
+                                f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_template(_template)"
                             )
                         else:
                             registration += (
                                 f"\n_resource = Resource.from_function(_wrapped_func, "
                                 f'uri="{component.uri_template}", name="{component.name}", '
-                                f'description="{component.docstring or ""}")\n'
+                                f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_resource(_resource)"
                             )
                     else:  # PROMPT
                         registration += (
                             f"\n_prompt = Prompt.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f'description="{component.docstring or ""}")\n'
+                            f"description={repr(component.docstring or '')})\n"
                             f"mcp.add_prompt(_prompt)"
                         )
                 else:
@@ -1081,9 +1100,8 @@ class CodeGenerator:
 
                         # Add description from docstring
                         if component.docstring:
-                            # Escape any quotes in the docstring
-                            escaped_docstring = component.docstring.replace('"', '\\"')
-                            registration += f', description="{escaped_docstring}"'
+                            # Use repr() for proper escaping of quotes, newlines, etc.
+                            registration += f", description={repr(component.docstring)}"
 
                         registration += ")"
 
@@ -1170,9 +1188,8 @@ class CodeGenerator:
 
                         # Add description from docstring
                         if component.docstring:
-                            # Escape any quotes in the docstring
-                            escaped_docstring = component.docstring.replace('"', '\\"')
-                            registration += f', description="{escaped_docstring}"'
+                            # Use repr() for proper escaping of quotes, newlines, etc.
+                            registration += f", description={repr(component.docstring)}"
 
                         registration += ")\nmcp.add_prompt(_prompt)"
 
@@ -1190,6 +1207,9 @@ class CodeGenerator:
             "load_dotenv()",
             "",
         ]
+
+        # Generate syspath section
+        syspath_section = self._generate_syspath_section()
 
         # Generate startup section
         startup_section = self._generate_startup_section(self.project_path)
@@ -1399,12 +1419,13 @@ class CodeGenerator:
         check_helper_section = []
 
         # Combine all sections
-        # Order: imports, env_section, startup_section, auth_setup, server_code (mcp init),
+        # Order: imports, env_section, syspath_section, startup_section, auth_setup, server_code (mcp init),
         # early_telemetry_init, early_metrics_init, component_registrations,
         # metrics_route_code, check_helper_section, readiness_section, health_section, main_code (run block)
         code = "\n".join(
             imports
             + env_section
+            + syspath_section
             + startup_section
             + auth_setup_code
             + server_code_lines

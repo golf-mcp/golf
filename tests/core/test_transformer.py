@@ -10,7 +10,7 @@ class TestImportTransformer:
     """Test cases for the ImportTransformer class."""
     
     def test_direct_import_transformation_simple(self, tmp_path):
-        """Test that direct imports are converted to from-imports."""
+        """Test that direct imports to root files are preserved unchanged."""
         # Setup paths - component at components/tools/weather.py (2 levels deep)
         project_root = tmp_path
         target_path = project_root / "components" / "tools" / "weather.py"
@@ -29,10 +29,8 @@ class TestImportTransformer:
         node = ast.Import(names=[ast.alias(name="config", asname=None)])
         result = transformer.visit(node)
         
-        # Should convert to: from ...config import config
-        assert isinstance(result, ast.ImportFrom)
-        assert result.module == "config"
-        assert result.level == 2  # components/tools/ = 2 levels
+        # Should remain unchanged as absolute import
+        assert isinstance(result, ast.Import)
         assert len(result.names) == 1
         assert result.names[0].name == "config"
         assert result.names[0].asname is None
@@ -55,10 +53,8 @@ class TestImportTransformer:
         node = ast.Import(names=[ast.alias(name="config", asname="cfg")])
         result = transformer.visit(node)
         
-        # Should convert to: from ...config import config as cfg
-        assert isinstance(result, ast.ImportFrom)
-        assert result.module == "config"
-        assert result.level == 2
+        # Should remain unchanged as absolute import
+        assert isinstance(result, ast.Import)
         assert len(result.names) == 1
         assert result.names[0].name == "config"
         assert result.names[0].asname == "cfg"
@@ -119,11 +115,11 @@ class TestImportTransformer:
         ])
         result = transformer.visit(node)
         
-        # Should convert config to from-import, returning the from-import for config
-        # (the transformer converts first root module found and returns)
-        assert isinstance(result, ast.ImportFrom)
-        assert result.module == "config"
-        assert result.level == 2
+        # Both imports should remain unchanged as absolute imports
+        assert isinstance(result, ast.Import)
+        assert len(result.names) == 2
+        assert result.names[0].name == "config"
+        assert result.names[1].name == "os"
         
     def test_from_import_transformation(self, tmp_path):
         """Test that from-imports are transformed with dynamic depth."""
@@ -150,10 +146,10 @@ class TestImportTransformer:
         )
         result = transformer.visit(node)
         
-        # Should convert to: from ...env import API_KEY, TIMEOUT
+        # Should remain unchanged as absolute from-import
         assert isinstance(result, ast.ImportFrom)
         assert result.module == "env"
-        assert result.level == 2  # Dynamic depth
+        assert result.level == 0  # Absolute import
         assert len(result.names) == 2
         assert result.names[0].name == "API_KEY"
         assert result.names[1].name == "TIMEOUT"
@@ -180,10 +176,10 @@ class TestImportTransformer:
         )
         result = transformer.visit(node)
         
-        # Should use level=5 for deeply nested component
+        # Should remain unchanged as absolute from-import
         assert isinstance(result, ast.ImportFrom)
         assert result.module == "database"
-        assert result.level == 5  # 6 parts - 1 for filename = 5
+        assert result.level == 0  # Absolute import
         
     def test_non_root_imports_unchanged(self, tmp_path):
         """Test that non-root imports are left unchanged."""
@@ -225,9 +221,8 @@ class TestImportTransformer:
             node = ast.Import(names=[ast.alias(name=module_name, asname=None)])
             result = transformer.visit(node)
             
-            assert isinstance(result, ast.ImportFrom)
-            assert result.module == module_name
-            assert result.level == 2
+            assert isinstance(result, ast.Import)
+            assert result.names[0].name == module_name
             
     def test_import_depth_calculation_fallback(self, tmp_path):
         """Test that depth calculation falls back gracefully on errors."""
@@ -293,3 +288,90 @@ class TestImportTransformer:
         # Since we don't have import_map entries, it should return unchanged
         # (this tests that the root file transformation doesn't interfere)
         assert result is node
+
+
+class TestAbsoluteImports:
+    """Test cases for absolute imports functionality."""
+    
+    def test_absolute_imports_preserves_direct_imports(self, tmp_path):
+        """Test that root file imports are preserved as direct imports."""
+        project_root = tmp_path
+        target_path = project_root / "components" / "tools" / "weather.py"
+        original_path = project_root / "tools" / "weather.py"
+        
+        transformer = ImportTransformer(
+            original_path=original_path,
+            target_path=target_path,
+            import_map={},
+            project_root=project_root,
+            root_file_modules={"config"},
+        )
+        
+        # Test import config -> import config (unchanged)
+        node = ast.Import(names=[ast.alias(name="config", asname=None)])
+        result = transformer.visit(node)
+        
+        # Should remain unchanged (absolute import)
+        assert isinstance(result, ast.Import)
+        assert result.names[0].name == "config"
+        assert result.names[0].asname is None
+        
+    def test_absolute_imports_preserves_from_imports(self, tmp_path):
+        """Test that root file from-imports are preserved unchanged."""
+        project_root = tmp_path
+        target_path = project_root / "components" / "tools" / "weather.py"
+        original_path = project_root / "tools" / "weather.py"
+        
+        transformer = ImportTransformer(
+            original_path=original_path,
+            target_path=target_path,
+            import_map={},
+            project_root=project_root,
+            root_file_modules={"config"},
+        )
+        
+        # Test from config import API_KEY -> from config import API_KEY (unchanged)
+        node = ast.ImportFrom(
+            module="config",
+            names=[ast.alias(name="API_KEY", asname=None)],
+            level=0
+        )
+        result = transformer.visit(node)
+        
+        # Should remain unchanged (absolute from-import)
+        assert isinstance(result, ast.ImportFrom)
+        assert result.module == "config"
+        assert result.level == 0  # Absolute import
+        assert result.names[0].name == "API_KEY"
+        
+    def test_absolute_imports_preserves_shared_file_behavior(self, tmp_path):
+        """Test that absolute imports don't affect shared file import transformation."""
+        project_root = tmp_path
+        original_path = project_root / "tools" / "weather.py"
+        target_path = project_root / "components" / "tools" / "weather.py"
+        
+        # Create the directories so the path calculations work
+        (project_root / "tools").mkdir()
+        
+        transformer = ImportTransformer(
+            original_path=original_path,
+            target_path=target_path,
+            import_map={"tools/helpers": "components.tools.helpers"},
+            project_root=project_root,
+            root_file_modules={"config"},
+        )
+        
+        # Test from .helpers import utils -> should transform based on import_map
+        # Since we're in tools/weather.py and do "from .helpers", it resolves to tools/helpers
+        node = ast.ImportFrom(
+            module="helpers",
+            names=[ast.alias(name="utils", asname=None)],
+            level=1  # Relative import (.helpers from tools/weather.py -> tools/helpers)
+        )
+        result = transformer.visit(node)
+        
+        # Should still be transformed (shared file behavior unchanged)
+        assert isinstance(result, ast.ImportFrom)
+        assert result.module == "components.tools.helpers"
+        assert result.level == 0  # Converted to absolute
+        assert result.names[0].name == "utils"
