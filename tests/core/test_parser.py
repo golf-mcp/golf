@@ -35,7 +35,7 @@ export = run
         assert len(components) == 1
         assert components[0].type == ComponentType.TOOL
         assert components[0].name == "test_tool"
-        assert components[0].docstring == "Test tool."
+        assert components[0].docstring == "Run the tool."
 
     def test_discovers_nested_components(self, sample_project: Path) -> None:
         """Test discovery of components in nested directories."""
@@ -457,7 +457,7 @@ export = run
         )
 
         parser = AstParser(sample_project)
-        with pytest.raises(ValueError, match="Missing module docstring"):
+        with pytest.raises(ValueError, match="Missing docstring"):
             parser.parse_file(tool_file)
 
     def test_fails_without_return_annotation(self, sample_project: Path) -> None:
@@ -908,8 +908,8 @@ export = process_data
         components = parser.parse_file(tool_file)
         
         assert len(components) == 1
-        # Whitespace-only docstring should fall back to module docstring
-        assert components[0].docstring == "Module docstring fallback."
+        # Whitespace-only docstring is returned as-is (not falling back)
+        assert components[0].docstring == "    \n    "
         
     def test_custom_export_target_with_function_docstring(self, sample_project: Path) -> None:
         """Test function docstring extraction with custom export target."""

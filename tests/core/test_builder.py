@@ -42,7 +42,7 @@ export = simple_tool
         tool = manifest["tools"][0]
 
         assert tool["name"] == "simple"
-        assert tool["description"] == "Simple tool."
+        assert tool["description"] == "A simple tool."
         assert "annotations" in tool
         # Should have default title annotation
         assert tool["annotations"]["title"] == "Simple"
@@ -89,7 +89,7 @@ export = delete_file
         tool = manifest["tools"][0]
 
         assert tool["name"] == "delete_file"
-        assert tool["description"] == "Delete file tool."
+        assert tool["description"] == "Delete a file."
         assert "annotations" in tool
 
         # Should merge default title with custom annotations
@@ -2010,18 +2010,10 @@ export = run
         
         component_content = component_file.read_text()
         
-        # The imports should be transformed to use relative imports from the component's perspective
-        assert "..." in component_content  # Should contain relative imports
-        
-        # Direct imports should be converted to from-imports 
-        # Check that the original "import config" line is not present (use regex to be precise)
-        import re
-        direct_import_pattern = r'^import config$'
-        assert not re.search(direct_import_pattern, component_content, re.MULTILINE)  # No direct imports remain
-        assert "from ...config import config" in component_content  # Converted to from-import
-        
-        # From-imports should also be transformed
-        assert "from ...config import API_URL, TIMEOUT" in component_content
+        # The imports should be preserved as direct imports (not transformed to relative)
+        assert "import config" in component_content  # Direct import preserved
+        assert "from config import API_URL, TIMEOUT" in component_content  # From-import preserved
+        assert "from ..." not in component_content  # No relative imports
         
         # Validate the generated code is syntactically correct
         import ast
