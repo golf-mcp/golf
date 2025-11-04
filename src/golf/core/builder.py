@@ -689,10 +689,10 @@ class CodeGenerator:
         discovered_files = self._get_cached_root_files()
         if not discovered_files:
             return []
-        
+
         return [
             "",
-            "# Enable absolute imports for root files", 
+            "# Enable absolute imports for root files",
             "import sys",
             "from pathlib import Path",
             "",
@@ -1007,7 +1007,7 @@ class CodeGenerator:
                         registration += (
                             f"\n_tool = Tool.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f'description={repr(component.docstring or "")})'
+                            f"description={repr(component.docstring or '')})"
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
@@ -1018,21 +1018,21 @@ class CodeGenerator:
                             registration += (
                                 f"\n_template = ResourceTemplate.from_function(_wrapped_func, "
                                 f'uri_template="{component.uri_template}", name="{component.name}", '
-                                f'description={repr(component.docstring or "")})\n'
+                                f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_template(_template)"
                             )
                         else:
                             registration += (
                                 f"\n_resource = Resource.from_function(_wrapped_func, "
                                 f'uri="{component.uri_template}", name="{component.name}", '
-                                f'description={repr(component.docstring or "")})\n'
+                                f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_resource(_resource)"
                             )
                     else:  # PROMPT
                         registration += (
                             f"\n_prompt = Prompt.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f'description={repr(component.docstring or "")})\n'
+                            f"description={repr(component.docstring or '')})\n"
                             f"mcp.add_prompt(_prompt)"
                         )
                 elif self.settings.metrics_enabled:
@@ -1053,7 +1053,7 @@ class CodeGenerator:
                         registration += (
                             f"\n_tool = Tool.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f'description={repr(component.docstring or "")})'
+                            f"description={repr(component.docstring or '')})"
                         )
                         # Add annotations if present
                         if hasattr(component, "annotations") and component.annotations:
@@ -1064,21 +1064,21 @@ class CodeGenerator:
                             registration += (
                                 f"\n_template = ResourceTemplate.from_function(_wrapped_func, "
                                 f'uri_template="{component.uri_template}", name="{component.name}", '
-                                f'description={repr(component.docstring or "")})\n'
+                                f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_template(_template)"
                             )
                         else:
                             registration += (
                                 f"\n_resource = Resource.from_function(_wrapped_func, "
                                 f'uri="{component.uri_template}", name="{component.name}", '
-                                f'description={repr(component.docstring or "")})\n'
+                                f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_resource(_resource)"
                             )
                     else:  # PROMPT
                         registration += (
                             f"\n_prompt = Prompt.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f'description={repr(component.docstring or "")})\n'
+                            f"description={repr(component.docstring or '')})\n"
                             f"mcp.add_prompt(_prompt)"
                         )
                 else:
@@ -1101,7 +1101,7 @@ class CodeGenerator:
                         # Add description from docstring
                         if component.docstring:
                             # Use repr() for proper escaping of quotes, newlines, etc.
-                            registration += f', description={repr(component.docstring)}'
+                            registration += f", description={repr(component.docstring)}"
 
                         registration += ")"
 
@@ -1189,7 +1189,7 @@ class CodeGenerator:
                         # Add description from docstring
                         if component.docstring:
                             # Use repr() for proper escaping of quotes, newlines, etc.
-                            registration += f', description={repr(component.docstring)}'
+                            registration += f", description={repr(component.docstring)}"
 
                         registration += ")\nmcp.add_prompt(_prompt)"
 
@@ -1208,7 +1208,7 @@ class CodeGenerator:
             "",
         ]
 
-        # Generate syspath section  
+        # Generate syspath section
         syspath_section = self._generate_syspath_section()
 
         # Generate startup section

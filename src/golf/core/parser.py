@@ -183,35 +183,35 @@ class AstParser:
         self, tree: ast.Module, entry_function: ast.FunctionDef | ast.AsyncFunctionDef, file_path: Path
     ) -> str:
         """Extract component description prioritizing function over module docstring.
-        
+
         Args:
             tree: The AST module
             entry_function: The entry function node
             file_path: Path to the file being parsed
-            
+
         Returns:
             The description string from function or module docstring
-            
+
         Raises:
             ValueError: If neither function nor module docstring is found
         """
         function_docstring = None
         module_docstring = ast.get_docstring(tree)
-        
+
         # Extract function docstring if entry function exists
         if entry_function:
             function_docstring = ast.get_docstring(entry_function)
-        
+
         # Prefer function docstring, fall back to module docstring
         description = function_docstring or module_docstring
-        
+
         if not description:
             raise ValueError(
                 f"Missing docstring in {file_path}. "
                 f"Add either a function docstring to your exported function "
                 f"or a module docstring at the top of the file."
             )
-        
+
         return description
 
     def _process_entry_function(
