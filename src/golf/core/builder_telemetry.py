@@ -46,13 +46,13 @@ def generate_component_registration_with_telemetry(
         Python code string for registering the component with instrumentation
     """
     func_ref = f"{module_path}.{entry_function}"
-    escaped_docstring = docstring.replace('"', '\\"') if docstring else ""
+    escaped_docstring = repr(docstring) if docstring else '""'
 
     if component_type == "tool":
         wrapped_func = f"instrument_tool({func_ref}, '{component_name}')"
         return (
             f"_tool = Tool.from_function({wrapped_func}, "
-            f'name="{component_name}", description="{escaped_docstring}")\n'
+            f'name="{component_name}", description={escaped_docstring})\n'
             f"mcp.add_tool(_tool)"
         )
 
@@ -62,14 +62,14 @@ def generate_component_registration_with_telemetry(
             return (
                 f"_resource = ResourceTemplate.from_function({wrapped_func}, "
                 f'uri_template="{uri_template}", name="{component_name}", '
-                f'description="{escaped_docstring}")\n'
+                f'description={escaped_docstring})\n'
                 f"mcp.add_template(_resource)"
             )
         else:
             return (
                 f"_resource = Resource.from_function({wrapped_func}, "
                 f'uri="{uri_template}", name="{component_name}", '
-                f'description="{escaped_docstring}")\n'
+                f'description={escaped_docstring})\n'
                 f"mcp.add_resource(_resource)"
             )
 
@@ -77,7 +77,7 @@ def generate_component_registration_with_telemetry(
         wrapped_func = f"instrument_prompt({func_ref}, '{component_name}')"
         return (
             f"_prompt = Prompt.from_function({wrapped_func}, "
-            f'name="{component_name}", description="{escaped_docstring}")\n'
+            f'name="{component_name}", description={escaped_docstring})\n'
             f"mcp.add_prompt(_prompt)"
         )
 
