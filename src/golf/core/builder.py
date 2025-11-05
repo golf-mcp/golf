@@ -16,6 +16,7 @@ from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.core.builder_telemetry import (
     generate_telemetry_imports,
 )
+from golf.session.redis_session_id import is_redis_configured
 from golf.cli.branding import create_build_header, get_status_text
 from golf.core.config import Settings
 from golf.core.parser import (
@@ -620,6 +621,61 @@ class CodeGenerator:
             # Default to older behavior for safety
             return False
 
+    def _generate_session_imports(self) -> list[str]:
+        """Generate session ID imports if Redis is configured."""
+        if not is_redis_configured():
+            return []
+        
+        return [
+            "from golf.session.redis_session_id import create_redis_handler",
+            "import asyncio",
+        ]
+
+    def _generate_session_patch_code(self) -> list[str]:
+        """Generate Redis session ID patching code."""
+        if not is_redis_configured():
+            return []
+        
+        return [
+            "# Redis session ID storage setup",
+            "redis_session_handler = create_redis_handler()",
+            "if redis_session_handler:",
+            "    # Initialize Redis connection at startup",
+            "    async def init_redis():",
+            "        success = await redis_session_handler.initialize()",
+            "        if success:",
+            "            print('Redis session ID storage enabled')",
+            "        else:",
+            "            print('Warning: Redis connection failed, using default session storage')",
+            "    ",
+            "    # Patch FastMCP's session_id property to use Redis",
+            "    import fastmcp.server.context",
+            "    original_session_id_func = fastmcp.server.context.Context.session_id.fget",
+            "    ",
+            "    def redis_session_id(self):",
+            "        # Try to get session ID from Redis first",
+            "        if redis_session_handler and redis_session_handler._redis:",
+            "            try:",
+            "                # Use request hash as context key for session persistence",
+            "                context_key = str(hash(str(self)))",
+            "                session_id = asyncio.run(redis_session_handler.get_session_id(context_key))",
+            "                if session_id:",
+            "                    return session_id",
+            "                # Generate new session ID and store in Redis",
+            "                return asyncio.run(redis_session_handler.generate_and_store_session_id(context_key))",
+            "            except Exception:",
+            "                pass  # Fall back to original behavior",
+            "        # Fall back to original FastMCP session ID behavior", 
+            "        return original_session_id_func(self)",
+            "    ",
+            "    # Apply the patch",
+            "    fastmcp.server.context.Context.session_id = property(redis_session_id)",
+            "    ",
+            "    # Initialize Redis connection",
+            "    asyncio.create_task(init_redis())",
+            "",
+        ]
+
     def _generate_startup_section(self, project_path: Path) -> list[str]:
         """Generate code section for startup.py execution during server runtime."""
         startup_path = project_path / "startup.py"
@@ -876,6 +932,12 @@ class CodeGenerator:
         # Add auth imports if auth is configured
         if auth_components.get("has_auth"):
             imports.extend(auth_components["imports"])
+            imports.append("")
+
+        # Add session imports if Redis is configured
+        session_imports = self._generate_session_imports()
+        if session_imports:
+            imports.extend(session_imports)
             imports.append("")
 
         # Add OpenTelemetry imports if enabled
@@ -1214,6 +1276,9 @@ class CodeGenerator:
         # Generate startup section
         startup_section = self._generate_startup_section(self.project_path)
 
+        # Generate session ID patching section
+        session_patch_code = self._generate_session_patch_code()
+
         # OpenTelemetry setup code will be handled through imports and lifespan
 
         # Add auth setup code if auth is configured
@@ -1419,7 +1484,7 @@ class CodeGenerator:
         check_helper_section = []
 
         # Combine all sections
-        # Order: imports, env_section, syspath_section, startup_section, auth_setup, server_code (mcp init),
+        # Order: imports, env_section, syspath_section, startup_section, session_patch_code, auth_setup, server_code (mcp init),
         # early_telemetry_init, early_metrics_init, component_registrations,
         # metrics_route_code, check_helper_section, readiness_section, health_section, main_code (run block)
         code = "\n".join(
@@ -1427,6 +1492,7 @@ class CodeGenerator:
             + env_section
             + syspath_section
             + startup_section
+            + session_patch_code
             + auth_setup_code
             + server_code_lines
             + early_telemetry_init
