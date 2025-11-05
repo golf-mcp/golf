@@ -1138,7 +1138,7 @@ class CodeGenerator:
                             # Add description from docstring
                             if component.docstring:
                                 # Use repr() for proper escaping of quotes, newlines, etc.
-                                registration += f', description={repr(component.docstring)}'
+                                registration += f", description={repr(component.docstring)}"
 
                             registration += ")\nmcp.add_template(_template)"
                         else:
@@ -1165,7 +1165,7 @@ class CodeGenerator:
                             # Add description from docstring
                             if component.docstring:
                                 # Use repr() for proper escaping of quotes, newlines, etc.
-                                registration += f', description={repr(component.docstring)}'
+                                registration += f", description={repr(component.docstring)}"
 
                             registration += ")\nmcp.add_resource(_resource)"
 

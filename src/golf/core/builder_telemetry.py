@@ -62,14 +62,14 @@ def generate_component_registration_with_telemetry(
             return (
                 f"_resource = ResourceTemplate.from_function({wrapped_func}, "
                 f'uri_template="{uri_template}", name="{component_name}", '
-                f'description={escaped_docstring})\n'
+                f"description={escaped_docstring})\n"
                 f"mcp.add_template(_resource)"
             )
         else:
             return (
                 f"_resource = Resource.from_function({wrapped_func}, "
                 f'uri="{uri_template}", name="{component_name}", '
-                f'description={escaped_docstring})\n'
+                f"description={escaped_docstring})\n"
                 f"mcp.add_resource(_resource)"
             )
 
