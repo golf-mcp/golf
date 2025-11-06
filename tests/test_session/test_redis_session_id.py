@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from golf.session.redis_session_id import RedisSessionIdHandler, is_redis_configured, create_redis_handler
+from golf.session.store import RedisSessionIdHandler, is_redis_configured, create_redis_handler
 
 
 class TestRedisSessionIdHandler:
@@ -87,7 +87,7 @@ class TestRedisSessionIdHandler:
     @pytest.mark.asyncio
     async def test_generate_and_store_session_id(self, handler):
         with patch.object(handler, 'store_session_id') as mock_store:
-            with patch('golf.session.redis_session_id.uuid4', return_value="mock-uuid"):
+            with patch('golf.session.store.uuid4', return_value="mock-uuid"):
                 result = await handler.generate_and_store_session_id("context-key")
                 assert result == "mock-uuid"
                 mock_store.assert_called_once_with("context-key", "mock-uuid")
