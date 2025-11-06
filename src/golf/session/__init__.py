@@ -1,5 +1,5 @@
-"""Simple session ID storage for Golf MCP servers."""
+"""Session storage for Golf MCP servers."""
 
-from .redis_session_id import RedisSessionIdHandler, is_redis_configured
+from .store import RedisSessionIdHandler, RedisSessionStorage, is_redis_configured, create_redis_handler
 
-__all__ = ["RedisSessionIdHandler", "is_redis_configured"]
+__all__ = ["RedisSessionIdHandler", "RedisSessionStorage", "is_redis_configured", "create_redis_handler"]
