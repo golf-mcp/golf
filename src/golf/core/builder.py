@@ -16,7 +16,7 @@ from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.core.builder_telemetry import (
     generate_telemetry_imports,
 )
-from golf.session.redis_session_id import is_redis_configured
+from golf.session.store import is_redis_configured
 from golf.cli.branding import create_build_header, get_status_text
 from golf.core.config import Settings
 from golf.core.parser import (
@@ -627,28 +627,49 @@ class CodeGenerator:
             return []
         
         return [
-            "from golf.session.redis_session_id import create_redis_handler",
+            "from golf.session.store import create_redis_handler, RedisSessionStorage",
             "import asyncio",
+            "import contextlib",
         ]
 
     def _generate_session_patch_code(self) -> list[str]:
-        """Generate Redis session ID patching code."""
+        """Generate Redis session ID and session object patching code."""
         if not is_redis_configured():
             return []
         
         return [
-            "# Redis session ID storage setup",
+            "# Enhanced Redis session storage setup",
             "redis_session_handler = create_redis_handler()",
             "if redis_session_handler:",
             "    # Initialize Redis connection at startup",
             "    async def init_redis():",
             "        success = await redis_session_handler.initialize()",
             "        if success:",
-            "            print('Redis session ID storage enabled')",
+            "            print('Enhanced Redis session storage enabled')",
+            "            ",
+            "            # Patch StreamableHTTPSessionManager for session object persistence",
+            "            try:",
+            "                # Import FastMCP's StreamableHTTPSessionManager",
+            "                from mcp.server.streamable_http_manager import StreamableHTTPSessionManager",
+            "                ",
+            "                # Create Redis-backed storage",
+            "                redis_session_storage = RedisSessionStorage(redis_session_handler)",
+            "                ",
+            "                # Store original _server_instances for fallback",
+            "                original_server_instances = StreamableHTTPSessionManager._server_instances",
+            "                ",
+            "                # Replace _server_instances with Redis-backed storage",
+            "                StreamableHTTPSessionManager._server_instances = redis_session_storage",
+            "                ",
+            "                print('FastMCP session manager patched for Redis persistence')",
+            "                ",
+            "            except (ImportError, AttributeError) as e:",
+            "                print(f'Warning: Could not patch StreamableHTTPSessionManager: {e}')",
+            "                print('Session objects will use in-memory storage only')",
             "        else:",
             "            print('Warning: Redis connection failed, using default session storage')",
             "    ",
-            "    # Patch FastMCP's session_id property to use Redis",
+            "    # Keep existing Context.session_id patching for session ID persistence",
             "    import fastmcp.server.context",
             "    original_session_id_func = fastmcp.server.context.Context.session_id.fget",
             "    ",
@@ -668,10 +689,10 @@ class CodeGenerator:
             "        # Fall back to original FastMCP session ID behavior", 
             "        return original_session_id_func(self)",
             "    ",
-            "    # Apply the patch",
+            "    # Apply the Context.session_id patch",
             "    fastmcp.server.context.Context.session_id = property(redis_session_id)",
             "    ",
-            "    # Initialize Redis connection",
+            "    # Initialize Redis connection and apply patches",
             "    asyncio.create_task(init_redis())",
             "",
         ]
