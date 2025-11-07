@@ -625,77 +625,28 @@ class CodeGenerator:
         """Generate session ID imports if Redis is configured."""
         if not is_redis_configured():
             return []
-        
+
         return [
             "from golf.session.store import create_redis_handler, RedisSessionStorage",
             "import asyncio",
             "import contextlib",
+            "import logging",
+            "import os",
         ]
 
     def _generate_session_patch_code(self) -> list[str]:
-        """Generate Redis session ID and session object patching code."""
+        """Generate import for Redis session lifespan hook."""
         if not is_redis_configured():
             return []
-        
-        return [
-            "# Enhanced Redis session storage setup",
-            "redis_session_handler = create_redis_handler()",
-            "if redis_session_handler:",
-            "    # Initialize Redis connection at startup",
-            "    async def init_redis():",
-            "        success = await redis_session_handler.initialize()",
-            "        if success:",
-            "            print('Enhanced Redis session storage enabled')",
-            "            ",
-            "            # Patch StreamableHTTPSessionManager for session object persistence",
-            "            try:",
-            "                # Import FastMCP's StreamableHTTPSessionManager",
-            "                from mcp.server.streamable_http_manager import StreamableHTTPSessionManager",
-            "                ",
-            "                # Create Redis-backed storage",
-            "                redis_session_storage = RedisSessionStorage(redis_session_handler)",
-            "                ",
-            "                # Store original _server_instances for fallback",
-            "                original_server_instances = StreamableHTTPSessionManager._server_instances",
-            "                ",
-            "                # Replace _server_instances with Redis-backed storage",
-            "                StreamableHTTPSessionManager._server_instances = redis_session_storage",
-            "                ",
-            "                print('FastMCP session manager patched for Redis persistence')",
-            "                ",
-            "            except (ImportError, AttributeError) as e:",
-            "                print(f'Warning: Could not patch StreamableHTTPSessionManager: {e}')",
-            "                print('Session objects will use in-memory storage only')",
-            "        else:",
-            "            print('Warning: Redis connection failed, using default session storage')",
-            "    ",
-            "    # Keep existing Context.session_id patching for session ID persistence",
-            "    import fastmcp.server.context",
-            "    original_session_id_func = fastmcp.server.context.Context.session_id.fget",
-            "    ",
-            "    def redis_session_id(self):",
-            "        # Try to get session ID from Redis first",
-            "        if redis_session_handler and redis_session_handler._redis:",
-            "            try:",
-            "                # Use request hash as context key for session persistence",
-            "                context_key = str(hash(str(self)))",
-            "                session_id = asyncio.run(redis_session_handler.get_session_id(context_key))",
-            "                if session_id:",
-            "                    return session_id",
-            "                # Generate new session ID and store in Redis",
-            "                return asyncio.run(redis_session_handler.generate_and_store_session_id(context_key))",
-            "            except Exception:",
-            "                pass  # Fall back to original behavior",
-            "        # Fall back to original FastMCP session ID behavior", 
-            "        return original_session_id_func(self)",
-            "    ",
-            "    # Apply the Context.session_id patch",
-            "    fastmcp.server.context.Context.session_id = property(redis_session_id)",
-            "    ",
-            "    # Initialize Redis connection and apply patches",
-            "    asyncio.create_task(init_redis())",
+
+        # Import both Redis and combined lifespan functions
+        imports = [
+            "# Import Redis session lifespan hooks",
+            "from golf.session.lifespan import redis_session_lifespan, combined_lifespan",
             "",
         ]
+
+        return imports
 
     def _generate_startup_section(self, project_path: Path) -> list[str]:
         """Generate code section for startup.py execution during server runtime."""
@@ -1322,9 +1273,13 @@ class CodeGenerator:
         if self.settings.stateless_http:
             mcp_constructor_args.append("stateless_http=True")
 
-        # Add OpenTelemetry parameters if enabled
-        if self.settings.opentelemetry_enabled:
+        # Handle lifespan configuration
+        if self.settings.opentelemetry_enabled and is_redis_configured():
+            mcp_constructor_args.append("lifespan=combined_lifespan")
+        elif self.settings.opentelemetry_enabled:
             mcp_constructor_args.append("lifespan=telemetry_lifespan")
+        elif is_redis_configured():
+            mcp_constructor_args.append("lifespan=redis_session_lifespan")
 
         mcp_instance_line = f"mcp = FastMCP({', '.join(mcp_constructor_args)})"
         server_code_lines.append(mcp_instance_line)
@@ -1911,19 +1866,19 @@ def discover_root_files(project_path: Path) -> dict[str, Path]:
 
 
 # Updated to handle any shared file, not just common.py files
-def build_import_map(project_path: Path, shared_files: dict[str, Path]) -> dict[str, str]:
+def build_import_map(_project_path: Path, shared_files: dict[str, Path]) -> dict[str, str]:
     """Build a mapping of import paths to their new locations in the build output.
 
     This maps from original relative import paths to absolute import paths
     in the components directory structure.
 
     Args:
-        project_path: Path to the project root
+        _project_path: Path to the project root (unused but kept for API compatibility)
         shared_files: Dictionary mapping module paths to shared file paths
     """
     import_map = {}
 
-    for module_path_str, file_path in shared_files.items():
+    for module_path_str, _file_path in shared_files.items():
         # Convert module path to Path object (e.g., "tools/weather/helpers" -> Path("tools/weather/helpers"))
         module_path = Path(module_path_str)
 
