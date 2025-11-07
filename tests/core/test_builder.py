@@ -2169,3 +2169,135 @@ export = handle
         assert "import testfile" in component_content  # Direct import preserved
         assert "from testfile import API_KEY" in component_content  # From-import preserved
         assert "from ...." not in component_content  # No relative imports
+
+
+class TestMiddlewareBuildIntegration:
+    """Integration tests for middleware.py build process."""
+
+    def test_middleware_copied_and_imported(self, sample_project: Path, temp_dir: Path):
+        """Test middleware.py is copied to build dir and imported."""
+        middleware_content = '''
+from fastmcp.server.middleware import Middleware
+
+class BuildTestMiddleware(Middleware):
+    async def on_call_tool(self, context, call_next):
+        return await call_next(context)
+'''
+        
+        middleware_file = sample_project / "middleware.py"
+        middleware_file.write_text(middleware_content)
+
+        # Build project
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+        build_project(sample_project, settings, output_dir)
+
+        # Verify middleware.py copied
+        copied_middleware = output_dir / "middleware.py"
+        assert copied_middleware.exists()
+        assert copied_middleware.read_text().strip() == middleware_content.strip()
+
+        # Verify server.py includes middleware
+        server_file = output_dir / "server.py"
+        server_content = server_file.read_text()
+        assert "from middleware import BuildTestMiddleware" in server_content
+        assert "mcp.add_middleware(BuildTestMiddleware())" in server_content
+
+    def test_middleware_with_auth_integration(self, sample_project: Path, temp_dir: Path):
+        """Test middleware works alongside auth.py."""
+        # Create auth.py
+        auth_file = sample_project / "auth.py"
+        auth_file.write_text('''
+from golf.auth import configure_api_key
+configure_api_key()
+''')
+
+        # Create middleware.py
+        middleware_file = sample_project / "middleware.py"
+        middleware_file.write_text('''
+from golf.middleware import Middleware
+
+class AuthTestMiddleware(Middleware):
+    async def on_message(self, context, call_next):
+        return await call_next(context)
+''')
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+        build_project(sample_project, settings, output_dir)
+
+        server_content = (output_dir / "server.py").read_text()
+        
+        # Both auth and middleware should be present
+        assert "# Configure authentication" in server_content or "ApiKeyMiddleware" in server_content
+        assert "from middleware import AuthTestMiddleware" in server_content
+        assert "mcp.add_middleware(AuthTestMiddleware())" in server_content
+
+    def test_multiple_middleware_classes_integration(self, sample_project: Path, temp_dir: Path):
+        """Test integration with multiple middleware classes."""
+        middleware_file = sample_project / "middleware.py"
+        middleware_file.write_text('''
+from golf.middleware import Middleware
+
+class LoggingMiddleware(Middleware):
+    async def on_call_tool(self, context, call_next):
+        print(f"Tool called: {context.message.params.name}")
+        return await call_next(context)
+
+class TimingMiddleware(Middleware):
+    async def on_message(self, context, call_next):
+        import time
+        start = time.time()
+        result = await call_next(context)
+        print(f"Request took: {time.time() - start:.2f}s")
+        return result
+''')
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+        build_project(sample_project, settings, output_dir)
+
+        server_content = (output_dir / "server.py").read_text()
+        
+        # Verify both middleware classes are imported and registered
+        assert "from middleware import LoggingMiddleware, TimingMiddleware" in server_content
+        assert "mcp.add_middleware(LoggingMiddleware())" in server_content
+        assert "mcp.add_middleware(TimingMiddleware())" in server_content
+
+    def test_build_without_middleware_file(self, sample_project: Path, temp_dir: Path):
+        """Test build succeeds when no middleware.py file exists."""
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+        build_project(sample_project, settings, output_dir)
+
+        # Build should succeed
+        server_file = output_dir / "server.py"
+        assert server_file.exists()
+        
+        # Should not contain middleware code
+        server_content = server_file.read_text()
+        assert "from middleware import" not in server_content
+        assert "mcp.add_middleware(" not in server_content
+
+    def test_build_with_broken_middleware_file(self, sample_project: Path, temp_dir: Path):
+        """Test build succeeds gracefully with broken middleware.py."""
+        middleware_file = sample_project / "middleware.py"
+        middleware_file.write_text('''
+from nonexistent_module import SomeClass
+syntax error here!
+''')
+
+        settings = load_settings(sample_project)
+        output_dir = temp_dir / "build"
+        
+        # Build should succeed despite broken middleware.py
+        build_project(sample_project, settings, output_dir)
+
+        # Server file should be created
+        server_file = output_dir / "server.py"
+        assert server_file.exists()
+        
+        # Should not contain middleware code due to error
+        server_content = server_file.read_text()
+        assert "from middleware import" not in server_content
+        assert "mcp.add_middleware(" not in server_content
