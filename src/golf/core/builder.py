@@ -1,6 +1,7 @@
 """Builder for generating FastMCP manifests from parsed components."""
 
 import json
+import inspect
 import os
 import shutil
 import sys
@@ -1197,6 +1198,19 @@ class CodeGenerator:
             imports.append("")
             component_registrations.append("")
 
+        # Check for custom middleware.py file and register middleware classes
+        middleware_classes = self._discover_middleware_classes(self.project_path)
+        if middleware_classes:
+            imports.append("# Import custom middleware")
+            imports.append("from middleware import " + ", ".join(middleware_classes))
+            imports.append("")
+            
+            for cls_name in middleware_classes:
+                # Add each discovered middleware class to FastMCP
+                component_registrations.append(f"# Register custom middleware: {cls_name}")
+                component_registrations.append(f"mcp.add_middleware({cls_name}())")
+            component_registrations.append("")
+
         # Create environment section based on build type - moved after imports
         env_section = [
             "",
@@ -1447,6 +1461,75 @@ class CodeGenerator:
         with open(server_file, "w") as f:
             f.write(code)
 
+    def _discover_middleware_classes(self, project_path: Path) -> list[str]:
+        """Discover middleware classes from middleware.py file."""
+        middleware_path = project_path / "middleware.py"
+        if not middleware_path.exists():
+            return []
+        
+        try:
+            # Save current directory and path
+            original_dir = os.getcwd()
+            original_path = sys.path[:]
+            
+            # Change to project directory for proper imports
+            os.chdir(project_path)
+            sys.path.insert(0, str(project_path))
+            
+            # Import middleware.py dynamically
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("middleware", middleware_path)
+            if spec is None or spec.loader is None:
+                return []
+            middleware_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(middleware_module)
+            
+            # Auto-discover middleware classes using duck typing
+            middleware_classes = []
+            for name, obj in inspect.getmembers(middleware_module, inspect.isclass):
+                # Skip classes that are not defined in this module (imported classes)
+                if obj.__module__ != middleware_module.__name__:
+                    continue
+                    
+                # Check if class actually implements middleware methods (not just inherits them)
+                middleware_methods = ['on_message', 'on_request', 'on_call_tool', 'dispatch']
+                has_implemented_method = any(method in obj.__dict__ for method in middleware_methods)
+                if has_implemented_method:
+                    middleware_classes.append(name)
+                    console.print(f"[green]Discovered middleware: {name}[/green]")
+            
+            return middleware_classes
+            
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not load middleware.py: {e}[/yellow]")
+            import traceback
+            console.print(f"[yellow]{traceback.format_exc()}[/yellow]")
+            
+            # Track error for telemetry
+            try:
+                from golf.core.telemetry import track_detailed_error
+                track_detailed_error(
+                    "build_middleware_failed",
+                    e,
+                    context="Executing middleware.py configuration script",
+                    operation="middleware_discovery",
+                    additional_props={
+                        "file_path": str(middleware_path.relative_to(project_path)),
+                    },
+                )
+            except Exception:
+                pass
+            
+            return []
+        
+        finally:
+            # Always restore original directory and path
+            try:
+                os.chdir(original_dir)
+                sys.path = original_path
+            except Exception:
+                sys.path = original_path
+
 
 def build_project(
     project_path: Path,
@@ -1627,6 +1710,12 @@ def build_project(
         shutil.copy2(startup_path, dest_path)
         console.print(get_status_text("success", "Startup script copied to build directory"))
 
+    # Copy middleware.py to output directory if it exists
+    middleware_path = project_path / "middleware.py"
+    if middleware_path.exists():
+        shutil.copy2(middleware_path, output_dir)
+        console.print(get_status_text("success", "Middleware configuration copied to build directory"))
+
     # Copy optional check files to build directory
     readiness_path = project_path / "readiness.py"
     if readiness_path.exists():
@@ -1770,6 +1859,7 @@ def discover_root_files(project_path: Path) -> dict[str, Path]:
         "health.py",
         "readiness.py",
         "auth.py",
+        "middleware.py",  # Middleware configuration
         "server.py",
         "pre_build.py",  # Legacy auth file
         "golf.json",
