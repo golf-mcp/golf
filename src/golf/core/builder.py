@@ -1204,7 +1204,7 @@ class CodeGenerator:
             imports.append("# Import custom middleware")
             imports.append("from middleware import " + ", ".join(middleware_classes))
             imports.append("")
-            
+
             for cls_name in middleware_classes:
                 # Add each discovered middleware class to FastMCP
                 component_registrations.append(f"# Register custom middleware: {cls_name}")
@@ -1466,48 +1466,51 @@ class CodeGenerator:
         middleware_path = project_path / "middleware.py"
         if not middleware_path.exists():
             return []
-        
+
         try:
             # Save current directory and path
             original_dir = os.getcwd()
             original_path = sys.path[:]
-            
+
             # Change to project directory for proper imports
             os.chdir(project_path)
             sys.path.insert(0, str(project_path))
-            
+
             # Import middleware.py dynamically
             import importlib.util
+
             spec = importlib.util.spec_from_file_location("middleware", middleware_path)
             if spec is None or spec.loader is None:
                 return []
             middleware_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(middleware_module)
-            
+
             # Auto-discover middleware classes using duck typing
             middleware_classes = []
             for name, obj in inspect.getmembers(middleware_module, inspect.isclass):
                 # Skip classes that are not defined in this module (imported classes)
                 if obj.__module__ != middleware_module.__name__:
                     continue
-                    
+
                 # Check if class actually implements middleware methods (not just inherits them)
-                middleware_methods = ['on_message', 'on_request', 'on_call_tool', 'dispatch']
+                middleware_methods = ["on_message", "on_request", "on_call_tool", "dispatch"]
                 has_implemented_method = any(method in obj.__dict__ for method in middleware_methods)
                 if has_implemented_method:
                     middleware_classes.append(name)
                     console.print(f"[green]Discovered middleware: {name}[/green]")
-            
+
             return middleware_classes
-            
+
         except Exception as e:
             console.print(f"[yellow]Warning: Could not load middleware.py: {e}[/yellow]")
             import traceback
+
             console.print(f"[yellow]{traceback.format_exc()}[/yellow]")
-            
+
             # Track error for telemetry
             try:
                 from golf.core.telemetry import track_detailed_error
+
                 track_detailed_error(
                     "build_middleware_failed",
                     e,
@@ -1519,9 +1522,9 @@ class CodeGenerator:
                 )
             except Exception:
                 pass
-            
+
             return []
-        
+
         finally:
             # Always restore original directory and path
             try:
