@@ -254,19 +254,215 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
 
 
 def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
-    """Create OAuth proxy provider - requires enterprise package."""
+    """Create OAuth proxy provider from configuration with runtime validation."""
+    # Resolve runtime values from environment variables
+    authorization_endpoint = config.authorization_endpoint
+    if config.authorization_endpoint_env_var:
+        env_value = os.environ.get(config.authorization_endpoint_env_var)
+        if env_value:
+            # Validate the URL from environment
+            env_value = env_value.strip()
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(env_value)
+                if not parsed.scheme or not parsed.netloc:
+                    raise ValueError(
+                        f"Invalid authorization_endpoint from environment variable "
+                        f"{config.authorization_endpoint_env_var}: '{env_value}' - "
+                        f"must be a valid URL with scheme and netloc"
+                    )
+                if parsed.scheme not in ("http", "https"):
+                    raise ValueError(
+                        f"Authorization endpoint from {config.authorization_endpoint_env_var} "
+                        f"must use http or https: '{env_value}'"
+                    )
+                authorization_endpoint = env_value
+            except Exception as e:
+                if isinstance(e, ValueError):
+                    raise
+                raise ValueError(
+                    f"Invalid authorization_endpoint from {config.authorization_endpoint_env_var}: {e}"
+                ) from e
+
+    token_endpoint = config.token_endpoint
+    if config.token_endpoint_env_var:
+        env_value = os.environ.get(config.token_endpoint_env_var)
+        if env_value:
+            # Validate the URL from environment
+            env_value = env_value.strip()
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(env_value)
+                if not parsed.scheme or not parsed.netloc:
+                    raise ValueError(
+                        f"Invalid token_endpoint from environment variable "
+                        f"{config.token_endpoint_env_var}: '{env_value}'"
+                    )
+                if parsed.scheme not in ("http", "https"):
+                    raise ValueError(
+                        f"Token endpoint from {config.token_endpoint_env_var} "
+                        f"must use http or https: '{env_value}'"
+                    )
+                token_endpoint = env_value
+            except Exception as e:
+                if isinstance(e, ValueError):
+                    raise
+                raise ValueError(
+                    f"Invalid token_endpoint from {config.token_endpoint_env_var}: {e}"
+                ) from e
+
+    client_id = config.client_id
+    if config.client_id_env_var:
+        env_value = os.environ.get(config.client_id_env_var)
+        if env_value:
+            client_id = env_value.strip()
+            if not client_id:
+                raise ValueError(
+                    f"Client ID from environment variable {config.client_id_env_var} cannot be empty"
+                )
+
+    client_secret = config.client_secret
+    if config.client_secret_env_var:
+        env_value = os.environ.get(config.client_secret_env_var)
+        if env_value:
+            client_secret = env_value.strip()
+            if not client_secret:
+                raise ValueError(
+                    f"Client secret from environment variable {config.client_secret_env_var} cannot be empty"
+                )
+
+    base_url = config.base_url
+    if config.base_url_env_var:
+        env_value = os.environ.get(config.base_url_env_var)
+        if env_value:
+            # Validate the URL from environment
+            env_value = env_value.strip()
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(env_value)
+                if not parsed.scheme or not parsed.netloc:
+                    raise ValueError(
+                        f"Invalid base_url from environment variable "
+                        f"{config.base_url_env_var}: '{env_value}'"
+                    )
+                if parsed.scheme not in ("http", "https"):
+                    raise ValueError(
+                        f"Base URL from {config.base_url_env_var} "
+                        f"must use http or https: '{env_value}'"
+                    )
+                base_url = env_value
+            except Exception as e:
+                if isinstance(e, ValueError):
+                    raise
+                raise ValueError(
+                    f"Invalid base_url from {config.base_url_env_var}: {e}"
+                ) from e
+
+    revocation_endpoint = config.revocation_endpoint
+    if config.revocation_endpoint_env_var:
+        env_value = os.environ.get(config.revocation_endpoint_env_var)
+        if env_value:
+            # Validate optional URL from environment
+            env_value = env_value.strip()
+            if env_value:  # Only validate if not empty
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(env_value)
+                    if not parsed.scheme or not parsed.netloc:
+                        raise ValueError(
+                            f"Invalid revocation_endpoint from environment variable "
+                            f"{config.revocation_endpoint_env_var}: '{env_value}'"
+                        )
+                    if parsed.scheme not in ("http", "https"):
+                        raise ValueError(
+                            f"Revocation endpoint from {config.revocation_endpoint_env_var} "
+                            f"must use http or https: '{env_value}'"
+                        )
+                    revocation_endpoint = env_value
+                except Exception as e:
+                    if isinstance(e, ValueError):
+                        raise
+                    raise ValueError(
+                        f"Invalid revocation_endpoint from {config.revocation_endpoint_env_var}: {e}"
+                    ) from e
+
+    # Final validation: ensure all required fields have values after env resolution
+    if not authorization_endpoint:
+        env_var_hint = f" (environment variable {config.authorization_endpoint_env_var} is not set)" \
+                      if config.authorization_endpoint_env_var else ""
+        raise ValueError(f"Authorization endpoint is required but not provided{env_var_hint}")
+
+    if not token_endpoint:
+        env_var_hint = f" (environment variable {config.token_endpoint_env_var} is not set)" \
+                      if config.token_endpoint_env_var else ""
+        raise ValueError(f"Token endpoint is required but not provided{env_var_hint}")
+
+    if not client_id:
+        env_var_hint = f" (environment variable {config.client_id_env_var} is not set)" \
+                      if config.client_id_env_var else ""
+        raise ValueError(f"Client ID is required but not provided{env_var_hint}")
+
+    if not client_secret:
+        env_var_hint = f" (environment variable {config.client_secret_env_var} is not set)" \
+                      if config.client_secret_env_var else ""
+        raise ValueError(f"Client secret is required but not provided{env_var_hint}")
+
+    if not base_url:
+        env_var_hint = f" (environment variable {config.base_url_env_var} is not set)" \
+                      if config.base_url_env_var else ""
+        raise ValueError(f"Base URL is required but not provided{env_var_hint}")
+
+    # Production security checks
+    is_production = (
+        os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
+        or os.environ.get("NODE_ENV", "").lower() == "production"
+        or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
+    )
+
+    if is_production:
+        from urllib.parse import urlparse
+
+        # Check for HTTPS in production
+        for url_name, url_value in [
+            ("authorization_endpoint", authorization_endpoint),
+            ("token_endpoint", token_endpoint),
+            ("base_url", base_url),
+        ]:
+            parsed = urlparse(url_value)
+            if parsed.scheme == "http":
+                raise ValueError(
+                    f"OAuth proxy {url_name} must use HTTPS in production environment: '{url_value}'"
+                )
+
+        # Check for localhost in production
+        parsed_base = urlparse(base_url)
+        if parsed_base.hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
+            raise ValueError(
+                f"OAuth proxy base_url cannot use localhost/loopback addresses in production: '{base_url}'"
+            )
+
+    # Import and create the OAuth proxy provider
     try:
         # Try to import from enterprise package
         from golf_enterprise import create_oauth_proxy_provider
-
-        return create_oauth_proxy_provider(config)
-    except ImportError as e:
+    except ImportError:
+        # Provide helpful error message
         raise ImportError(
-            "OAuth Proxy requires golf-mcp-enterprise package. "
-            "This feature provides OAuth proxy functionality for non-DCR providers "
-            "(GitHub, Google, Okta Web Apps, etc.). "
-            "Contact sales@golf.dev for enterprise licensing."
-        ) from e
+            "OAuth proxy authentication requires the golf-mcp-enterprise package. "
+            "Please install it with: pip install golf-mcp-enterprise"
+        ) from None
+
+    return create_oauth_proxy_provider(
+        authorization_endpoint=authorization_endpoint,
+        token_endpoint=token_endpoint,
+        client_id=client_id,
+        client_secret=client_secret,
+        revocation_endpoint=revocation_endpoint,
+        base_url=base_url,
+        redirect_path=config.redirect_path,
+        scopes_supported=config.scopes_supported,
+        token_verifier_config=config.token_verifier_config,
+    )
 
 
 def create_simple_jwt_provider(

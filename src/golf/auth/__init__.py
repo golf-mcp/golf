@@ -193,12 +193,12 @@ def configure_dev_auth(
 
 
 def configure_oauth_proxy(
-    authorization_endpoint: str,
-    token_endpoint: str,
-    client_id: str,
-    client_secret: str,
-    base_url: str,
-    token_verifier_config: JWTAuthConfig | StaticTokenConfig,
+    authorization_endpoint: str | None = None,
+    token_endpoint: str | None = None,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    base_url: str | None = None,
+    token_verifier_config: JWTAuthConfig | StaticTokenConfig | None = None,
     scopes_supported: list[str] | None = None,
     revocation_endpoint: str | None = None,
     redirect_path: str = "/oauth/callback",
@@ -206,27 +206,71 @@ def configure_oauth_proxy(
 ) -> None:
     """Configure OAuth proxy authentication for non-DCR providers.
 
-    This sets up an OAuth proxy that bridges MCP clients (expecting DCR) with
-    traditional OAuth providers like GitHub, Google, Okta Web Apps that use
-    fixed client credentials.
+    All parameters can be provided either directly or via environment variables.
+    For each parameter, you can provide the value directly or use the
+    corresponding *_env_var parameter to specify an environment variable name.
+
+    Examples:
+        # Direct values (backward compatible)
+        configure_oauth_proxy(
+            authorization_endpoint="https://auth.example.com/authorize",
+            token_endpoint="https://auth.example.com/token",
+            client_id="my-client",
+            client_secret="my-secret",
+            base_url="https://myserver.com",
+            token_verifier_config=jwt_config,
+        )
+
+        # Environment variables only (new behavior)
+        configure_oauth_proxy(
+            authorization_endpoint_env_var="OAUTH_AUTH_ENDPOINT",
+            token_endpoint_env_var="OAUTH_TOKEN_ENDPOINT",
+            client_id_env_var="OAUTH_CLIENT_ID",
+            client_secret_env_var="OAUTH_CLIENT_SECRET",
+            base_url_env_var="OAUTH_BASE_URL",
+            token_verifier_config=jwt_config,
+        )
+
+        # Mixed (direct values with env var overrides)
+        configure_oauth_proxy(
+            authorization_endpoint="https://default.example.com/authorize",
+            authorization_endpoint_env_var="OAUTH_AUTH_ENDPOINT",  # Overrides at runtime
+            # ...
+        )
 
     Args:
-        authorization_endpoint: Provider's authorization URL
-        token_endpoint: Provider's token endpoint URL
-        client_id: Your client ID registered with the provider
-        client_secret: Your client secret from the provider
-        base_url: This proxy server's public URL
-        token_verifier_config: JWT or static token config for token verification
-        scopes_supported: Scopes to advertise to MCP clients
+        authorization_endpoint: OAuth provider's authorization endpoint URL
+        token_endpoint: OAuth provider's token endpoint URL
+        client_id: Your registered client ID with the OAuth provider
+        client_secret: Your registered client secret with the OAuth provider
+        base_url: Public URL of this OAuth proxy server
+        token_verifier_config: JWT or Static token configuration for verifying tokens
+        scopes_supported: List of OAuth scopes this proxy supports
         revocation_endpoint: Optional token revocation endpoint
-        redirect_path: OAuth callback path (default: /oauth/callback)
-        **env_vars: Environment variable names (authorization_endpoint_env_var,
-            token_endpoint_env_var, client_id_env_var, client_secret_env_var,
-            base_url_env_var, revocation_endpoint_env_var)
+        redirect_path: OAuth callback path (default: "/oauth/callback")
+        **env_vars: Environment variable names for runtime configuration
+            - authorization_endpoint_env_var: Env var for authorization endpoint
+            - token_endpoint_env_var: Env var for token endpoint
+            - client_id_env_var: Env var for client ID
+            - client_secret_env_var: Env var for client secret
+            - base_url_env_var: Env var for base URL
+            - revocation_endpoint_env_var: Env var for revocation endpoint
 
-    Note:
-        Requires golf-mcp-enterprise package for implementation.
+    Raises:
+        ValueError: If token_verifier_config is not provided or invalid
+        ValueError: If required fields lack both direct value and env var
     """
+    # Validate token_verifier_config is provided (always required)
+    if token_verifier_config is None:
+        raise ValueError("token_verifier_config is required and must be JWTAuthConfig or StaticTokenConfig")
+
+    if not isinstance(token_verifier_config, (JWTAuthConfig, StaticTokenConfig)):
+        raise ValueError(
+            f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, "
+            f"got {type(token_verifier_config).__name__}"
+        )
+
+    # Create config with all parameters (None values are OK now)
     config = OAuthProxyConfig(
         authorization_endpoint=authorization_endpoint,
         token_endpoint=token_endpoint,
