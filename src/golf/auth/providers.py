@@ -459,14 +459,14 @@ class OAuthProxyConfig(BaseModel):
     provider_type: Literal["oauth_proxy"] = "oauth_proxy"
 
     # OAuth provider configuration
-    authorization_endpoint: str = Field(..., description="OAuth provider's authorization endpoint URL")
-    token_endpoint: str = Field(..., description="OAuth provider's token endpoint URL")
-    client_id: str = Field(..., description="Your registered client ID with the OAuth provider")
-    client_secret: str = Field(..., description="Your registered client secret with the OAuth provider")
+    authorization_endpoint: str | None = Field(None, description="OAuth provider's authorization endpoint URL")
+    token_endpoint: str | None = Field(None, description="OAuth provider's token endpoint URL")
+    client_id: str | None = Field(None, description="Your registered client ID with the OAuth provider")
+    client_secret: str | None = Field(None, description="Your registered client secret with the OAuth provider")
     revocation_endpoint: str | None = Field(None, description="Optional token revocation endpoint")
 
     # This proxy server configuration
-    base_url: str = Field(..., description="Public URL of this OAuth proxy server")
+    base_url: str | None = Field(None, description="Public URL of this OAuth proxy server")
     redirect_path: str = Field("/oauth/callback", description="OAuth callback path (must match provider registration)")
 
     # Scopes and token verification
@@ -491,10 +491,14 @@ class OAuthProxyConfig(BaseModel):
 
     @field_validator("authorization_endpoint", "token_endpoint", "base_url")
     @classmethod
-    def validate_required_urls(cls, v: str) -> str:
-        """Validate required URLs are properly formatted."""
-        if not v or not v.strip():
-            raise ValueError("URL cannot be empty")
+    def validate_required_urls(cls, v: str | None) -> str | None:
+        """Validate required URLs are properly formatted if provided."""
+        # Allow None values at build time when env vars will be used
+        if v is None:
+            return v
+
+        if not v.strip():
+            raise ValueError("URL cannot be empty string (use None or provide a valid URL)")
 
         url = v.strip()
         try:
@@ -540,15 +544,37 @@ class OAuthProxyConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_oauth_proxy_config(self) -> "OAuthProxyConfig":
-        """Validate OAuth proxy configuration consistency."""
-        # Validate token verifier config is compatible
+        """Validate OAuth proxy configuration consistency and requirements."""
+
+        # Phase 1: Check that each required field has EITHER a value OR an env_var
+        required_fields = [
+            ("authorization_endpoint", self.authorization_endpoint, self.authorization_endpoint_env_var),
+            ("token_endpoint", self.token_endpoint, self.token_endpoint_env_var),
+            ("client_id", self.client_id, self.client_id_env_var),
+            ("client_secret", self.client_secret, self.client_secret_env_var),
+            ("base_url", self.base_url, self.base_url_env_var),
+        ]
+
+        missing_fields = []
+        for field_name, value, env_var in required_fields:
+            if value is None and not env_var:
+                missing_fields.append(field_name)
+
+        if missing_fields:
+            raise ValueError(
+                f"The following required fields must be provided either directly or via environment variables: "
+                f"{', '.join(missing_fields)}. "
+                f"For example, provide '{missing_fields[0]}' or '{missing_fields[0]}_env_var'."
+            )
+
+        # Phase 2: Existing validation - token verifier type check
         if not isinstance(self.token_verifier_config, JWTAuthConfig | StaticTokenConfig):
             raise ValueError(
                 f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, "
                 f"got {type(self.token_verifier_config).__name__}"
             )
 
-        # Warn about HTTPS requirements in production
+        # Phase 3: HTTPS warnings in production (only for provided values, not None)
         is_production = (
             os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
             or os.environ.get("NODE_ENV", "").lower() == "production"
@@ -558,12 +584,15 @@ class OAuthProxyConfig(BaseModel):
         if is_production:
             from urllib.parse import urlparse
 
-            urls_to_check = [
-                ("base_url", self.base_url),
-                ("authorization_endpoint", self.authorization_endpoint),
-                ("token_endpoint", self.token_endpoint),
-            ]
+            urls_to_check = []
 
+            # Only check URLs that have actual values (not None)
+            if self.base_url:
+                urls_to_check.append(("base_url", self.base_url))
+            if self.authorization_endpoint:
+                urls_to_check.append(("authorization_endpoint", self.authorization_endpoint))
+            if self.token_endpoint:
+                urls_to_check.append(("token_endpoint", self.token_endpoint))
             if self.revocation_endpoint:
                 urls_to_check.append(("revocation_endpoint", self.revocation_endpoint))
 
