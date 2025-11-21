@@ -452,7 +452,8 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
             "Please install it with: pip install golf-mcp-enterprise"
         ) from None
 
-    return create_oauth_proxy_provider(
+    # Create a new config with resolved values for the enterprise package
+    resolved_config = OAuthProxyConfig(
         authorization_endpoint=authorization_endpoint,
         token_endpoint=token_endpoint,
         client_id=client_id,
@@ -463,6 +464,8 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
         scopes_supported=config.scopes_supported,
         token_verifier_config=config.token_verifier_config,
     )
+
+    return create_oauth_proxy_provider(resolved_config)
 
 
 def create_simple_jwt_provider(
