@@ -17,6 +17,7 @@ from golf.core.builder_auth import generate_auth_code, generate_auth_routes
 from golf.core.builder_telemetry import (
     generate_telemetry_imports,
 )
+from golf.session.store import is_redis_configured
 from golf.cli.branding import create_build_header, get_status_text
 from golf.core.config import Settings
 from golf.core.parser import (
@@ -621,6 +622,33 @@ class CodeGenerator:
             # Default to older behavior for safety
             return False
 
+    def _generate_session_imports(self) -> list[str]:
+        """Generate session ID imports if Redis is configured."""
+        if not is_redis_configured():
+            return []
+
+        return [
+            "from golf.session.store import create_redis_handler, RedisSessionStorage",
+            "import asyncio",
+            "import contextlib",
+            "import logging",
+            "import os",
+        ]
+
+    def _generate_session_patch_code(self) -> list[str]:
+        """Generate import for Redis session lifespan hook."""
+        if not is_redis_configured():
+            return []
+
+        # Import both Redis and combined lifespan functions
+        imports = [
+            "# Import Redis session lifespan hooks",
+            "from golf.session.lifespan import redis_session_lifespan, combined_lifespan",
+            "",
+        ]
+
+        return imports
+
     def _generate_startup_section(self, project_path: Path) -> list[str]:
         """Generate code section for startup.py execution during server runtime."""
         startup_path = project_path / "startup.py"
@@ -877,6 +905,12 @@ class CodeGenerator:
         # Add auth imports if auth is configured
         if auth_components.get("has_auth"):
             imports.extend(auth_components["imports"])
+            imports.append("")
+
+        # Add session imports if Redis is configured
+        session_imports = self._generate_session_imports()
+        if session_imports:
+            imports.extend(session_imports)
             imports.append("")
 
         # Add OpenTelemetry imports if enabled
@@ -1226,6 +1260,9 @@ class CodeGenerator:
         # Generate startup section
         startup_section = self._generate_startup_section(self.project_path)
 
+        # Generate session ID patching section
+        session_patch_code = self._generate_session_patch_code()
+
         # OpenTelemetry setup code will be handled through imports and lifespan
 
         # Add auth setup code if auth is configured
@@ -1248,9 +1285,13 @@ class CodeGenerator:
         if self.settings.stateless_http:
             mcp_constructor_args.append("stateless_http=True")
 
-        # Add OpenTelemetry parameters if enabled
-        if self.settings.opentelemetry_enabled:
+        # Handle lifespan configuration
+        if self.settings.opentelemetry_enabled and is_redis_configured():
+            mcp_constructor_args.append("lifespan=combined_lifespan")
+        elif self.settings.opentelemetry_enabled:
             mcp_constructor_args.append("lifespan=telemetry_lifespan")
+        elif is_redis_configured():
+            mcp_constructor_args.append("lifespan=redis_session_lifespan")
 
         mcp_instance_line = f"mcp = FastMCP({', '.join(mcp_constructor_args)})"
         server_code_lines.append(mcp_instance_line)
@@ -1431,7 +1472,7 @@ class CodeGenerator:
         check_helper_section = []
 
         # Combine all sections
-        # Order: imports, env_section, syspath_section, startup_section, auth_setup, server_code (mcp init),
+        # Order: imports, env_section, syspath_section, startup_section, session_patch_code, auth_setup, server_code (mcp init),
         # early_telemetry_init, early_metrics_init, component_registrations,
         # metrics_route_code, check_helper_section, readiness_section, health_section, main_code (run block)
         code = "\n".join(
@@ -1439,6 +1480,7 @@ class CodeGenerator:
             + env_section
             + syspath_section
             + startup_section
+            + session_patch_code
             + auth_setup_code
             + server_code_lines
             + early_telemetry_init
@@ -1915,19 +1957,19 @@ def discover_root_files(project_path: Path) -> dict[str, Path]:
 
 
 # Updated to handle any shared file, not just common.py files
-def build_import_map(project_path: Path, shared_files: dict[str, Path]) -> dict[str, str]:
+def build_import_map(_project_path: Path, shared_files: dict[str, Path]) -> dict[str, str]:
     """Build a mapping of import paths to their new locations in the build output.
 
     This maps from original relative import paths to absolute import paths
     in the components directory structure.
 
     Args:
-        project_path: Path to the project root
+        _project_path: Path to the project root (unused but kept for API compatibility)
         shared_files: Dictionary mapping module paths to shared file paths
     """
     import_map = {}
 
-    for module_path_str, file_path in shared_files.items():
+    for module_path_str, _file_path in shared_files.items():
         # Convert module path to Path object (e.g., "tools/weather/helpers" -> Path("tools/weather/helpers"))
         module_path = Path(module_path_str)
 

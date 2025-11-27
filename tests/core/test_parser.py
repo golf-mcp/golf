@@ -750,7 +750,7 @@ export = run
 
 class TestFunctionDocstringExtraction:
     """Test cases for function docstring extraction with fallback to module docstrings."""
-    
+
     def test_prefers_function_over_module_docstring(self, sample_project: Path) -> None:
         """Test that function docstring takes precedence over module docstring."""
         tool_file = sample_project / "tools" / "function_priority.py"
@@ -762,13 +762,13 @@ def process_data() -> dict:
 
 export = process_data
 ''')
-        
+
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
         assert components[0].docstring == "Detailed function description for tool."
-    
+
     def test_falls_back_to_module_docstring(self, sample_project: Path) -> None:
         """Test fallback to module docstring when function docstring missing."""
         tool_file = sample_project / "tools" / "module_fallback.py"
@@ -780,13 +780,13 @@ def process_data() -> dict:
 
 export = process_data
 ''')
-        
+
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
         assert components[0].docstring == "Module description used as fallback."
-    
+
     def test_handles_multiline_function_docstring(self, sample_project: Path) -> None:
         """Test parsing complex multiline function docstrings."""
         tool_file = sample_project / "tools" / "multiline_func.py"
@@ -807,12 +807,12 @@ def complex_tool() -> dict:
 
 export = complex_tool
 ''')
-        
+
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
-        expected = '''Complex multiline function docstring.
+        expected = """Complex multiline function docstring.
 
 This tool performs advanced operations including:
 - Data processing and transformation
@@ -820,9 +820,9 @@ This tool performs advanced operations including:
 - Result formatting and export
 
 Example usage:
-    result = complex_tool()'''
+    result = complex_tool()"""
         assert components[0].docstring == expected
-        
+
     def test_extracts_async_function_docstring(self, sample_project: Path) -> None:
         """Test docstring extraction from async functions."""
         tool_file = sample_project / "tools" / "async_func.py"
@@ -834,13 +834,13 @@ async def async_tool() -> dict:
 
 export = async_tool
 ''')
-        
+
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
         assert components[0].docstring == "Async function docstring for tool."
-        
+
     def test_handles_run_function_docstring(self, sample_project: Path) -> None:
         """Test docstring extraction from run function fallback."""
         tool_file = sample_project / "tools" / "run_func.py"
@@ -850,27 +850,27 @@ def run() -> dict:
     """Run function docstring."""
     return {"run": True}
 ''')
-        
+
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
         assert components[0].docstring == "Run function docstring."
-        
+
     def test_fails_when_both_docstrings_missing(self, sample_project: Path) -> None:
         """Test that parser fails when neither docstring type is present."""
         tool_file = sample_project / "tools" / "no_docstrings.py"
-        tool_file.write_text('''
+        tool_file.write_text("""
 def process_data() -> dict:
     return {"processed": True}
 
 export = process_data
-''')
-        
+""")
+
         parser = AstParser(sample_project)
         with pytest.raises(ValueError, match="Missing docstring"):
             parser.parse_file(tool_file)
-            
+
     def test_handles_empty_function_docstring(self, sample_project: Path) -> None:
         """Test behavior with empty function docstring."""
         tool_file = sample_project / "tools" / "empty_func_docstring.py"
@@ -882,14 +882,14 @@ def process_data() -> dict:
 
 export = process_data
 ''')
-        
+
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
         # Empty docstring should fall back to module docstring
         assert components[0].docstring == "Module docstring fallback."
-        
+
     def test_handles_whitespace_only_function_docstring(self, sample_project: Path) -> None:
         """Test behavior with whitespace-only function docstring."""
         tool_file = sample_project / "tools" / "whitespace_func_docstring.py"
@@ -903,14 +903,14 @@ def process_data() -> dict:
 
 export = process_data
 ''')
-        
+
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
         # Whitespace-only docstring is returned as-is (not falling back)
         assert components[0].docstring == "    \n    "
-        
+
     def test_custom_export_target_with_function_docstring(self, sample_project: Path) -> None:
         """Test function docstring extraction with custom export target."""
         tool_file = sample_project / "tools" / "custom_export.py"
@@ -926,10 +926,10 @@ def run() -> dict:
 
 export = my_custom_function
 ''')
-        
+
         parser = AstParser(sample_project)
         components = parser.parse_file(tool_file)
-        
+
         assert len(components) == 1
         assert components[0].docstring == "Custom export function docstring."
         assert components[0].entry_function == "my_custom_function"
