@@ -9,6 +9,8 @@ from golf.telemetry.instrumentation import (
     instrument_sampling,
     instrument_tool,
     telemetry_lifespan,
+    OpenTelemetryMiddleware,
+    OTelContextCapturingMiddleware,
 )
 
 __all__ = [
@@ -20,4 +22,6 @@ __all__ = [
     "telemetry_lifespan",
     "init_telemetry",
     "get_tracer",
+    "OpenTelemetryMiddleware",
+    "OTelContextCapturingMiddleware",
 ]
