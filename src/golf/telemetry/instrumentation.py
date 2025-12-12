@@ -1283,6 +1283,7 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
                 # Record metrics
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_tool_execution(tool_name, "success")
                     metrics_collector.record_tool_duration(tool_name, time.time() - start_time)
@@ -1299,6 +1300,7 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
                 )
                 try:
                     from golf.metrics import get_metrics_collector
+
                     metrics_collector = get_metrics_collector()
                     metrics_collector.increment_tool_execution(tool_name, "error")
                 except ImportError:
