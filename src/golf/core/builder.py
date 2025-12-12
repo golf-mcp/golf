@@ -1314,13 +1314,11 @@ class CodeGenerator:
                 middleware_list.append("Middleware(MetricsMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
+            # Note: We intentionally do NOT use opentelemetry.instrumentation.asgi.OpenTelemetryMiddleware
+            # because it creates noisy low-level ASGI spans (http receive/send). Golf's FastMCP middleware
+            # (OpenTelemetryMiddleware) creates cleaner, more meaningful MCP-level spans.
             if self.settings.opentelemetry_enabled:
-                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
-                middleware_setup.append("    from golf.telemetry import OTelContextCapturingMiddleware")
-                middleware_setup.append("    from starlette.middleware import Middleware")
-                # Order matters: OpenTelemetryMiddleware creates HTTP span, then OTelContextCapturingMiddleware captures it
-                middleware_list.append("Middleware(OpenTelemetryMiddleware)")
-                middleware_list.append("Middleware(OTelContextCapturingMiddleware)")
+                pass  # OpenTelemetry middleware is added via mcp.add_middleware() earlier in the code
 
             if middleware_setup:
                 main_code.extend(middleware_setup)
@@ -1377,13 +1375,11 @@ class CodeGenerator:
                 middleware_list.append("Middleware(MetricsMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
+            # Note: We intentionally do NOT use opentelemetry.instrumentation.asgi.OpenTelemetryMiddleware
+            # because it creates noisy low-level ASGI spans (http receive/send). Golf's FastMCP middleware
+            # (OpenTelemetryMiddleware) creates cleaner, more meaningful MCP-level spans.
             if self.settings.opentelemetry_enabled:
-                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
-                middleware_setup.append("    from golf.telemetry import OTelContextCapturingMiddleware")
-                middleware_setup.append("    from starlette.middleware import Middleware")
-                # Order matters: OpenTelemetryMiddleware creates HTTP span, then OTelContextCapturingMiddleware captures it
-                middleware_list.append("Middleware(OpenTelemetryMiddleware)")
-                middleware_list.append("Middleware(OTelContextCapturingMiddleware)")
+                pass  # OpenTelemetry middleware is added via mcp.add_middleware() earlier in the code
 
             if middleware_setup:
                 main_code.extend(middleware_setup)

@@ -35,13 +35,45 @@ _detailed_tracing_enabled: bool = False
 _http_span_context: ContextVar[otel_context.Context | None] = ContextVar("http_span_context", default=None)
 
 
+def _extract_serializable_content(data: Any) -> Any:
+    """Extract serializable content from MCP result types like ToolResult."""
+    # Handle FastMCP ToolResult and similar result objects
+    if hasattr(data, "structured_content") and data.structured_content is not None:
+        return data.structured_content
+    if hasattr(data, "content"):
+        content = data.content
+        # If content is a list of content blocks, extract text from them
+        if isinstance(content, list):
+            extracted = []
+            for item in content:
+                if hasattr(item, "text"):
+                    extracted.append(item.text)
+                elif hasattr(item, "data"):
+                    extracted.append(f"[binary data: {len(item.data) if item.data else 0} bytes]")
+                elif isinstance(item, str):
+                    extracted.append(item)
+                else:
+                    extracted.append(str(item))
+            return extracted if len(extracted) > 1 else (extracted[0] if extracted else None)
+        return content
+    # Handle pydantic models
+    if hasattr(data, "model_dump"):
+        return data.model_dump()
+    if hasattr(data, "dict"):
+        return data.dict()
+    return data
+
+
 def _safe_serialize(data: Any, max_length: int = 1000) -> str | None:
     """Safely serialize data to string with length limit."""
     try:
-        if isinstance(data, str):
-            serialized = data
+        # First, extract serializable content from MCP result types
+        serializable_data = _extract_serializable_content(data)
+
+        if isinstance(serializable_data, str):
+            serialized = serializable_data
         else:
-            serialized = json.dumps(data, default=str, ensure_ascii=False)
+            serialized = json.dumps(serializable_data, default=str, ensure_ascii=False)
 
         if len(serialized) > max_length:
             return serialized[:max_length] + "..." + f" (truncated from {len(serialized)} chars)"
@@ -149,6 +181,11 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         raise
 
     return provider
+
+
+def get_provider() -> TracerProvider | None:
+    """Get the global tracer provider instance."""
+    return _provider
 
 
 def get_tracer() -> trace.Tracer:
