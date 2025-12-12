@@ -12,7 +12,7 @@ from typing import Any, TypeVar
 from collections.abc import AsyncGenerator
 from collections import OrderedDict
 
-from opentelemetry import baggage, trace
+from opentelemetry import baggage, trace, context as otel_context
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
@@ -21,6 +21,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 from opentelemetry.trace import Status, StatusCode
 
 from starlette.middleware.base import BaseHTTPMiddleware
+from fastmcp.server.middleware import Middleware as FastMCPMiddleware, MiddlewareContext, CallNext
+from contextvars import ContextVar
 
 T = TypeVar("T")
 
@@ -29,14 +31,49 @@ _tracer: trace.Tracer | None = None
 _provider: TracerProvider | None = None
 _detailed_tracing_enabled: bool = False
 
+# ContextVar to store the HTTP request span for propagation to MCP layer
+_http_span_context: ContextVar[otel_context.Context | None] = ContextVar("http_span_context", default=None)
+
+
+def _extract_serializable_content(data: Any) -> Any:
+    """Extract serializable content from MCP result types like ToolResult."""
+    # Handle FastMCP ToolResult and similar result objects
+    if hasattr(data, "structured_content") and data.structured_content is not None:
+        return data.structured_content
+    if hasattr(data, "content"):
+        content = data.content
+        # If content is a list of content blocks, extract text from them
+        if isinstance(content, list):
+            extracted = []
+            for item in content:
+                if hasattr(item, "text"):
+                    extracted.append(item.text)
+                elif hasattr(item, "data"):
+                    extracted.append(f"[binary data: {len(item.data) if item.data else 0} bytes]")
+                elif isinstance(item, str):
+                    extracted.append(item)
+                else:
+                    extracted.append(str(item))
+            return extracted if len(extracted) > 1 else (extracted[0] if extracted else None)
+        return content
+    # Handle pydantic models
+    if hasattr(data, "model_dump"):
+        return data.model_dump()
+    if hasattr(data, "dict"):
+        return data.dict()
+    return data
+
 
 def _safe_serialize(data: Any, max_length: int = 1000) -> str | None:
     """Safely serialize data to string with length limit."""
     try:
-        if isinstance(data, str):
-            serialized = data
+        # First, extract serializable content from MCP result types
+        serializable_data = _extract_serializable_content(data)
+
+        if isinstance(serializable_data, str):
+            serialized = serializable_data
         else:
-            serialized = json.dumps(data, default=str, ensure_ascii=False)
+            serialized = json.dumps(serializable_data, default=str, ensure_ascii=False)
 
         if len(serialized) > max_length:
             return serialized[:max_length] + "..." + f" (truncated from {len(serialized)} chars)"
@@ -144,6 +181,11 @@ def init_telemetry(service_name: str = "golf-mcp-server") -> TracerProvider | No
         raise
 
     return provider
+
+
+def get_provider() -> TracerProvider | None:
+    """Get the global tracer provider instance."""
+    return _provider
 
 
 def get_tracer() -> trace.Tracer:
@@ -1179,6 +1221,231 @@ class BoundedSessionTracker:
 
     def get_active_session_count(self) -> int:
         return len(self.sessions)
+
+
+class OpenTelemetryMiddleware(FastMCPMiddleware):
+    """FastMCP middleware that creates OpenTelemetry spans for MCP operations.
+
+    This middleware wraps tool calls, resource reads, and prompt gets with
+    proper OpenTelemetry spans that are correctly parented to the current context.
+    """
+
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[Any],
+        call_next: CallNext[Any, Any],
+    ) -> Any:
+        """Wrap tool calls with OpenTelemetry spans."""
+        global _provider
+        if _provider is None:
+            return await call_next(context)
+
+        tracer = get_tracer()
+        tool_name = context.message.name if hasattr(context.message, "name") else "unknown"
+        start_time = time.time()
+
+        span_name = f"mcp.tool.{tool_name}.execute"
+        with tracer.start_as_current_span(span_name) as span:
+            span.set_attribute("mcp.component.type", "tool")
+            span.set_attribute("mcp.tool.name", tool_name)
+            span.set_attribute("mcp.method", "tools/call")
+
+            # Capture arguments if detailed tracing enabled
+            if _detailed_tracing_enabled and hasattr(context.message, "arguments"):
+                args_str = _safe_serialize(context.message.arguments)
+                if args_str:
+                    span.set_attribute("mcp.tool.input", args_str)
+
+            # Extract context attributes from FastMCP context
+            if context.fastmcp_context:
+                ctx = context.fastmcp_context
+                for attr in ["request_id", "session_id", "client_id", "user_id", "tenant_id"]:
+                    if hasattr(ctx, attr):
+                        value = getattr(ctx, attr)
+                        if value is not None:
+                            span.set_attribute(f"mcp.context.{attr}", str(value))
+
+            span.add_event("tool.execution.started", {"tool.name": tool_name})
+
+            try:
+                result = await call_next(context)
+                span.set_status(Status(StatusCode.OK))
+                span.add_event("tool.execution.completed", {"tool.name": tool_name})
+
+                # Capture result metadata
+                if result is not None:
+                    span.set_attribute("mcp.tool.result.type", type(result).__name__)
+                    if _detailed_tracing_enabled:
+                        output_str = _safe_serialize(result)
+                        if output_str:
+                            span.set_attribute("mcp.tool.output", output_str)
+
+                # Record metrics
+                try:
+                    from golf.metrics import get_metrics_collector
+
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_tool_execution(tool_name, "success")
+                    metrics_collector.record_tool_duration(tool_name, time.time() - start_time)
+                except ImportError:
+                    pass
+
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.add_event(
+                    "tool.execution.error",
+                    {"tool.name": tool_name, "error.type": type(e).__name__, "error.message": str(e)},
+                )
+                try:
+                    from golf.metrics import get_metrics_collector
+
+                    metrics_collector = get_metrics_collector()
+                    metrics_collector.increment_tool_execution(tool_name, "error")
+                except ImportError:
+                    pass
+                raise
+
+    async def on_read_resource(
+        self,
+        context: MiddlewareContext[Any],
+        call_next: CallNext[Any, Any],
+    ) -> Any:
+        """Wrap resource reads with OpenTelemetry spans."""
+        global _provider
+        if _provider is None:
+            return await call_next(context)
+
+        tracer = get_tracer()
+        resource_uri = context.message.uri if hasattr(context.message, "uri") else "unknown"
+
+        span_name = "mcp.resource.read"
+        with tracer.start_as_current_span(span_name) as span:
+            span.set_attribute("mcp.component.type", "resource")
+            span.set_attribute("mcp.resource.uri", str(resource_uri))
+            span.set_attribute("mcp.method", "resources/read")
+
+            span.add_event("resource.read.started", {"resource.uri": str(resource_uri)})
+
+            try:
+                result = await call_next(context)
+                span.set_status(Status(StatusCode.OK))
+                span.add_event("resource.read.completed", {"resource.uri": str(resource_uri)})
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                raise
+
+    async def on_get_prompt(
+        self,
+        context: MiddlewareContext[Any],
+        call_next: CallNext[Any, Any],
+    ) -> Any:
+        """Wrap prompt gets with OpenTelemetry spans."""
+        global _provider
+        if _provider is None:
+            return await call_next(context)
+
+        tracer = get_tracer()
+        prompt_name = context.message.name if hasattr(context.message, "name") else "unknown"
+
+        span_name = f"mcp.prompt.{prompt_name}.generate"
+        with tracer.start_as_current_span(span_name) as span:
+            span.set_attribute("mcp.component.type", "prompt")
+            span.set_attribute("mcp.prompt.name", prompt_name)
+            span.set_attribute("mcp.method", "prompts/get")
+
+            span.add_event("prompt.generation.started", {"prompt.name": prompt_name})
+
+            try:
+                result = await call_next(context)
+                span.set_status(Status(StatusCode.OK))
+                span.add_event("prompt.generation.completed", {"prompt.name": prompt_name})
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                raise
+
+    async def on_message(
+        self,
+        context: MiddlewareContext[Any],
+        call_next: CallNext[Any, Any],
+    ) -> Any:
+        """Create a parent span for all MCP messages, linked to HTTP context if available."""
+        global _provider
+        if _provider is None:
+            return await call_next(context)
+
+        tracer = get_tracer()
+        method = context.method or "unknown"
+
+        # Try to get the HTTP span context that was stored by our ASGI middleware
+        parent_context = _http_span_context.get()
+
+        # Create a parent span for the MCP request, using HTTP context as parent if available
+        span_name = f"mcp.request.{method.replace('/', '.')}"
+
+        if parent_context is not None:
+            # Attach the HTTP context so child spans inherit from it
+            token = otel_context.attach(parent_context)
+            try:
+                with tracer.start_as_current_span(span_name) as span:
+                    span.set_attribute("mcp.method", method)
+                    span.set_attribute("mcp.message.type", context.type)
+                    span.set_attribute("mcp.message.source", context.source)
+
+                    try:
+                        result = await call_next(context)
+                        span.set_status(Status(StatusCode.OK))
+                        return result
+                    except Exception as e:
+                        span.record_exception(e)
+                        span.set_status(Status(StatusCode.ERROR, str(e)))
+                        raise
+            finally:
+                otel_context.detach(token)
+        else:
+            # No HTTP context available, create as root span
+            with tracer.start_as_current_span(span_name) as span:
+                span.set_attribute("mcp.method", method)
+                span.set_attribute("mcp.message.type", context.type)
+                span.set_attribute("mcp.message.source", context.source)
+
+                try:
+                    result = await call_next(context)
+                    span.set_status(Status(StatusCode.OK))
+                    return result
+                except Exception as e:
+                    span.record_exception(e)
+                    span.set_status(Status(StatusCode.ERROR, str(e)))
+                    raise
+
+
+class OTelContextCapturingMiddleware:
+    """ASGI middleware that captures the current OTEL context and stores it for MCP layer propagation.
+
+    This middleware should be added AFTER the OpenTelemetryMiddleware (ASGI) so that
+    the HTTP span is already created when we capture the context.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] == "http":
+            # Capture the current OTEL context (which should include the HTTP span)
+            current_ctx = otel_context.get_current()
+            # Store it in the ContextVar so FastMCP middleware can access it
+            token = _http_span_context.set(current_ctx)
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                _http_span_context.reset(token)
+        else:
+            await self.app(scope, receive, send)
 
 
 class SessionTracingMiddleware(BaseHTTPMiddleware):

@@ -1,6 +1,7 @@
 """Golf telemetry module for OpenTelemetry instrumentation."""
 
 from golf.telemetry.instrumentation import (
+    get_provider,
     get_tracer,
     init_telemetry,
     instrument_elicitation,
@@ -9,6 +10,8 @@ from golf.telemetry.instrumentation import (
     instrument_sampling,
     instrument_tool,
     telemetry_lifespan,
+    OpenTelemetryMiddleware,
+    OTelContextCapturingMiddleware,
 )
 
 __all__ = [
@@ -19,5 +22,8 @@ __all__ = [
     "instrument_sampling",
     "telemetry_lifespan",
     "init_telemetry",
+    "get_provider",
     "get_tracer",
+    "OpenTelemetryMiddleware",
+    "OTelContextCapturingMiddleware",
 ]

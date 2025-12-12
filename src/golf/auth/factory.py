@@ -264,6 +264,7 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
             env_value = env_value.strip()
             try:
                 from urllib.parse import urlparse
+
                 parsed = urlparse(env_value)
                 if not parsed.scheme or not parsed.netloc:
                     raise ValueError(
@@ -292,6 +293,7 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
             env_value = env_value.strip()
             try:
                 from urllib.parse import urlparse
+
                 parsed = urlparse(env_value)
                 if not parsed.scheme or not parsed.netloc:
                     raise ValueError(
@@ -300,16 +302,13 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
                     )
                 if parsed.scheme not in ("http", "https"):
                     raise ValueError(
-                        f"Token endpoint from {config.token_endpoint_env_var} "
-                        f"must use http or https: '{env_value}'"
+                        f"Token endpoint from {config.token_endpoint_env_var} must use http or https: '{env_value}'"
                     )
                 token_endpoint = env_value
             except Exception as e:
                 if isinstance(e, ValueError):
                     raise
-                raise ValueError(
-                    f"Invalid token_endpoint from {config.token_endpoint_env_var}: {e}"
-                ) from e
+                raise ValueError(f"Invalid token_endpoint from {config.token_endpoint_env_var}: {e}") from e
 
     client_id = config.client_id
     if config.client_id_env_var:
@@ -317,9 +316,7 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
         if env_value:
             client_id = env_value.strip()
             if not client_id:
-                raise ValueError(
-                    f"Client ID from environment variable {config.client_id_env_var} cannot be empty"
-                )
+                raise ValueError(f"Client ID from environment variable {config.client_id_env_var} cannot be empty")
 
     client_secret = config.client_secret
     if config.client_secret_env_var:
@@ -339,24 +336,19 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
             env_value = env_value.strip()
             try:
                 from urllib.parse import urlparse
+
                 parsed = urlparse(env_value)
                 if not parsed.scheme or not parsed.netloc:
                     raise ValueError(
-                        f"Invalid base_url from environment variable "
-                        f"{config.base_url_env_var}: '{env_value}'"
+                        f"Invalid base_url from environment variable {config.base_url_env_var}: '{env_value}'"
                     )
                 if parsed.scheme not in ("http", "https"):
-                    raise ValueError(
-                        f"Base URL from {config.base_url_env_var} "
-                        f"must use http or https: '{env_value}'"
-                    )
+                    raise ValueError(f"Base URL from {config.base_url_env_var} must use http or https: '{env_value}'")
                 base_url = env_value
             except Exception as e:
                 if isinstance(e, ValueError):
                     raise
-                raise ValueError(
-                    f"Invalid base_url from {config.base_url_env_var}: {e}"
-                ) from e
+                raise ValueError(f"Invalid base_url from {config.base_url_env_var}: {e}") from e
 
     revocation_endpoint = config.revocation_endpoint
     if config.revocation_endpoint_env_var:
@@ -367,6 +359,7 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
             if env_value:  # Only validate if not empty
                 try:
                     from urllib.parse import urlparse
+
                     parsed = urlparse(env_value)
                     if not parsed.scheme or not parsed.netloc:
                         raise ValueError(
@@ -388,28 +381,37 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
 
     # Final validation: ensure all required fields have values after env resolution
     if not authorization_endpoint:
-        env_var_hint = f" (environment variable {config.authorization_endpoint_env_var} is not set)" \
-                      if config.authorization_endpoint_env_var else ""
+        env_var_hint = (
+            f" (environment variable {config.authorization_endpoint_env_var} is not set)"
+            if config.authorization_endpoint_env_var
+            else ""
+        )
         raise ValueError(f"Authorization endpoint is required but not provided{env_var_hint}")
 
     if not token_endpoint:
-        env_var_hint = f" (environment variable {config.token_endpoint_env_var} is not set)" \
-                      if config.token_endpoint_env_var else ""
+        env_var_hint = (
+            f" (environment variable {config.token_endpoint_env_var} is not set)"
+            if config.token_endpoint_env_var
+            else ""
+        )
         raise ValueError(f"Token endpoint is required but not provided{env_var_hint}")
 
     if not client_id:
-        env_var_hint = f" (environment variable {config.client_id_env_var} is not set)" \
-                      if config.client_id_env_var else ""
+        env_var_hint = (
+            f" (environment variable {config.client_id_env_var} is not set)" if config.client_id_env_var else ""
+        )
         raise ValueError(f"Client ID is required but not provided{env_var_hint}")
 
     if not client_secret:
-        env_var_hint = f" (environment variable {config.client_secret_env_var} is not set)" \
-                      if config.client_secret_env_var else ""
+        env_var_hint = (
+            f" (environment variable {config.client_secret_env_var} is not set)" if config.client_secret_env_var else ""
+        )
         raise ValueError(f"Client secret is required but not provided{env_var_hint}")
 
     if not base_url:
-        env_var_hint = f" (environment variable {config.base_url_env_var} is not set)" \
-                      if config.base_url_env_var else ""
+        env_var_hint = (
+            f" (environment variable {config.base_url_env_var} is not set)" if config.base_url_env_var else ""
+        )
         raise ValueError(f"Base URL is required but not provided{env_var_hint}")
 
     # Production security checks
@@ -430,9 +432,7 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
         ]:
             parsed = urlparse(url_value)
             if parsed.scheme == "http":
-                raise ValueError(
-                    f"OAuth proxy {url_name} must use HTTPS in production environment: '{url_value}'"
-                )
+                raise ValueError(f"OAuth proxy {url_name} must use HTTPS in production environment: '{url_value}'")
 
         # Check for localhost in production
         parsed_base = urlparse(base_url)

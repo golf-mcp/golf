@@ -990,23 +990,20 @@ class CodeGenerator:
                 imports.append(f"import {full_module_path}")
 
                 # Add code to register this component
+                # Note: When opentelemetry_enabled, we use OpenTelemetryMiddleware for span creation
+                # instead of wrapping individual functions, to ensure proper context propagation
                 if self.settings.opentelemetry_enabled:
-                    # Use telemetry instrumentation
-                    registration = f"# Register the {component_type.value} '{component.name}' with telemetry"
+                    # Register components without function wrapping - middleware handles tracing
                     entry_func = (
                         component.entry_function
                         if hasattr(component, "entry_function") and component.entry_function
                         else "export"
                     )
 
-                    registration += (
-                        f"\n_wrapped_func = instrument_{component_type.value}("
-                        f"{full_module_path}.{entry_func}, '{component.name}')"
-                    )
-
                     if component_type == ComponentType.TOOL:
+                        registration = f"# Register the tool '{component.name}'"
                         registration += (
-                            f"\n_tool = Tool.from_function(_wrapped_func, "
+                            f"\n_tool = Tool.from_function({full_module_path}.{entry_func}, "
                             f'name="{component.name}", '
                             f"description={repr(component.docstring or '')})"
                         )
@@ -1015,23 +1012,25 @@ class CodeGenerator:
                             registration += f".with_annotations({component.annotations})"
                         registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
+                        registration = f"# Register the resource '{component.name}'"
                         if self._is_resource_template(component):
                             registration += (
-                                f"\n_template = ResourceTemplate.from_function(_wrapped_func, "
+                                f"\n_template = ResourceTemplate.from_function({full_module_path}.{entry_func}, "
                                 f'uri_template="{component.uri_template}", name="{component.name}", '
                                 f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_template(_template)"
                             )
                         else:
                             registration += (
-                                f"\n_resource = Resource.from_function(_wrapped_func, "
+                                f"\n_resource = Resource.from_function({full_module_path}.{entry_func}, "
                                 f'uri="{component.uri_template}", name="{component.name}", '
                                 f"description={repr(component.docstring or '')})\n"
                                 f"mcp.add_resource(_resource)"
                             )
                     else:  # PROMPT
+                        registration = f"# Register the prompt '{component.name}'"
                         registration += (
-                            f"\n_prompt = Prompt.from_function(_wrapped_func, "
+                            f"\n_prompt = Prompt.from_function({full_module_path}.{entry_func}, "
                             f'name="{component.name}", '
                             f"description={repr(component.docstring or '')})\n"
                             f"mcp.add_prompt(_prompt)"
@@ -1198,6 +1197,13 @@ class CodeGenerator:
             imports.append("")
             component_registrations.append("")
 
+        # Add OpenTelemetry FastMCP middleware if enabled (must be added before other middleware)
+        if self.settings.opentelemetry_enabled:
+            component_registrations.append("# Register OpenTelemetry middleware for proper span context propagation")
+            component_registrations.append("from golf.telemetry import OpenTelemetryMiddleware")
+            component_registrations.append("mcp.add_middleware(OpenTelemetryMiddleware())")
+            component_registrations.append("")
+
         # Check for custom middleware.py file and register middleware classes
         middleware_classes = self._discover_middleware_classes(self.project_path)
         if middleware_classes:
@@ -1308,10 +1314,11 @@ class CodeGenerator:
                 middleware_list.append("Middleware(MetricsMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
+            # Note: We intentionally do NOT use opentelemetry.instrumentation.asgi.OpenTelemetryMiddleware
+            # because it creates noisy low-level ASGI spans (http receive/send). Golf's FastMCP middleware
+            # (OpenTelemetryMiddleware) creates cleaner, more meaningful MCP-level spans.
             if self.settings.opentelemetry_enabled:
-                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
-                middleware_setup.append("    from starlette.middleware import Middleware")
-                middleware_list.append("Middleware(OpenTelemetryMiddleware)")
+                pass  # OpenTelemetry middleware is added via mcp.add_middleware() earlier in the code
 
             if middleware_setup:
                 main_code.extend(middleware_setup)
@@ -1368,10 +1375,11 @@ class CodeGenerator:
                 middleware_list.append("Middleware(MetricsMiddleware)")
 
             # Add OpenTelemetry middleware if enabled
+            # Note: We intentionally do NOT use opentelemetry.instrumentation.asgi.OpenTelemetryMiddleware
+            # because it creates noisy low-level ASGI spans (http receive/send). Golf's FastMCP middleware
+            # (OpenTelemetryMiddleware) creates cleaner, more meaningful MCP-level spans.
             if self.settings.opentelemetry_enabled:
-                middleware_setup.append("    from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware")
-                middleware_setup.append("    from starlette.middleware import Middleware")
-                middleware_list.append("Middleware(OpenTelemetryMiddleware)")
+                pass  # OpenTelemetry middleware is added via mcp.add_middleware() earlier in the code
 
             if middleware_setup:
                 main_code.extend(middleware_setup)
