@@ -1228,7 +1228,53 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
 
     This middleware wraps tool calls, resource reads, and prompt gets with
     proper OpenTelemetry spans that are correctly parented to the current context.
+
+    Supports FastMCP 2.14+ hooks including:
+    - on_initialize: Session initialization tracing
+    - on_message: Request-level tracing
+    - on_call_tool: Tool execution tracing
+    - on_read_resource: Resource read tracing
+    - on_get_prompt: Prompt generation tracing
     """
+
+    async def on_initialize(
+        self,
+        context: MiddlewareContext[Any],
+        call_next: CallNext[Any, Any],
+    ) -> Any:
+        """Trace MCP session initialization (FastMCP 2.13+)."""
+        global _provider
+        if _provider is None:
+            return await call_next(context)
+
+        tracer = get_tracer()
+        with tracer.start_as_current_span("mcp.session.initialize") as span:
+            span.set_attribute("mcp.operation", "initialize")
+            span.set_attribute("mcp.message.type", context.type)
+            span.set_attribute("mcp.message.source", context.source)
+
+            # Extract client info from initialize message if available
+            if hasattr(context.message, "params"):
+                params = context.message.params
+                if hasattr(params, "clientInfo"):
+                    client_info = params.clientInfo
+                    if hasattr(client_info, "name"):
+                        span.set_attribute("mcp.client.name", client_info.name)
+                    if hasattr(client_info, "version"):
+                        span.set_attribute("mcp.client.version", client_info.version)
+
+            span.add_event("session.initialization.started")
+
+            try:
+                result = await call_next(context)
+                span.set_status(Status(StatusCode.OK))
+                span.add_event("session.initialization.completed")
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.add_event("session.initialization.failed", {"error.type": type(e).__name__})
+                raise
 
     async def on_call_tool(
         self,
