@@ -119,9 +119,7 @@ def record_runtime_error(
     span.record_exception(error, attributes=extra_attrs, escaped=True)
 
     # Set span status to ERROR
-    span.set_status(
-        Status(StatusCode.ERROR, f"{component}.{operation}: {type(error).__name__}: {error}")
-    )
+    span.set_status(Status(StatusCode.ERROR, f"{component}.{operation}: {type(error).__name__}: {error}"))
 
     # Add an error event with structured attributes
     span.add_event(
