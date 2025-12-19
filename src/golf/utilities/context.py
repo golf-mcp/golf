@@ -35,11 +35,11 @@ def get_current_context() -> "Context":
         ```
     """
     try:
-        # Import FastMCP context utilities at runtime
-        from fastmcp.server.context import _current_context
+        # Use FastMCP's public context API (2.14+)
+        from fastmcp.server.dependencies import get_context
 
-        # Get the current context from the context variable
-        context = _current_context.get(None)
+        # Get the current context using public API
+        context = get_context()
 
         if context is None:
             raise RuntimeError(
@@ -50,4 +50,4 @@ def get_current_context() -> "Context":
         return context
 
     except ImportError as e:
-        raise ImportError("FastMCP is not available. Please ensure fastmcp>=2.11.0 is installed.") from e
+        raise ImportError("FastMCP is not available. Please ensure fastmcp>=2.14.0 is installed.") from e

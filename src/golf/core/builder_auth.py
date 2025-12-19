@@ -182,8 +182,9 @@ def generate_api_key_auth_components(
 def generate_auth_routes() -> str:
     """Generate code for auth routes in the FastMCP app.
 
-    Auth providers (RemoteAuthProvider, OAuthProvider) provide OAuth metadata routes
-    that need to be added to the server.
+    In FastMCP 2.14+, auth providers automatically register their routes
+    when passed to the FastMCP constructor via the auth= parameter.
+    This function uses the public custom_route API as a fallback.
     """
     # API key auth doesn't need special routes
     api_key_config = get_api_key_config()
@@ -194,16 +195,31 @@ def generate_auth_routes() -> str:
     if not is_auth_configured():
         return ""
 
-    # Auth providers provide OAuth metadata routes that need to be added to the server
+    # Auth providers in FastMCP 2.14+ auto-register routes when passed to constructor.
+    # This code provides fallback registration using the public custom_route API.
     return """
-# Add OAuth metadata routes from auth provider
+# Add OAuth metadata routes from auth provider (FastMCP 2.14+ compatible)
+# Note: FastMCP 2.14+ automatically registers auth routes when auth provider
+# is passed to the constructor. This is a fallback for explicit route registration.
 if auth_provider and hasattr(auth_provider, 'get_routes'):
     auth_routes = auth_provider.get_routes()
     if auth_routes:
-        # Add routes to FastMCP's additional HTTP routes list
-        try:
-            mcp._additional_http_routes.extend(auth_routes)
-            # Added {len(auth_routes)} OAuth metadata routes
-        except Exception as e:
-            print(f"Warning: Failed to add OAuth routes: {e}")
+        # Register routes using FastMCP's public custom_route API
+        for route in auth_routes:
+            try:
+                path = route.path if hasattr(route, 'path') else str(route)
+                methods = list(getattr(route, 'methods', ['GET']))
+                endpoint = getattr(route, 'endpoint', None)
+
+                if endpoint:
+                    # Create a closure to capture the endpoint
+                    def make_handler(ep):
+                        async def handler(request):
+                            return await ep(request)
+                        return handler
+
+                    # Register using public API
+                    mcp.custom_route(path, methods=methods)(make_handler(endpoint))
+            except Exception as e:
+                print(f"Warning: Failed to add OAuth route {path}: {e}")
 """

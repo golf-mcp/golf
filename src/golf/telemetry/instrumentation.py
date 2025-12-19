@@ -1615,7 +1615,11 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def telemetry_lifespan(mcp_instance: Any) -> AsyncGenerator[None, None]:
-    """Simplified lifespan for telemetry initialization and cleanup."""
+    """Simplified lifespan for telemetry initialization and cleanup.
+
+    Note: Request-level tracing is handled by OpenTelemetryMiddleware (FastMCP middleware),
+    not by monkey-patching. Add OpenTelemetryMiddleware to your server via mcp.add_middleware().
+    """
     global _provider
 
     # Initialize telemetry with the server name
@@ -1623,43 +1627,10 @@ async def telemetry_lifespan(mcp_instance: Any) -> AsyncGenerator[None, None]:
 
     # If provider is None, telemetry is disabled
     if provider is None:
-        # Just yield without any telemetry setup
         yield
         return
 
-    # Try to add session tracking middleware if possible
     try:
-        # Try to add middleware to FastMCP app if it has Starlette app
-        if hasattr(mcp_instance, "app") or hasattr(mcp_instance, "_app"):
-            app = getattr(mcp_instance, "app", getattr(mcp_instance, "_app", None))
-            if app and hasattr(app, "add_middleware"):
-                app.add_middleware(SessionTracingMiddleware)
-
-        # Also try to instrument FastMCP's internal handlers
-        if hasattr(mcp_instance, "_tool_manager") and hasattr(mcp_instance._tool_manager, "tools"):
-            # The tools should already be instrumented when they were registered
-            pass
-
-        # Try to patch FastMCP's request handling to ensure context propagation
-        if hasattr(mcp_instance, "handle_request"):
-            original_handle_request = mcp_instance.handle_request
-
-            async def traced_handle_request(*args: Any, **kwargs: Any) -> Any:
-                tracer = get_tracer()
-                with tracer.start_as_current_span("mcp.handle_request") as span:
-                    span.set_attribute("mcp.request.handler", "handle_request")
-                    return await original_handle_request(*args, **kwargs)
-
-            mcp_instance.handle_request = traced_handle_request
-
-    except Exception:
-        # Silently continue if middleware setup fails
-        import traceback
-
-        traceback.print_exc()
-
-    try:
-        # Yield control back to FastMCP
         yield
     finally:
         # Cleanup - shutdown the provider
