@@ -13,6 +13,7 @@ from golf.telemetry.instrumentation import (
     OpenTelemetryMiddleware,
     OTelContextCapturingMiddleware,
 )
+from golf.telemetry.errors import record_http_error, record_runtime_error
 
 __all__ = [
     "instrument_tool",
@@ -26,4 +27,6 @@ __all__ = [
     "get_tracer",
     "OpenTelemetryMiddleware",
     "OTelContextCapturingMiddleware",
+    "record_http_error",
+    "record_runtime_error",
 ]

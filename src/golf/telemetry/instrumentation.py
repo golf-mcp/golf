@@ -1542,15 +1542,24 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Determine the operation type from the path
-        operation_type = "unknown"
         if "/mcp" in path:
-            operation_type = "mcp.request"
+            operation_type = "mcp"
         elif "/sse" in path:
-            operation_type = "sse.stream"
+            operation_type = "sse"
+        elif "/oauth" in path:
+            operation_type = "oauth"
         elif "/auth" in path:
             operation_type = "auth"
+        elif path in ("/health", "/healthz", "/ready", "/readiness", "/live", "/liveness"):
+            operation_type = "health"
+        elif path == "/" or path == "":
+            operation_type = "root"
+        else:
+            # Use first path segment as operation type, or "http" as fallback
+            segments = [s for s in path.split("/") if s]
+            operation_type = segments[0] if segments else "http"
 
-        span_name = f"{operation_type}.{method.lower()}"
+        span_name = f"http.{operation_type}.{method.lower()}"
 
         tracer = get_tracer()
         with tracer.start_as_current_span(span_name) as span:
@@ -1589,8 +1598,33 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
                 span.set_attribute("http.status_code", response.status_code)
 
                 # Set span status based on HTTP status
+                # Record detailed error for non-success responses (not 200 or 202)
                 if response.status_code >= 400:
                     span.set_status(Status(StatusCode.ERROR, f"HTTP {response.status_code}"))
+                    # Add detailed error event for client/server errors
+                    span.add_event(
+                        "golf.http_error",
+                        {
+                            "http.method": method,
+                            "http.path": path,
+                            "http.status_code": response.status_code,
+                            "error.category": "client_error" if response.status_code < 500 else "server_error",
+                            "operation": operation_type,
+                        },
+                    )
+                elif response.status_code not in (200, 202):
+                    # Record non-standard success codes (e.g., 201, 204, 3xx redirects)
+                    # as informational events, not errors
+                    span.set_status(Status(StatusCode.OK))
+                    span.add_event(
+                        "golf.http_response",
+                        {
+                            "http.method": method,
+                            "http.path": path,
+                            "http.status_code": response.status_code,
+                            "operation": operation_type,
+                        },
+                    )
                 else:
                     span.set_status(Status(StatusCode.OK))
 
