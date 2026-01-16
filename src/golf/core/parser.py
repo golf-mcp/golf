@@ -168,8 +168,12 @@ class AstParser:
         elif component_type == ComponentType.PROMPT:
             self._process_prompt(component, tree)
 
-        # Set component name based on file path
-        component.name = self._derive_component_name(file_path, component_type)
+        # Set component name - use explicit decorator name if available, otherwise derive from path
+        explicit_name = self._extract_explicit_name_from_decorator(entry_function, component_type)
+        if explicit_name:
+            component.name = explicit_name
+        else:
+            component.name = self._derive_component_name(file_path, component_type)
 
         # Set parent module if it's in a nested structure
         if len(rel_path.parts) > 2:  # More than just "tools/file.py"
@@ -213,6 +217,85 @@ class AstParser:
             )
 
         return description
+
+    def _extract_explicit_name_from_decorator(
+        self,
+        func_node: ast.FunctionDef | ast.AsyncFunctionDef,
+        component_type: ComponentType,
+    ) -> str | None:
+        """Extract explicit name from @tool/@resource/@prompt decorator.
+
+        Handles both import patterns:
+        - @tool(name="x") or @tool("x")
+        - @golf.tool(name="x") or @golf.tool("x")
+
+        Args:
+            func_node: The function AST node to check
+            component_type: The type of component being parsed
+
+        Returns:
+            The explicit name if found and valid, None otherwise.
+        """
+        # Map component type to expected decorator name
+        decorator_names = {
+            ComponentType.TOOL: "tool",
+            ComponentType.RESOURCE: "resource",
+            ComponentType.PROMPT: "prompt",
+        }
+        expected_decorator = decorator_names.get(component_type)
+        if not expected_decorator:
+            return None
+
+        for decorator in func_node.decorator_list:
+            # Handle @tool(...) or @golf.tool(...)
+            if isinstance(decorator, ast.Call):
+                func = decorator.func
+
+                # Check for @tool(...) pattern
+                is_direct_decorator = (
+                    isinstance(func, ast.Name) and func.id == expected_decorator
+                )
+
+                # Check for @golf.tool(...) pattern
+                is_qualified_decorator = (
+                    isinstance(func, ast.Attribute)
+                    and func.attr == expected_decorator
+                    and isinstance(func.value, ast.Name)
+                    and func.value.id == "golf"
+                )
+
+                if is_direct_decorator or is_qualified_decorator:
+                    # Check for positional arg: @tool("name")
+                    if decorator.args:
+                        first_arg = decorator.args[0]
+                        if isinstance(first_arg, ast.Constant) and isinstance(
+                            first_arg.value, str
+                        ):
+                            return first_arg.value
+                        else:
+                            # Non-string or dynamic value
+                            console.print(
+                                "[yellow]Warning: Decorator name must be a string literal, "
+                                "falling back to path-derived name[/yellow]"
+                            )
+                            return None
+
+                    # Check for keyword arg: @tool(name="name")
+                    for keyword in decorator.keywords:
+                        if keyword.arg == "name":
+                            if isinstance(keyword.value, ast.Constant) and isinstance(
+                                keyword.value.value, str
+                            ):
+                                return keyword.value.value
+                            else:
+                                # Non-string or dynamic value
+                                console.print(
+                                    "[yellow]Warning: Decorator name must be a string literal, "
+                                    "falling back to path-derived name[/yellow]"
+                                )
+                                return None
+
+        return None
 
     def _process_entry_function(
         self,

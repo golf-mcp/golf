@@ -933,3 +933,258 @@ export = my_custom_function
         assert len(components) == 1
         assert components[0].docstring == "Custom export function docstring."
         assert components[0].entry_function == "my_custom_function"
+
+
+class TestExplicitNaming:
+    """Test cases for explicit component naming via decorators."""
+
+    def test_tool_with_explicit_name(self, sample_project: Path) -> None:
+        """Test that @tool(name=...) sets explicit name."""
+        tool_file = sample_project / "tools" / "charge.py"
+        tool_file.write_text(
+            '''"""Process payment."""
+
+from golf import tool
+
+
+@tool(name="stripe_charge")
+async def run(amount: int) -> str:
+    """Charge the card."""
+    return f"Charged {amount}"
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        assert components[0].name == "stripe_charge"
+        assert components[0].type == ComponentType.TOOL
+
+    def test_tool_with_positional_name(self, sample_project: Path) -> None:
+        """Test that @tool("name") positional arg works."""
+        tool_file = sample_project / "tools" / "charge.py"
+        tool_file.write_text(
+            '''"""Process payment."""
+
+from golf import tool
+
+
+@tool("my_charge")
+async def run(amount: int) -> str:
+    """Charge the card."""
+    return f"Charged {amount}"
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        assert components[0].name == "my_charge"
+
+    def test_tool_with_qualified_import(self, sample_project: Path) -> None:
+        """Test that @golf.tool(name=...) works."""
+        tool_file = sample_project / "tools" / "charge.py"
+        tool_file.write_text(
+            '''"""Process payment."""
+
+import golf
+
+
+@golf.tool(name="qualified_charge")
+async def run(amount: int) -> str:
+    """Charge the card."""
+    return f"Charged {amount}"
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        assert components[0].name == "qualified_charge"
+
+    def test_resource_with_explicit_name(self, sample_project: Path) -> None:
+        """Test that @resource(name=...) sets explicit name."""
+        resource_file = sample_project / "resources" / "user.py"
+        resource_file.write_text(
+            '''"""User resource."""
+
+from golf import resource
+
+resource_uri = "users://{user_id}"
+
+
+@resource(name="user_profile")
+async def run(user_id: str) -> dict:
+    """Get user profile."""
+    return {"user_id": user_id}
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(resource_file)
+
+        assert len(components) == 1
+        assert components[0].name == "user_profile"
+        assert components[0].type == ComponentType.RESOURCE
+
+    def test_prompt_with_explicit_name(self, sample_project: Path) -> None:
+        """Test that @prompt(name=...) sets explicit name."""
+        prompt_file = sample_project / "prompts" / "greet.py"
+        prompt_file.write_text(
+            '''"""Greeting prompt."""
+
+from golf import prompt
+
+
+@prompt(name="hello_greeting")
+async def run(name: str) -> list:
+    """Generate greeting."""
+    return [{"role": "user", "content": f"Hello {name}"}]
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(prompt_file)
+
+        assert len(components) == 1
+        assert components[0].name == "hello_greeting"
+        assert components[0].type == ComponentType.PROMPT
+
+    def test_tool_without_decorator_uses_path_name(self, sample_project: Path) -> None:
+        """Test that tools without decorator still use path-derived name."""
+        tool_file = sample_project / "tools" / "payments" / "charge.py"
+        tool_file.parent.mkdir(parents=True, exist_ok=True)
+        tool_file.write_text(
+            '''"""Process payment."""
+
+
+async def run(amount: int) -> str:
+    """Charge the card."""
+    return f"Charged {amount}"
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        assert components[0].name == "charge_payments"
+
+    def test_decorator_on_non_entry_function_ignored(self, sample_project: Path) -> None:
+        """Test that decorator on helper function is ignored."""
+        tool_file = sample_project / "tools" / "helper_test.py"
+        tool_file.write_text(
+            '''"""Test tool."""
+
+from golf import tool
+
+
+@tool(name="should_be_ignored")
+def helper(x: int) -> int:
+    """Helper function."""
+    return x * 2
+
+
+async def run(amount: int) -> str:
+    """Main function."""
+    return f"Result: {helper(amount)}"
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        # Should use path-derived name since decorator is not on entry function
+        assert components[0].name == "helper_test"
+
+    def test_dynamic_name_falls_back_to_path(self, sample_project: Path) -> None:
+        """Test that non-string name falls back to path-derived name."""
+        tool_file = sample_project / "tools" / "dynamic.py"
+        tool_file.write_text(
+            '''"""Test tool."""
+
+from golf import tool
+
+NAME = "dynamic_name"
+
+
+@tool(name=NAME)  # Variable, not string literal
+async def run() -> str:
+    """Test function."""
+    return "result"
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        # Should fall back to path-derived name
+        assert components[0].name == "dynamic"
+
+    def test_explicit_name_collision_detected(self, sample_project: Path) -> None:
+        """Test that explicit name collisions are detected in parse_project."""
+        tool1 = sample_project / "tools" / "tool1.py"
+        tool1.write_text(
+            '''"""Tool 1."""
+
+from golf import tool
+
+
+@tool(name="same_name")
+async def run() -> str:
+    """Tool 1."""
+    return "1"
+
+
+export = run
+'''
+        )
+
+        tool2 = sample_project / "tools" / "tool2.py"
+        tool2.write_text(
+            '''"""Tool 2."""
+
+from golf import tool
+
+
+@tool(name="same_name")
+async def run() -> str:
+    """Tool 2."""
+    return "2"
+
+
+export = run
+'''
+        )
+
+        with pytest.raises(ValueError, match="ID collision detected"):
+            parse_project(sample_project)
