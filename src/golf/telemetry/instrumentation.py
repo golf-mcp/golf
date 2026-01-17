@@ -1228,7 +1228,53 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
 
     This middleware wraps tool calls, resource reads, and prompt gets with
     proper OpenTelemetry spans that are correctly parented to the current context.
+
+    Supports FastMCP 2.14+ hooks including:
+    - on_initialize: Session initialization tracing
+    - on_message: Request-level tracing
+    - on_call_tool: Tool execution tracing
+    - on_read_resource: Resource read tracing
+    - on_get_prompt: Prompt generation tracing
     """
+
+    async def on_initialize(
+        self,
+        context: MiddlewareContext[Any],
+        call_next: CallNext[Any, Any],
+    ) -> Any:
+        """Trace MCP session initialization (FastMCP 2.13+)."""
+        global _provider
+        if _provider is None:
+            return await call_next(context)
+
+        tracer = get_tracer()
+        with tracer.start_as_current_span("mcp.session.initialize") as span:
+            span.set_attribute("mcp.operation", "initialize")
+            span.set_attribute("mcp.message.type", context.type)
+            span.set_attribute("mcp.message.source", context.source)
+
+            # Extract client info from initialize message if available
+            if hasattr(context.message, "params"):
+                params = context.message.params
+                if hasattr(params, "clientInfo"):
+                    client_info = params.clientInfo
+                    if hasattr(client_info, "name"):
+                        span.set_attribute("mcp.client.name", client_info.name)
+                    if hasattr(client_info, "version"):
+                        span.set_attribute("mcp.client.version", client_info.version)
+
+            span.add_event("session.initialization.started")
+
+            try:
+                result = await call_next(context)
+                span.set_status(Status(StatusCode.OK))
+                span.add_event("session.initialization.completed")
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.add_event("session.initialization.failed", {"error.type": type(e).__name__})
+                raise
 
     async def on_call_tool(
         self,
@@ -1496,15 +1542,24 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Determine the operation type from the path
-        operation_type = "unknown"
         if "/mcp" in path:
-            operation_type = "mcp.request"
+            operation_type = "mcp"
         elif "/sse" in path:
-            operation_type = "sse.stream"
+            operation_type = "sse"
+        elif "/oauth" in path:
+            operation_type = "oauth"
         elif "/auth" in path:
             operation_type = "auth"
+        elif path in ("/health", "/healthz", "/ready", "/readiness", "/live", "/liveness"):
+            operation_type = "health"
+        elif path == "/" or path == "":
+            operation_type = "root"
+        else:
+            # Use first path segment as operation type, or "http" as fallback
+            segments = [s for s in path.split("/") if s]
+            operation_type = segments[0] if segments else "http"
 
-        span_name = f"{operation_type}.{method.lower()}"
+        span_name = f"http.{operation_type}.{method.lower()}"
 
         tracer = get_tracer()
         with tracer.start_as_current_span(span_name) as span:
@@ -1543,8 +1598,33 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
                 span.set_attribute("http.status_code", response.status_code)
 
                 # Set span status based on HTTP status
+                # Record detailed error for non-success responses (not 200 or 202)
                 if response.status_code >= 400:
                     span.set_status(Status(StatusCode.ERROR, f"HTTP {response.status_code}"))
+                    # Add detailed error event for client/server errors
+                    span.add_event(
+                        "golf.http_error",
+                        {
+                            "http.method": method,
+                            "http.path": path,
+                            "http.status_code": response.status_code,
+                            "error.category": "client_error" if response.status_code < 500 else "server_error",
+                            "operation": operation_type,
+                        },
+                    )
+                elif response.status_code not in (200, 202):
+                    # Record non-standard success codes (e.g., 201, 204, 3xx redirects)
+                    # as informational events, not errors
+                    span.set_status(Status(StatusCode.OK))
+                    span.add_event(
+                        "golf.http_response",
+                        {
+                            "http.method": method,
+                            "http.path": path,
+                            "http.status_code": response.status_code,
+                            "operation": operation_type,
+                        },
+                    )
                 else:
                     span.set_status(Status(StatusCode.OK))
 
@@ -1615,7 +1695,11 @@ class SessionTracingMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def telemetry_lifespan(mcp_instance: Any) -> AsyncGenerator[None, None]:
-    """Simplified lifespan for telemetry initialization and cleanup."""
+    """Simplified lifespan for telemetry initialization and cleanup.
+
+    Note: Request-level tracing is handled by OpenTelemetryMiddleware (FastMCP middleware),
+    not by monkey-patching. Add OpenTelemetryMiddleware to your server via mcp.add_middleware().
+    """
     global _provider
 
     # Initialize telemetry with the server name
@@ -1623,43 +1707,10 @@ async def telemetry_lifespan(mcp_instance: Any) -> AsyncGenerator[None, None]:
 
     # If provider is None, telemetry is disabled
     if provider is None:
-        # Just yield without any telemetry setup
         yield
         return
 
-    # Try to add session tracking middleware if possible
     try:
-        # Try to add middleware to FastMCP app if it has Starlette app
-        if hasattr(mcp_instance, "app") or hasattr(mcp_instance, "_app"):
-            app = getattr(mcp_instance, "app", getattr(mcp_instance, "_app", None))
-            if app and hasattr(app, "add_middleware"):
-                app.add_middleware(SessionTracingMiddleware)
-
-        # Also try to instrument FastMCP's internal handlers
-        if hasattr(mcp_instance, "_tool_manager") and hasattr(mcp_instance._tool_manager, "tools"):
-            # The tools should already be instrumented when they were registered
-            pass
-
-        # Try to patch FastMCP's request handling to ensure context propagation
-        if hasattr(mcp_instance, "handle_request"):
-            original_handle_request = mcp_instance.handle_request
-
-            async def traced_handle_request(*args: Any, **kwargs: Any) -> Any:
-                tracer = get_tracer()
-                with tracer.start_as_current_span("mcp.handle_request") as span:
-                    span.set_attribute("mcp.request.handler", "handle_request")
-                    return await original_handle_request(*args, **kwargs)
-
-            mcp_instance.handle_request = traced_handle_request
-
-    except Exception:
-        # Silently continue if middleware setup fails
-        import traceback
-
-        traceback.print_exc()
-
-    try:
-        # Yield control back to FastMCP
         yield
     finally:
         # Cleanup - shutdown the provider

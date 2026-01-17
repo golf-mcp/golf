@@ -670,6 +670,12 @@ class CodeGenerator:
             "        ",
             "    except Exception as e:",
             "        import traceback",
+            "        # Record error to trace if telemetry is available",
+            "        try:",
+            "            from golf.telemetry import record_runtime_error",
+            "            record_runtime_error(e, 'startup_script')",
+            "        except ImportError:",
+            "            pass  # Telemetry not available",
             "        print(f'Warning: Startup script execution failed: {e}', file=sys.stderr)",
             "        print(traceback.format_exc(), file=sys.stderr)",
             "        # Continue server startup despite script failure",
@@ -826,6 +832,12 @@ class CodeGenerator:
             "    except Exception as e:",
             "        # Log error and return failure response",
             "        import sys",
+            "        # Record error to trace if telemetry is available",
+            "        try:",
+            "            from golf.telemetry import record_runtime_error",
+            "            record_runtime_error(e, f'{check_type}_check')",
+            "        except ImportError:",
+            "            pass  # Telemetry not available",
             '        print(f"Error calling {check_type} check function: {e}", file=sys.stderr)',
             "        print(traceback.format_exc(), file=sys.stderr)",
             "        return JSONResponse({",
@@ -1313,12 +1325,13 @@ class CodeGenerator:
                 middleware_setup.append("    from starlette.middleware import Middleware")
                 middleware_list.append("Middleware(MetricsMiddleware)")
 
-            # Add OpenTelemetry middleware if enabled
-            # Note: We intentionally do NOT use opentelemetry.instrumentation.asgi.OpenTelemetryMiddleware
-            # because it creates noisy low-level ASGI spans (http receive/send). Golf's FastMCP middleware
-            # (OpenTelemetryMiddleware) creates cleaner, more meaningful MCP-level spans.
+            # Add OpenTelemetry HTTP tracing middleware if enabled
+            # This adds SessionTracingMiddleware for HTTP-level error recording (4xx/5xx responses)
+            # The FastMCP-level OpenTelemetryMiddleware is added via mcp.add_middleware() earlier
             if self.settings.opentelemetry_enabled:
-                pass  # OpenTelemetry middleware is added via mcp.add_middleware() earlier in the code
+                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_setup.append("    from golf.telemetry.instrumentation import SessionTracingMiddleware")
+                middleware_list.append("Middleware(SessionTracingMiddleware)")
 
             if middleware_setup:
                 main_code.extend(middleware_setup)
@@ -1374,12 +1387,13 @@ class CodeGenerator:
                 middleware_setup.append("    from starlette.middleware import Middleware")
                 middleware_list.append("Middleware(MetricsMiddleware)")
 
-            # Add OpenTelemetry middleware if enabled
-            # Note: We intentionally do NOT use opentelemetry.instrumentation.asgi.OpenTelemetryMiddleware
-            # because it creates noisy low-level ASGI spans (http receive/send). Golf's FastMCP middleware
-            # (OpenTelemetryMiddleware) creates cleaner, more meaningful MCP-level spans.
+            # Add OpenTelemetry HTTP tracing middleware if enabled
+            # This adds SessionTracingMiddleware for HTTP-level error recording (4xx/5xx responses)
+            # The FastMCP-level OpenTelemetryMiddleware is added via mcp.add_middleware() earlier
             if self.settings.opentelemetry_enabled:
-                pass  # OpenTelemetry middleware is added via mcp.add_middleware() earlier in the code
+                middleware_setup.append("    from starlette.middleware import Middleware")
+                middleware_setup.append("    from golf.telemetry.instrumentation import SessionTracingMiddleware")
+                middleware_list.append("Middleware(SessionTracingMiddleware)")
 
             if middleware_setup:
                 main_code.extend(middleware_setup)
@@ -1813,6 +1827,12 @@ from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConf
             shutil.copy(src_instrumentation, dst_instrumentation)
         else:
             console.print("[yellow]Warning: Could not find telemetry instrumentation module[/yellow]")
+
+        # Copy errors module for runtime error recording
+        src_errors = Path(__file__).parent.parent.parent / "golf" / "telemetry" / "errors.py"
+        dst_errors = telemetry_dir / "errors.py"
+        if src_errors.exists():
+            shutil.copy(src_errors, dst_errors)
 
     # Check if auth routes need to be added
     if is_auth_configured() or get_api_key_config():
