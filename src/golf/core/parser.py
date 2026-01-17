@@ -252,9 +252,7 @@ class AstParser:
                 func = decorator.func
 
                 # Check for @tool(...) pattern
-                is_direct_decorator = (
-                    isinstance(func, ast.Name) and func.id == expected_decorator
-                )
+                is_direct_decorator = isinstance(func, ast.Name) and func.id == expected_decorator
 
                 # Check for @golf.tool(...) pattern
                 is_qualified_decorator = (
@@ -268,9 +266,7 @@ class AstParser:
                     # Check for positional arg: @tool("name")
                     if decorator.args:
                         first_arg = decorator.args[0]
-                        if isinstance(first_arg, ast.Constant) and isinstance(
-                            first_arg.value, str
-                        ):
+                        if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
                             return first_arg.value
                         else:
                             # Non-string or dynamic value
@@ -283,9 +279,7 @@ class AstParser:
                     # Check for keyword arg: @tool(name="name")
                     for keyword in decorator.keywords:
                         if keyword.arg == "name":
-                            if isinstance(keyword.value, ast.Constant) and isinstance(
-                                keyword.value.value, str
-                            ):
+                            if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
                                 return keyword.value.value
                             else:
                                 # Non-string or dynamic value
