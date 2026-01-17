@@ -181,41 +181,36 @@ def generate_metrics_instrumentation() -> list[str]:
 
 
 def generate_session_tracking() -> list[str]:
-    """Generate session tracking integration code.
+    """Generate session tracking using FastMCP middleware (2.14+ compatible).
 
     Returns:
-        List of code lines for session tracking
+        List of code lines for session tracking via middleware
     """
     return [
-        "# Session tracking integration",
-        "import asyncio",
-        "from typing import Dict",
+        "# Session tracking via FastMCP middleware (2.14+ compatible)",
+        "from fastmcp.server.middleware import Middleware as FastMCPMiddleware, MiddlewareContext, CallNext",
+        "from typing import Any",
         "",
-        "# Track active sessions",
-        "_active_sessions: Dict[str, float] = {}",
-        "",
-        "# Hook into FastMCP's session lifecycle if available",
-        "try:",
-        "    from fastmcp.server import SessionManager",
+        "class SessionTrackingMiddleware(FastMCPMiddleware):",
+        '    """Middleware to track MCP session lifecycle for metrics."""',
         "    ",
-        "    # Monkey patch session creation if possible",
-        "    _original_create_session = getattr(mcp, '_create_session', None)",
-        "    if _original_create_session:",
-        "        async def _patched_create_session(*args, **kwargs):",
-        "            session_id = str(id(args)) if args else 'unknown'",
-        "            _active_sessions[session_id] = time.time()",
-        "            track_session_start()",
-        "            try:",
-        "                return await _original_create_session(*args, **kwargs)",
-        "            except Exception:",
-        "                # If session creation fails, clean up",
-        "                if session_id in _active_sessions:",
-        "                    del _active_sessions[session_id]",
-        "                raise",
+        "    async def on_initialize(",
+        "        self,",
+        "        context: MiddlewareContext[Any],",
+        "        call_next: CallNext[Any, Any],",
+        "    ) -> Any:",
+        '        """Track session initialization."""',
+        "        # Track session start",
+        "        track_session_start()",
         "        ",
-        "        mcp._create_session = _patched_create_session",
-        "except (ImportError, AttributeError):",
-        "    # Fallback: track sessions via request patterns",
-        "    pass",
+        "        try:",
+        "            result = await call_next(context)",
+        "            return result",
+        "        except Exception:",
+        "            # Session initialization failed",
+        "            raise",
+        "",
+        "# Add session tracking middleware",
+        "mcp.add_middleware(SessionTrackingMiddleware())",
         "",
     ]
