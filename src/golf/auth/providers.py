@@ -489,6 +489,20 @@ class OAuthProxyConfig(BaseModel):
     )
     base_url_env_var: str | None = Field(None, description="Environment variable name for base URL")
 
+    # Redirect URI validation configuration (extends defaults)
+    allowed_redirect_patterns: list[str] | None = Field(
+        None, description="Additional redirect URI patterns to allow (extends default localhost patterns)"
+    )
+    allowed_redirect_patterns_env_var: str | None = Field(
+        None, description="Environment variable name for comma-separated redirect patterns"
+    )
+    allowed_redirect_schemes: list[str] | None = Field(
+        None, description="Additional URI schemes to allow (extends http/https/cursor/warp)"
+    )
+    allowed_redirect_schemes_env_var: str | None = Field(
+        None, description="Environment variable name for comma-separated redirect schemes"
+    )
+
     @field_validator("authorization_endpoint", "token_endpoint", "base_url")
     @classmethod
     def validate_required_urls(cls, v: str | None) -> str | None:
