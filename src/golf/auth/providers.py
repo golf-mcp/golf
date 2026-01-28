@@ -5,10 +5,20 @@ replacing the legacy custom OAuth implementation with the new built-in auth syst
 """
 
 import os
+from collections.abc import Callable
 from typing import Any, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+# Type aliases for dynamic redirect URI configuration
+# A callable that returns a list of redirect URI patterns
+RedirectPatternsProvider = Callable[[], list[str]]
+# A callable that returns a list of allowed URI schemes
+RedirectSchemesProvider = Callable[[], list[str]]
+# A callable that validates a redirect URI directly (returns True if allowed)
+RedirectUriValidator = Callable[[str], bool]
 
 
 class JWTAuthConfig(BaseModel):
@@ -490,18 +500,41 @@ class OAuthProxyConfig(BaseModel):
     base_url_env_var: str | None = Field(None, description="Environment variable name for base URL")
 
     # Redirect URI validation configuration (extends defaults)
+    # Static patterns - evaluated once at startup
     allowed_redirect_patterns: list[str] | None = Field(
         None, description="Additional redirect URI patterns to allow (extends default localhost patterns)"
     )
     allowed_redirect_patterns_env_var: str | None = Field(
         None, description="Environment variable name for comma-separated redirect patterns"
     )
+    # Static schemes - evaluated once at startup
     allowed_redirect_schemes: list[str] | None = Field(
         None, description="Additional URI schemes to allow (extends http/https/cursor/warp)"
     )
     allowed_redirect_schemes_env_var: str | None = Field(
         None, description="Environment variable name for comma-separated redirect schemes"
     )
+
+    # Dynamic redirect URI validation (evaluated at runtime for each request)
+    # These allow integration with feature flags, databases, or other dynamic sources
+    allowed_redirect_patterns_func: RedirectPatternsProvider | None = Field(
+        None,
+        description="Callable that returns redirect URI patterns dynamically. "
+        "Called on each authorization request. Useful for feature flags or dynamic configuration.",
+    )
+    allowed_redirect_schemes_func: RedirectSchemesProvider | None = Field(
+        None,
+        description="Callable that returns allowed URI schemes dynamically. "
+        "Called on each authorization request. Useful for feature flags or dynamic configuration.",
+    )
+    redirect_uri_validator: RedirectUriValidator | None = Field(
+        None,
+        description="Custom validator function that receives the full redirect URI and returns True if allowed. "
+        "Takes precedence over pattern/scheme matching when provided. "
+        "Useful for complex validation logic or external lookups.",
+    )
+
+    model_config = {"arbitrary_types_allowed": True}
 
     @field_validator("authorization_endpoint", "token_endpoint", "base_url")
     @classmethod

@@ -452,6 +452,21 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
             "Please install it with: pip install golf-mcp-enterprise"
         ) from None
 
+    # Resolve static redirect patterns from environment variables
+    allowed_redirect_patterns = config.allowed_redirect_patterns
+    if config.allowed_redirect_patterns_env_var:
+        env_value = os.environ.get(config.allowed_redirect_patterns_env_var)
+        if env_value:
+            # Split comma-separated values and strip whitespace
+            allowed_redirect_patterns = [p.strip() for p in env_value.split(",") if p.strip()]
+
+    allowed_redirect_schemes = config.allowed_redirect_schemes
+    if config.allowed_redirect_schemes_env_var:
+        env_value = os.environ.get(config.allowed_redirect_schemes_env_var)
+        if env_value:
+            # Split comma-separated values and strip whitespace
+            allowed_redirect_schemes = [s.strip() for s in env_value.split(",") if s.strip()]
+
     # Create a new config with resolved values for the enterprise package
     resolved_config = OAuthProxyConfig(
         authorization_endpoint=authorization_endpoint,
@@ -463,6 +478,13 @@ def _create_oauth_proxy_provider(config: OAuthProxyConfig) -> "AuthProvider":
         redirect_path=config.redirect_path,
         scopes_supported=config.scopes_supported,
         token_verifier_config=config.token_verifier_config,
+        # Static redirect URI configuration (resolved from env vars)
+        allowed_redirect_patterns=allowed_redirect_patterns,
+        allowed_redirect_schemes=allowed_redirect_schemes,
+        # Dynamic redirect URI configuration (pass through callables)
+        allowed_redirect_patterns_func=config.allowed_redirect_patterns_func,
+        allowed_redirect_schemes_func=config.allowed_redirect_schemes_func,
+        redirect_uri_validator=config.redirect_uri_validator,
     )
 
     return create_oauth_proxy_provider(resolved_config)

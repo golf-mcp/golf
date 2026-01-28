@@ -15,6 +15,10 @@ from .providers import (
     OAuthServerConfig,
     RemoteAuthConfig,
     OAuthProxyConfig,
+    # Type aliases for dynamic redirect URI configuration
+    RedirectPatternsProvider,
+    RedirectSchemesProvider,
+    RedirectUriValidator,
 )
 from .factory import (
     create_auth_provider,
@@ -53,6 +57,10 @@ __all__ = [
     "OAuthServerConfig",
     "RemoteAuthConfig",
     "OAuthProxyConfig",
+    # Type aliases for dynamic redirect URI configuration
+    "RedirectPatternsProvider",
+    "RedirectSchemesProvider",
+    "RedirectUriValidator",
     # Factory functions
     "create_auth_provider",
     "create_simple_jwt_provider",
@@ -202,6 +210,13 @@ def configure_oauth_proxy(
     scopes_supported: list[str] | None = None,
     revocation_endpoint: str | None = None,
     redirect_path: str = "/oauth/callback",
+    # Static redirect URI configuration
+    allowed_redirect_patterns: list[str] | None = None,
+    allowed_redirect_schemes: list[str] | None = None,
+    # Dynamic redirect URI configuration (callables for runtime evaluation)
+    allowed_redirect_patterns_func: RedirectPatternsProvider | None = None,
+    allowed_redirect_schemes_func: RedirectSchemesProvider | None = None,
+    redirect_uri_validator: RedirectUriValidator | None = None,
     **env_vars: str,
 ) -> None:
     """Configure OAuth proxy authentication for non-DCR providers.
@@ -209,6 +224,10 @@ def configure_oauth_proxy(
     All parameters can be provided either directly or via environment variables.
     For each parameter, you can provide the value directly or use the
     corresponding *_env_var parameter to specify an environment variable name.
+
+    Redirect URI validation supports both static and dynamic configuration:
+    - Static: Use allowed_redirect_patterns and allowed_redirect_schemes lists
+    - Dynamic: Use callable functions that are evaluated at runtime for each request
 
     Examples:
         # Direct values (backward compatible)
@@ -231,11 +250,32 @@ def configure_oauth_proxy(
             token_verifier_config=jwt_config,
         )
 
-        # Mixed (direct values with env var overrides)
+        # Dynamic redirect URI validation with feature flags
+        def get_allowed_patterns():
+            # Could fetch from Amplitude, LaunchDarkly, database, etc.
+            if amplitude.is_enabled("new-redirect-uris"):
+                return ["https://new-app.example.com/*"]
+            return ["https://legacy-app.example.com/*"]
+
         configure_oauth_proxy(
-            authorization_endpoint="https://default.example.com/authorize",
-            authorization_endpoint_env_var="OAUTH_AUTH_ENDPOINT",  # Overrides at runtime
-            # ...
+            authorization_endpoint="https://auth.example.com/authorize",
+            token_endpoint="https://auth.example.com/token",
+            client_id="my-client",
+            client_secret="my-secret",
+            base_url="https://myserver.com",
+            token_verifier_config=jwt_config,
+            allowed_redirect_patterns_func=get_allowed_patterns,
+        )
+
+        # Custom redirect URI validator for complex logic
+        def validate_redirect_uri(uri: str) -> bool:
+            # Custom validation logic - check database, feature flags, etc.
+            allowed = fetch_allowed_uris_from_database()
+            return uri in allowed
+
+        configure_oauth_proxy(
+            # ... other config ...
+            redirect_uri_validator=validate_redirect_uri,
         )
 
     Args:
@@ -248,6 +288,11 @@ def configure_oauth_proxy(
         scopes_supported: List of OAuth scopes this proxy supports
         revocation_endpoint: Optional token revocation endpoint
         redirect_path: OAuth callback path (default: "/oauth/callback")
+        allowed_redirect_patterns: Static list of redirect URI patterns
+        allowed_redirect_schemes: Static list of allowed URI schemes
+        allowed_redirect_patterns_func: Callable returning patterns (evaluated per request)
+        allowed_redirect_schemes_func: Callable returning schemes (evaluated per request)
+        redirect_uri_validator: Custom validator function for redirect URIs
         **env_vars: Environment variable names for runtime configuration
             - authorization_endpoint_env_var: Env var for authorization endpoint
             - token_endpoint_env_var: Env var for token endpoint
@@ -255,6 +300,8 @@ def configure_oauth_proxy(
             - client_secret_env_var: Env var for client secret
             - base_url_env_var: Env var for base URL
             - revocation_endpoint_env_var: Env var for revocation endpoint
+            - allowed_redirect_patterns_env_var: Env var for redirect patterns
+            - allowed_redirect_schemes_env_var: Env var for redirect schemes
 
     Raises:
         ValueError: If token_verifier_config is not provided or invalid
@@ -281,6 +328,13 @@ def configure_oauth_proxy(
         redirect_path=redirect_path,
         scopes_supported=scopes_supported,
         token_verifier_config=token_verifier_config,
+        # Static redirect URI configuration
+        allowed_redirect_patterns=allowed_redirect_patterns,
+        allowed_redirect_schemes=allowed_redirect_schemes,
+        # Dynamic redirect URI configuration
+        allowed_redirect_patterns_func=allowed_redirect_patterns_func,
+        allowed_redirect_schemes_func=allowed_redirect_schemes_func,
+        redirect_uri_validator=redirect_uri_validator,
         **env_vars,
     )
     configure_auth(config)
