@@ -5,8 +5,13 @@ import pytest
 from unittest.mock import Mock, patch
 from pydantic import ValidationError
 
-from golf.auth.providers import JWTAuthConfig, OAuthServerConfig, RemoteAuthConfig
-from golf.auth.factory import _create_jwt_provider, _create_oauth_server_provider, _create_remote_provider
+from golf.auth.providers import JWTAuthConfig, OAuthServerConfig, RemoteAuthConfig, OAuthProxyConfig, StaticTokenConfig
+from golf.auth.factory import (
+    _create_jwt_provider,
+    _create_oauth_server_provider,
+    _create_remote_provider,
+    _create_oauth_proxy_provider,
+)
 
 
 class TestJWTProviderCreation:
@@ -389,3 +394,224 @@ class TestOAuthServerCreation:
             # Verify OAuthProvider was called with None revocation options
             call_args = mock_oauth_provider.call_args[1]
             assert call_args["revocation_options"] is None
+
+
+class TestOAuthProxyDynamicRedirectUris:
+    """Test OAuth proxy configuration with dynamic redirect URI validation."""
+
+    def _create_base_config(self, **kwargs) -> OAuthProxyConfig:
+        """Create a base OAuth proxy config with required fields for testing."""
+        token_verifier = StaticTokenConfig(tokens={"test-token": {"client_id": "test", "scopes": ["read"]}})
+        defaults = {
+            "authorization_endpoint": "https://auth.example.com/authorize",
+            "token_endpoint": "https://auth.example.com/token",
+            "client_id": "test-client",
+            "client_secret": "test-secret",
+            "base_url": "https://proxy.example.com",
+            "token_verifier_config": token_verifier,
+        }
+        defaults.update(kwargs)
+        return OAuthProxyConfig(**defaults)
+
+    def test_config_with_static_redirect_patterns(self) -> None:
+        """Test config creation with static redirect patterns list."""
+        config = self._create_base_config(
+            allowed_redirect_patterns=["https://app1.example.com/*", "https://app2.example.com/*"],
+            allowed_redirect_schemes=["myapp", "custom"],
+        )
+
+        assert config.allowed_redirect_patterns == ["https://app1.example.com/*", "https://app2.example.com/*"]
+        assert config.allowed_redirect_schemes == ["myapp", "custom"]
+        assert config.allowed_redirect_patterns_func is None
+        assert config.allowed_redirect_schemes_func is None
+        assert config.redirect_uri_validator is None
+
+    def test_config_with_callable_patterns_func(self) -> None:
+        """Test config creation with callable that returns patterns dynamically."""
+        call_count = 0
+
+        def get_patterns() -> list[str]:
+            nonlocal call_count
+            call_count += 1
+            # Simulate feature flag check
+            return ["https://dynamic-app.example.com/*"]
+
+        config = self._create_base_config(
+            allowed_redirect_patterns_func=get_patterns,
+        )
+
+        assert config.allowed_redirect_patterns_func is not None
+        assert callable(config.allowed_redirect_patterns_func)
+
+        # Call the function to verify it works
+        patterns = config.allowed_redirect_patterns_func()
+        assert patterns == ["https://dynamic-app.example.com/*"]
+        assert call_count == 1
+
+        # Call again to verify it can be called multiple times
+        patterns = config.allowed_redirect_patterns_func()
+        assert call_count == 2
+
+    def test_config_with_callable_schemes_func(self) -> None:
+        """Test config creation with callable that returns schemes dynamically."""
+
+        def get_schemes() -> list[str]:
+            # Could check feature flags, database, etc.
+            return ["myapp", "vscode"]
+
+        config = self._create_base_config(
+            allowed_redirect_schemes_func=get_schemes,
+        )
+
+        assert config.allowed_redirect_schemes_func is not None
+        schemes = config.allowed_redirect_schemes_func()
+        assert schemes == ["myapp", "vscode"]
+
+    def test_config_with_redirect_uri_validator(self) -> None:
+        """Test config creation with custom redirect URI validator function."""
+        allowed_uris = {"https://allowed.example.com/callback", "https://also-allowed.example.com/oauth"}
+
+        def validate_uri(uri: str) -> bool:
+            return uri in allowed_uris
+
+        config = self._create_base_config(
+            redirect_uri_validator=validate_uri,
+        )
+
+        assert config.redirect_uri_validator is not None
+        assert config.redirect_uri_validator("https://allowed.example.com/callback") is True
+        assert config.redirect_uri_validator("https://not-allowed.example.com/callback") is False
+
+    def test_config_with_mixed_static_and_dynamic(self) -> None:
+        """Test config with both static patterns and dynamic validator."""
+
+        def dynamic_validator(uri: str) -> bool:
+            return uri.startswith("https://dynamic")
+
+        config = self._create_base_config(
+            allowed_redirect_patterns=["https://static.example.com/*"],
+            allowed_redirect_patterns_func=lambda: ["https://func.example.com/*"],
+            redirect_uri_validator=dynamic_validator,
+        )
+
+        # All configurations should be set
+        assert config.allowed_redirect_patterns == ["https://static.example.com/*"]
+        assert config.allowed_redirect_patterns_func is not None
+        assert config.redirect_uri_validator is not None
+
+    def test_factory_passes_callable_to_enterprise(self) -> None:
+        """Test that factory function passes callable parameters to enterprise package."""
+        patterns_func = lambda: ["https://dynamic.example.com/*"]  # noqa: E731
+        schemes_func = lambda: ["myscheme"]  # noqa: E731
+        validator = lambda uri: uri.startswith("https://")  # noqa: E731
+
+        config = self._create_base_config(
+            allowed_redirect_patterns=["https://static.example.com/*"],
+            allowed_redirect_schemes=["http", "https"],
+            allowed_redirect_patterns_func=patterns_func,
+            allowed_redirect_schemes_func=schemes_func,
+            redirect_uri_validator=validator,
+        )
+
+        # Mock the golf_enterprise module import
+        mock_enterprise = Mock()
+        mock_provider_instance = Mock()
+        mock_enterprise.create_oauth_proxy_provider.return_value = mock_provider_instance
+
+        import sys
+
+        with patch.dict(sys.modules, {"golf_enterprise": mock_enterprise}):
+            provider = _create_oauth_proxy_provider(config)
+
+            # Verify the enterprise function was called
+            mock_enterprise.create_oauth_proxy_provider.assert_called_once()
+
+            # Get the resolved config passed to the enterprise function
+            resolved_config = mock_enterprise.create_oauth_proxy_provider.call_args[0][0]
+
+            # Verify static patterns are passed
+            assert resolved_config.allowed_redirect_patterns == ["https://static.example.com/*"]
+            assert resolved_config.allowed_redirect_schemes == ["http", "https"]
+
+            # Verify callable functions are passed through
+            assert resolved_config.allowed_redirect_patterns_func is patterns_func
+            assert resolved_config.allowed_redirect_schemes_func is schemes_func
+            assert resolved_config.redirect_uri_validator is validator
+
+            assert provider == mock_provider_instance
+
+    def test_factory_resolves_patterns_from_env_var(self) -> None:
+        """Test that factory resolves static patterns from environment variable."""
+        config = self._create_base_config(
+            allowed_redirect_patterns_env_var="REDIRECT_PATTERNS",
+            allowed_redirect_schemes_env_var="REDIRECT_SCHEMES",
+        )
+
+        env_vars = {
+            "REDIRECT_PATTERNS": "https://env1.example.com/*, https://env2.example.com/*",
+            "REDIRECT_SCHEMES": "myapp, custom",
+        }
+
+        # Mock the golf_enterprise module import
+        mock_enterprise = Mock()
+        mock_enterprise.create_oauth_proxy_provider.return_value = Mock()
+
+        import sys
+
+        with patch.dict(os.environ, env_vars), patch.dict(sys.modules, {"golf_enterprise": mock_enterprise}):
+            _create_oauth_proxy_provider(config)
+
+            resolved_config = mock_enterprise.create_oauth_proxy_provider.call_args[0][0]
+            assert resolved_config.allowed_redirect_patterns == [
+                "https://env1.example.com/*",
+                "https://env2.example.com/*",
+            ]
+            assert resolved_config.allowed_redirect_schemes == ["myapp", "custom"]
+
+    def test_callable_integration_with_feature_flags(self) -> None:
+        """Test realistic integration pattern with simulated feature flags."""
+        # Simulate a feature flag service
+        feature_flags = {"enable_new_redirect_uris": False}
+
+        def get_allowed_patterns() -> list[str]:
+            base_patterns = ["https://legacy-app.example.com/*"]
+            if feature_flags["enable_new_redirect_uris"]:
+                base_patterns.append("https://new-app.example.com/*")
+            return base_patterns
+
+        config = self._create_base_config(
+            allowed_redirect_patterns_func=get_allowed_patterns,
+        )
+
+        # Initial call - feature flag disabled
+        patterns = config.allowed_redirect_patterns_func()
+        assert patterns == ["https://legacy-app.example.com/*"]
+
+        # Enable feature flag
+        feature_flags["enable_new_redirect_uris"] = True
+
+        # Call again - should include new pattern
+        patterns = config.allowed_redirect_patterns_func()
+        assert patterns == ["https://legacy-app.example.com/*", "https://new-app.example.com/*"]
+
+    def test_callable_with_async_simulation(self) -> None:
+        """Test that callable can wrap async operations (sync wrapper pattern)."""
+        # Simulate a database lookup that might be async in real code
+        db_allowed_uris = ["https://db-uri-1.example.com/callback"]
+
+        def sync_db_lookup_wrapper(uri: str) -> bool:
+            # In real code, this might use asyncio.run() or similar
+            return uri in db_allowed_uris
+
+        config = self._create_base_config(
+            redirect_uri_validator=sync_db_lookup_wrapper,
+        )
+
+        assert config.redirect_uri_validator("https://db-uri-1.example.com/callback") is True
+        assert config.redirect_uri_validator("https://unknown.example.com/callback") is False
+
+        # Simulate adding a new URI to the "database"
+        db_allowed_uris.append("https://new-uri.example.com/callback")
+
+        # Validator should now accept the new URI
+        assert config.redirect_uri_validator("https://new-uri.example.com/callback") is True
