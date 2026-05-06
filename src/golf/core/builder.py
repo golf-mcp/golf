@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import black
 from rich.console import Console
 
 from golf.auth import is_auth_configured
@@ -1504,9 +1503,16 @@ class CodeGenerator:
             + main_code
         )
 
-        # Format with black
+        # Format with black (build-time dep; install with `pip install golf-mcp[dev]`)
         try:
+            import black
+
             code = black.format_str(code, mode=black.Mode())
+        except ImportError:
+            console.print(
+                "[yellow]Warning: black is not installed; generated server.py will not be formatted. "
+                "Install with `pip install golf-mcp[dev]`.[/yellow]"
+            )
         except Exception as e:
             console.print(f"[yellow]Warning: Could not format server.py: {e}[/yellow]")
 
@@ -1908,14 +1914,18 @@ from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConf
                     server_code_content[:app_pos] + auth_routes_code + "\n\n" + server_code_content[app_pos:]
                 )
 
-                # Format with black before writing
+                # Format with black before writing (build-time dep)
+                final_code_to_write = modified_code
                 try:
+                    import black
+
                     final_code_to_write = black.format_str(modified_code, mode=black.Mode())
+                except ImportError:
+                    pass  # already warned above when generating server.py
                 except Exception as e:
                     console.print(
                         f"[yellow]Warning: Could not format server.py after auth routes injection: {e}[/yellow]"
                     )
-                    final_code_to_write = modified_code
 
                 with open(server_file, "w") as f:
                     f.write(final_code_to_write)
