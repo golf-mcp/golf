@@ -28,11 +28,10 @@ classifiers = [
 dependencies = [
     "typer>=0.15.4",
     "rich>=14.0.0",
-    "fastmcp>=2.14.0,<2.15.0",
+    "fastmcp>=3.2.0,<4.0.0",
     "pydantic>=2.11.0",
     "pydantic-settings>=2.0.0",
     "python-dotenv>=1.1.0",
-    "black>=24.10.0",
     "pyjwt>=2.0.0",
     "httpx>=0.28.1",
     "posthog>=4.1.0",
@@ -46,6 +45,9 @@ dependencies = [
 [project.optional-dependencies]
 metrics = [
     "prometheus-client>=0.22.1"
+]
+dev = [
+    "black>=24.10.0"
 ]
 
 [project.scripts]
@@ -85,13 +87,12 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.8" # Match requires-python
-fastmcp = ">=2.14.0,<2.15.0"
+fastmcp = ">=3.2.0,<4.0.0"
 typer = {extras = ["all"], version = ">=0.15.4"}
 pydantic = ">=2.11.0"
 pydantic-settings = ">=2.0.0"
 rich = ">=14.0.0"
 python-dotenv = ">=1.1.0"
-black = ">=24.10.0"
 pyjwt = ">=2.0.0"
 httpx = ">=0.28.1"
 posthog = ">=4.1.0"
@@ -111,6 +112,7 @@ pytest-asyncio = "^0.23.0"
 ruff = "^0.1.0"
 mypy = "^1.6.0"
 pytest-cov = "^4.1.0"
+black = ">=24.10.0"
 
 [tool.black]
 line-length = 120
