@@ -1278,10 +1278,6 @@ class CodeGenerator:
             for key, value in auth_components["fastmcp_args"].items():
                 mcp_constructor_args.append(f"{key}={value}")
 
-        # Add stateless HTTP parameter if enabled
-        if self.settings.stateless_http:
-            mcp_constructor_args.append("stateless_http=True")
-
         # Add OpenTelemetry parameters if enabled
         if self.settings.opentelemetry_enabled:
             mcp_constructor_args.append("lifespan=telemetry_lifespan")
@@ -1322,6 +1318,7 @@ class CodeGenerator:
             f'    transport_to_run = "{self.settings.transport}"',
             "",
         ]
+        stateless_kwarg = ", stateless_http=True" if self.settings.stateless_http else ""
 
         main_code.append("")
 
@@ -1433,8 +1430,8 @@ class CodeGenerator:
                     main_code.extend(
                         [
                             "    # Run HTTP server with middleware using FastMCP's run method",
-                            '    mcp.run(transport="streamable-http", host=host, '
-                            'port=port, log_level="info", middleware=middleware, show_banner=False)',
+                            f'    mcp.run(transport="streamable-http", host=host, '
+                            f'port=port, log_level="info", middleware=middleware, show_banner=False{stateless_kwarg})',
                         ]
                     )
                 else:
@@ -1443,7 +1440,7 @@ class CodeGenerator:
                             "    # Run HTTP server with middleware using FastMCP's run method",
                             f'    mcp.run(transport="streamable-http", host=host, '
                             f'port=port, path="{endpoint_path}", log_level="info", '
-                            f"middleware=middleware, show_banner=False)",
+                            f"middleware=middleware, show_banner=False{stateless_kwarg})",
                         ]
                     )
             else:
@@ -1451,8 +1448,8 @@ class CodeGenerator:
                     main_code.extend(
                         [
                             "    # Run HTTP server using FastMCP's run method",
-                            '    mcp.run(transport="streamable-http", host=host, '
-                            'port=port, log_level="info", show_banner=False)',
+                            f'    mcp.run(transport="streamable-http", host=host, '
+                            f'port=port, log_level="info", show_banner=False{stateless_kwarg})',
                         ]
                     )
                 else:
@@ -1461,7 +1458,7 @@ class CodeGenerator:
                             "    # Run HTTP server using FastMCP's run method",
                             f'    mcp.run(transport="streamable-http", host=host, '
                             f'port=port, path="{endpoint_path}", log_level="info", '
-                            f"show_banner=False)",
+                            f"show_banner=False{stateless_kwarg})",
                         ]
                     )
         else:
