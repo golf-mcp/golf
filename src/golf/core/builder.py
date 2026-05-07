@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import black
 from rich.console import Console
 
 from golf.auth import is_auth_configured
@@ -1279,10 +1278,6 @@ class CodeGenerator:
             for key, value in auth_components["fastmcp_args"].items():
                 mcp_constructor_args.append(f"{key}={value}")
 
-        # Add stateless HTTP parameter if enabled
-        if self.settings.stateless_http:
-            mcp_constructor_args.append("stateless_http=True")
-
         # Add OpenTelemetry parameters if enabled
         if self.settings.opentelemetry_enabled:
             mcp_constructor_args.append("lifespan=telemetry_lifespan")
@@ -1323,6 +1318,7 @@ class CodeGenerator:
             f'    transport_to_run = "{self.settings.transport}"',
             "",
         ]
+        stateless_kwarg = ", stateless_http=True" if self.settings.stateless_http else ""
 
         main_code.append("")
 
@@ -1434,8 +1430,8 @@ class CodeGenerator:
                     main_code.extend(
                         [
                             "    # Run HTTP server with middleware using FastMCP's run method",
-                            '    mcp.run(transport="streamable-http", host=host, '
-                            'port=port, log_level="info", middleware=middleware, show_banner=False)',
+                            f'    mcp.run(transport="streamable-http", host=host, '
+                            f'port=port, log_level="info", middleware=middleware, show_banner=False{stateless_kwarg})',
                         ]
                     )
                 else:
@@ -1444,7 +1440,7 @@ class CodeGenerator:
                             "    # Run HTTP server with middleware using FastMCP's run method",
                             f'    mcp.run(transport="streamable-http", host=host, '
                             f'port=port, path="{endpoint_path}", log_level="info", '
-                            f"middleware=middleware, show_banner=False)",
+                            f"middleware=middleware, show_banner=False{stateless_kwarg})",
                         ]
                     )
             else:
@@ -1452,8 +1448,8 @@ class CodeGenerator:
                     main_code.extend(
                         [
                             "    # Run HTTP server using FastMCP's run method",
-                            '    mcp.run(transport="streamable-http", host=host, '
-                            'port=port, log_level="info", show_banner=False)',
+                            f'    mcp.run(transport="streamable-http", host=host, '
+                            f'port=port, log_level="info", show_banner=False{stateless_kwarg})',
                         ]
                     )
                 else:
@@ -1462,7 +1458,7 @@ class CodeGenerator:
                             "    # Run HTTP server using FastMCP's run method",
                             f'    mcp.run(transport="streamable-http", host=host, '
                             f'port=port, path="{endpoint_path}", log_level="info", '
-                            f"show_banner=False)",
+                            f"show_banner=False{stateless_kwarg})",
                         ]
                     )
         else:
@@ -1504,9 +1500,16 @@ class CodeGenerator:
             + main_code
         )
 
-        # Format with black
+        # Format with black (build-time dep; install with `pip install golf-mcp[dev]`)
         try:
+            import black
+
             code = black.format_str(code, mode=black.Mode())
+        except ImportError:
+            console.print(
+                "[yellow]Warning: black is not installed; generated server.py will not be formatted. "
+                "Install with `pip install golf-mcp[dev]`.[/yellow]"
+            )
         except Exception as e:
             console.print(f"[yellow]Warning: Could not format server.py: {e}[/yellow]")
 
@@ -1908,14 +1911,18 @@ from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConf
                     server_code_content[:app_pos] + auth_routes_code + "\n\n" + server_code_content[app_pos:]
                 )
 
-                # Format with black before writing
+                # Format with black before writing (build-time dep)
+                final_code_to_write = modified_code
                 try:
+                    import black
+
                     final_code_to_write = black.format_str(modified_code, mode=black.Mode())
+                except ImportError:
+                    pass  # already warned above when generating server.py
                 except Exception as e:
                     console.print(
                         f"[yellow]Warning: Could not format server.py after auth routes injection: {e}[/yellow]"
                     )
-                    final_code_to_write = modified_code
 
                 with open(server_file, "w") as f:
                     f.write(final_code_to_write)
