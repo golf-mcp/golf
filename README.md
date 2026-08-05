@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2Fgolf-mcp%2Fgolf.svg)](https://mcptoplist.com/server/glama%2Fgolf-mcp%2Fgolf)
+
 <div align="center">
   <img src="./golf-banner.png" alt="Golf Banner">
   
