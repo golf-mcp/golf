@@ -1,8 +1,8 @@
 """API Key authentication support for Golf MCP servers.
 
-This module provides a simple API key pass-through mechanism for Golf servers,
-allowing tools to access API keys from request headers and forward them to
-upstream services.
+This module provides an explicitly non-MCP custom API-key mode. It is separate
+from FastMCP JWT/OAuth resource-token authentication. Never configure it as a
+way to expose or forward inbound MCP resource tokens to upstream services.
 """
 
 from pydantic import BaseModel, Field
@@ -44,7 +44,7 @@ def configure_api_key(header_name: str = "X-API-Key", header_prefix: str = "", r
             required=True
         )
 
-        # Or make API key optional (pass-through mode)
+        # Or make this custom API key optional
         configure_api_key(
             header_name="Authorization",
             header_prefix="Bearer ",

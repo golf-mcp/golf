@@ -1229,7 +1229,7 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
     This middleware wraps tool calls, resource reads, and prompt gets with
     proper OpenTelemetry spans that are correctly parented to the current context.
 
-    Supports FastMCP 2.14+ hooks including:
+    Supports FastMCP 3.4.7 hooks including:
     - on_initialize: Session initialization tracing
     - on_message: Request-level tracing
     - on_call_tool: Tool execution tracing
@@ -1242,7 +1242,7 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
         context: MiddlewareContext[Any],
         call_next: CallNext[Any, Any],
     ) -> Any:
-        """Trace MCP session initialization (FastMCP 2.13+)."""
+        """Trace MCP session initialization with FastMCP 3.4.7."""
         global _provider
         if _provider is None:
             return await call_next(context)

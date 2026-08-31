@@ -38,7 +38,7 @@ Get your Golf project up and running in a few simple steps:
 
 ### 1. Install Golf
 
-Ensure you have Python (3.10+ recommended) installed. Then, install Golf using pip:
+Golf requires Python 3.10 or newer. Then, install Golf using pip:
 
 ```bash
 pip install golf-mcp
@@ -155,6 +155,11 @@ configure_auth(JWTAuthConfig(
 # Built-in utilities available in all tools
 from golf.utils import elicit, sample, get_context
 ```
+
+JWT authentication requires an audience so tokens are bound to this MCP
+resource. Inbound MCP JWT/OAuth bearer tokens must never be forwarded to an
+upstream API; use a separate upstream credential or a standards-based token
+exchange/delegation flow.
 
 ```bash
 # Enable OpenTelemetry tracing

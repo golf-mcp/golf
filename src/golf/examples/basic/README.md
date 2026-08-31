@@ -69,10 +69,10 @@ Create `.py` files in `prompts/` directory that return message lists:
 ```python
 # prompts/assistant.py
 async def assistant() -> list[dict]:
-    """System prompt for a helpful assistant."""
+    """Prompt for a helpful assistant."""
     return [
         {
-            "role": "system", 
+            "role": "assistant",
             "content": "You are a helpful assistant for {{project_name}}."
         }
     ]
@@ -86,6 +86,10 @@ export = assistant
 Leave `auth.py` empty or remove it entirely.
 
 ### API Key Authentication
+This is an explicitly non-MCP custom API-key mode. If the key is also used
+with an upstream API, it must have been issued for that upstream API. Never
+forward an MCP JWT/OAuth resource token to another service.
+
 ```python
 # auth.py
 from golf.auth import configure_api_key

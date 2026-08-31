@@ -181,13 +181,13 @@ def generate_metrics_instrumentation() -> list[str]:
 
 
 def generate_session_tracking() -> list[str]:
-    """Generate session tracking using FastMCP middleware (2.14+ compatible).
+    """Generate session tracking using FastMCP 3.4.7 middleware.
 
     Returns:
         List of code lines for session tracking via middleware
     """
     return [
-        "# Session tracking via FastMCP middleware (2.14+ compatible)",
+        "# Session tracking via FastMCP 3.4.7 middleware",
         "from fastmcp.server.middleware import Middleware as FastMCPMiddleware, MiddlewareContext, CallNext",
         "from typing import Any",
         "",

@@ -1651,8 +1651,8 @@ export = simple_tool
             assert 'transport="sse"' in server_content
             assert "mcp.run(" in server_content
 
-    def test_sse_transport_with_path_for_fastmcp_2_11(self, sample_project: Path, temp_dir: Path) -> None:
-        """Test that SSE transport includes path parameter for FastMCP 2.11.x."""
+    def test_sse_transport_ignores_obsolete_version_branch(self, sample_project: Path, temp_dir: Path) -> None:
+        """Pinned FastMCP code generation must not restore the legacy path argument."""
         with patch("fastmcp.__version__", "2.11.5"):
             # Update project config for SSE transport
             config_file = sample_project / "golf.json"
@@ -1690,8 +1690,8 @@ export = simple_tool
 
             server_content = server_file.read_text()
 
-            # Verify path parameter is included for FastMCP 2.11.x
-            assert 'path="/sse"' in server_content
+            # The exact FastMCP 3.4.7 API is generated regardless of a patched ambient version.
+            assert 'path="/sse"' not in server_content
             assert 'transport="sse"' in server_content
             assert "mcp.run(" in server_content
 
@@ -1739,8 +1739,8 @@ export = simple_tool
             assert 'transport="streamable-http"' in server_content
             assert "mcp.run(" in server_content
 
-    def test_http_transport_with_path_for_fastmcp_2_11(self, sample_project: Path, temp_dir: Path) -> None:
-        """Test that HTTP transport includes path parameter for FastMCP 2.11.x."""
+    def test_http_transport_ignores_obsolete_version_branch(self, sample_project: Path, temp_dir: Path) -> None:
+        """Pinned FastMCP code generation must not restore the legacy path argument."""
         with patch("fastmcp.__version__", "2.11.5"):
             # Update project config for HTTP transport
             config_file = sample_project / "golf.json"
@@ -1778,8 +1778,8 @@ export = simple_tool
 
             server_content = server_file.read_text()
 
-            # Verify path parameter is included for FastMCP 2.11.x
-            assert 'path="/mcp/"' in server_content
+            # The exact FastMCP 3.4.7 API is generated regardless of a patched ambient version.
+            assert 'path="/mcp/"' not in server_content
             assert 'transport="streamable-http"' in server_content
             assert "mcp.run(" in server_content
 

@@ -1,6 +1,6 @@
 """Modern authentication provider configurations for Golf MCP servers.
 
-This module provides configuration classes for FastMCP 2.11+ authentication providers,
+This module provides configuration classes for FastMCP 3.4.7 authentication providers,
 replacing the legacy custom OAuth implementation with the new built-in auth system.
 """
 
@@ -27,10 +27,8 @@ class JWTAuthConfig(BaseModel):
     Use this when you have JWT tokens issued by an external OAuth server
     (like Auth0, Okta, etc.) and want to verify them in your Golf server.
 
-    Security Note:
-        For production use, it's strongly recommended to specify both `issuer` and `audience`
-        to ensure tokens are validated against the expected issuer and intended audience.
-        This prevents token misuse across different services or environments.
+    ``audience`` is mandatory so an MCP resource never accepts a token issued
+    for another service. ``issuer`` is also strongly recommended.
     """
 
     provider_type: Literal["jwt"] = "jwt"
@@ -40,7 +38,7 @@ class JWTAuthConfig(BaseModel):
     jwks_uri: str | None = Field(None, description="URI to fetch JSON Web Key Set for verification")
     issuer: str | None = Field(None, description="Expected JWT issuer claim (strongly recommended for production)")
     audience: str | list[str] | None = Field(
-        None, description="Expected JWT audience claim(s) (strongly recommended for production)"
+        None, description="Required JWT audience claim(s) identifying this MCP resource"
     )
     algorithm: str = Field("RS256", description="JWT signing algorithm")
 
@@ -63,29 +61,28 @@ class JWTAuthConfig(BaseModel):
         if (self.public_key or self.public_key_env_var) and (self.jwks_uri or self.jwks_uri_env_var):
             raise ValueError("Provide either public_key or jwks_uri (or their env vars), not both")
 
-        # Warn about missing issuer/audience in production-like environments
+        if not self.audience and not self.audience_env_var:
+            raise ValueError(
+                "audience or audience_env_var is required for MCP JWT authentication "
+                "to bind access tokens to this resource"
+            )
+
+        # Warn about a missing issuer in production-like environments
         is_production = (
             os.environ.get("GOLF_ENV", "").lower() in ("prod", "production")
             or os.environ.get("NODE_ENV", "").lower() == "production"
             or os.environ.get("ENVIRONMENT", "").lower() in ("prod", "production")
         )
 
-        if is_production:
-            missing_fields = []
-            if not self.issuer and not self.issuer_env_var:
-                missing_fields.append("issuer")
-            if not self.audience and not self.audience_env_var:
-                missing_fields.append("audience")
+        if is_production and not self.issuer and not self.issuer_env_var:
+            import warnings
 
-            if missing_fields:
-                import warnings
-
-                warnings.warn(
-                    f"JWT configuration is missing recommended fields for production: {', '.join(missing_fields)}. "
-                    "This may allow tokens from unintended issuers or audiences to be accepted.",
-                    UserWarning,
-                    stacklevel=2,
-                )
+            warnings.warn(
+                "JWT configuration is missing the recommended issuer field for production. "
+                "This may allow tokens from an unintended issuer to be accepted.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         return self
 
@@ -180,9 +177,8 @@ class OAuthServerConfig(BaseModel):
                 )
 
             # Prevent common SSRF targets
-            if parsed.hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
-                if is_production:
-                    raise ValueError(f"Base URL cannot use localhost/loopback addresses in production: '{url}'")
+            if parsed.hostname in ("localhost", "127.0.0.1", "0.0.0.0") and is_production:
+                raise ValueError(f"Base URL cannot use localhost/loopback addresses in production: '{url}'")
 
         except Exception as e:
             if isinstance(e, ValueError):
@@ -440,14 +436,21 @@ class RemoteAuthConfig(BaseModel):
                 "JWT token verifier config must provide public_key, jwks_uri, or their environment variable equivalents"
             )
 
+        if isinstance(config, JWTAuthConfig) and config.audience:
+            audiences = [config.audience] if isinstance(config.audience, str) else config.audience
+            if self.resource_server_url not in audiences:
+                raise ValueError(
+                    "JWT token verifier audience must include resource_server_url "
+                    "to bind accepted tokens to this MCP resource"
+                )
+
         # For static token configs, ensure they have tokens
         if isinstance(config, StaticTokenConfig) and not config.tokens:
             raise ValueError("Static token verifier config must provide at least one token")
 
         # Convenience: if user didn't set scopes_supported, default to verifier.required_scopes
-        if not self.scopes_supported:
-            if hasattr(config, "required_scopes") and config.required_scopes:
-                self.scopes_supported = list(config.required_scopes)
+        if not self.scopes_supported and hasattr(config, "required_scopes") and config.required_scopes:
+            self.scopes_supported = list(config.required_scopes)
 
         return self
 
@@ -479,12 +482,16 @@ class OAuthProxyConfig(BaseModel):
     base_url: str | None = Field(None, description="Public URL of this OAuth proxy server")
     redirect_path: str = Field("/oauth/callback", description="OAuth callback path (must match provider registration)")
 
-    # Scopes and token verification
+    # Scopes and legacy upstream metadata hints
     scopes_supported: list[str] | None = Field(
         None, description="Scopes supported by this proxy (optional, can be empty for intelligent fallback)"
     )
-    token_verifier_config: JWTAuthConfig | StaticTokenConfig = Field(
-        ..., description="Token verifier configuration for validating upstream tokens"
+    token_verifier_config: JWTAuthConfig | StaticTokenConfig | None = Field(
+        None,
+        description=(
+            "Deprecated optional metadata provider. It may supply default scopes or an "
+            "upstream audience hint; proxy-owned client tokens are validated by the proxy."
+        ),
     )
 
     # Environment variable names for runtime configuration
@@ -590,7 +597,7 @@ class OAuthProxyConfig(BaseModel):
         return url
 
     @model_validator(mode="after")
-    def validate_oauth_proxy_config(self) -> "OAuthProxyConfig":
+    def validate_oauth_proxy_config(self) -> "OAuthProxyConfig":  # noqa: C901
         """Validate OAuth proxy configuration consistency and requirements."""
 
         # Phase 1: Check that each required field has EITHER a value OR an env_var
@@ -614,8 +621,10 @@ class OAuthProxyConfig(BaseModel):
                 f"For example, provide '{missing_fields[0]}' or '{missing_fields[0]}_env_var'."
             )
 
-        # Phase 2: Existing validation - token verifier type check
-        if not isinstance(self.token_verifier_config, JWTAuthConfig | StaticTokenConfig):
+        # Phase 2: Optional legacy verifier metadata type check
+        if self.token_verifier_config is not None and not isinstance(
+            self.token_verifier_config, JWTAuthConfig | StaticTokenConfig
+        ):
             raise ValueError(
                 f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, "
                 f"got {type(self.token_verifier_config).__name__}"

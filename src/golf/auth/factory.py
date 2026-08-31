@@ -103,7 +103,7 @@ def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
     try:
         from fastmcp.server.auth import JWTVerifier
     except ImportError as e:
-        raise ImportError("JWTVerifier not available. Please install fastmcp>=2.11.0") from e
+        raise ImportError("JWTVerifier not available. Please install fastmcp==3.4.7") from e
 
     return JWTVerifier(
         public_key=public_key,
@@ -123,7 +123,7 @@ def _create_static_provider(config: StaticTokenConfig) -> "StaticTokenVerifier":
     try:
         from fastmcp.server.auth import StaticTokenVerifier
     except ImportError as e:
-        raise ImportError("StaticTokenVerifier not available. Please install fastmcp>=2.11.0") from e
+        raise ImportError("StaticTokenVerifier not available. Please install fastmcp==3.4.7") from e
 
     return StaticTokenVerifier(
         tokens=config.tokens,
@@ -137,7 +137,7 @@ def _create_oauth_server_provider(config: OAuthServerConfig) -> "AuthProvider":
         from fastmcp.server.auth import OAuthProvider
     except ImportError as e:
         raise ImportError(
-            "OAuthProvider not available in this FastMCP version. Please upgrade to FastMCP 2.11.0 or later."
+            "OAuthProvider not available. Please install fastmcp==3.4.7."
         ) from e
 
     # Resolve runtime values from environment variables with validation
@@ -217,7 +217,7 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
         from fastmcp.server.auth import RemoteAuthProvider
     except ImportError as e:
         raise ImportError(
-            "RemoteAuthProvider not available in this FastMCP version. Please upgrade to FastMCP 2.11.0 or later."
+            "RemoteAuthProvider not available. Please install fastmcp==3.4.7."
         ) from e
 
     # Resolve runtime values from environment variables
@@ -241,15 +241,20 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
     if not hasattr(token_verifier, "verify_token"):
         raise ValueError(f"Remote auth provider requires a TokenVerifier, got {type(token_verifier).__name__}")
 
-    # Update token verifier's required_scopes to match our scopes_supported for PRM
-    # RemoteAuthProvider uses token_verifier.required_scopes for scopes_supported in PRM
-    if config.scopes_supported and hasattr(token_verifier, "required_scopes"):
-        token_verifier.required_scopes = list(config.scopes_supported)
+    if isinstance(config.token_verifier_config, JWTAuthConfig):
+        audience = getattr(token_verifier, "audience", None)
+        audiences = [audience] if isinstance(audience, str) else audience or []
+        if resource_server_url not in audiences:
+            raise ValueError(
+                "Resolved JWT audience must include resource_server_url "
+                "to bind accepted tokens to this MCP resource"
+            )
 
     return RemoteAuthProvider(
         token_verifier=token_verifier,
         authorization_servers=authorization_servers,
-        resource_server_url=resource_server_url,
+        base_url=resource_server_url,
+        scopes_supported=config.scopes_supported or None,
     )
 
 
