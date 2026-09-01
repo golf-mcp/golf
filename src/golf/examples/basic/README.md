@@ -51,6 +51,7 @@ async def add(a: int, b: int) -> int:
     """Add two numbers together."""
     return a + b
 
+
 export = add
 ```
 
@@ -61,9 +62,11 @@ Create `.py` files in `resources/` directory with a `resource_uri` and export fu
 # resources/status.py
 resource_uri = "status://server"
 
+
 async def status() -> dict:
     """Get server status information."""
     return {"status": "running", "timestamp": "2024-01-01T00:00:00Z"}
+
 
 export = status
 ```
@@ -75,12 +78,8 @@ Create `.py` files in `prompts/` directory that return message lists:
 # prompts/assistant.py
 async def assistant() -> list[dict]:
     """Prompt for a helpful assistant."""
-    return [
-        {
-            "role": "assistant",
-            "content": "You are a helpful assistant for {{project_name}}."
-        }
-    ]
+    return [{"role": "assistant", "content": "You are a helpful assistant for {{project_name}}."}]
+
 
 export = assistant
 ```
@@ -99,11 +98,7 @@ forward an MCP JWT/OAuth resource token to another service.
 # auth.py
 from golf.auth import configure_api_key
 
-configure_api_key(
-    header_name="Authorization",
-    header_prefix="Bearer ",
-    required=True
-)
+configure_api_key(header_name="Authorization", header_prefix="Bearer ", required=True)
 ```
 
 ### JWT Authentication  
@@ -114,23 +109,16 @@ from golf.auth import configure_jwt_auth
 configure_jwt_auth(
     jwks_uri="https://your-domain.auth0.com/.well-known/jwks.json",
     issuer="https://your-domain.auth0.com/",
-    audience="https://your-api.example.com"
+    audience="https://your-api.example.com",
 )
 ```
 
 ### Development Tokens
 ```python
-# auth.py  
+# auth.py
 from golf.auth import configure_dev_auth
 
-configure_dev_auth(
-    tokens={
-        "dev-token-123": {
-            "client_id": "dev-client",
-            "scopes": ["read", "write"]
-        }
-    }
-)
+configure_dev_auth(tokens={"dev-token-123": {"client_id": "dev-client", "scopes": ["read", "write"]}})
 ```
 
 ## Documentation
