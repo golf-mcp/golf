@@ -1,4 +1,5 @@
 """Integration tests for middleware.py build process."""
+
 import json
 from pathlib import Path
 from golf.core.builder import build_project
@@ -10,14 +11,14 @@ class TestMiddlewareBuildIntegration:
 
     def test_middleware_copied_and_imported(self, sample_project: Path, temp_dir: Path):
         """Test middleware.py is copied to build dir and imported."""
-        middleware_content = '''
+        middleware_content = """
 from fastmcp.server.middleware import Middleware
 
 class BuildTestMiddleware(Middleware):
     async def on_call_tool(self, context, call_next):
         return await call_next(context)
-'''
-        
+"""
+
         middleware_file = sample_project / "middleware.py"
         middleware_file.write_text(middleware_content)
 
@@ -41,27 +42,27 @@ class BuildTestMiddleware(Middleware):
         """Test middleware works alongside auth.py."""
         # Create auth.py
         auth_file = sample_project / "auth.py"
-        auth_file.write_text('''
+        auth_file.write_text("""
 from golf.auth import configure_api_key
 configure_api_key()
-''')
+""")
 
         # Create middleware.py
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from golf.middleware import Middleware
 
 class AuthTestMiddleware(Middleware):
     async def on_message(self, context, call_next):
         return await call_next(context)
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
         build_project(sample_project, settings, output_dir, build_env="dev", copy_env=False)
 
         server_content = (output_dir / "server.py").read_text()
-        
+
         # Both auth and middleware should be present
         assert "# Configure authentication" in server_content or "ApiKeyMiddleware" in server_content
         assert "from middleware import AuthTestMiddleware" in server_content
@@ -70,12 +71,12 @@ class AuthTestMiddleware(Middleware):
     def test_multiple_middleware_classes_integration(self, sample_project: Path, temp_dir: Path):
         """Test integration with multiple middleware classes."""
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from golf.middleware import Middleware
 
 class LoggingMiddleware(Middleware):
     async def on_call_tool(self, context, call_next):
-        print(f"Tool called: {context.message.params.name}")
+        print(f"Tool called: {context.message.name}")
         return await call_next(context)
 
 class TimingMiddleware(Middleware):
@@ -85,14 +86,14 @@ class TimingMiddleware(Middleware):
         result = await call_next(context)
         print(f"Request took: {time.time() - start:.2f}s")
         return result
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
         build_project(sample_project, settings, output_dir, build_env="dev", copy_env=False)
 
         server_content = (output_dir / "server.py").read_text()
-        
+
         # Verify both middleware classes are imported and registered
         assert "from middleware import LoggingMiddleware, TimingMiddleware" in server_content
         assert "mcp.add_middleware(LoggingMiddleware())" in server_content
@@ -107,7 +108,7 @@ class TimingMiddleware(Middleware):
         # Build should succeed
         server_file = output_dir / "server.py"
         assert server_file.exists()
-        
+
         # Should not contain middleware code
         server_content = server_file.read_text()
         assert "from middleware import" not in server_content
@@ -116,21 +117,21 @@ class TimingMiddleware(Middleware):
     def test_build_with_broken_middleware_file(self, sample_project: Path, temp_dir: Path):
         """Test build succeeds gracefully with broken middleware.py."""
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from nonexistent_module import SomeClass
 syntax error here!
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
-        
+
         # Build should succeed despite broken middleware.py
         build_project(sample_project, settings, output_dir, build_env="dev", copy_env=False)
 
         # Server file should be created
         server_file = output_dir / "server.py"
         assert server_file.exists()
-        
+
         # Should not contain middleware code due to error
         server_content = server_file.read_text()
         assert "from middleware import" not in server_content
@@ -144,13 +145,13 @@ syntax error here!
         config_file.write_text(json.dumps(config))
 
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from golf.middleware import Middleware
 
 class TransportMiddleware(Middleware):
     async def on_message(self, context, call_next):
         return await call_next(context)
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "sse_build"
@@ -181,20 +182,20 @@ class TransportMiddleware(Middleware):
         config_file.write_text(json.dumps(config))
 
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from golf.middleware import Middleware
 
 class MetricsMiddleware(Middleware):
     async def on_message(self, context, call_next):
         return await call_next(context)
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
         build_project(sample_project, settings, output_dir, build_env="dev", copy_env=False)
 
         server_content = (output_dir / "server.py").read_text()
-        
+
         # Both metrics and custom middleware should be present
         assert "from middleware import MetricsMiddleware" in server_content
         assert "mcp.add_middleware(MetricsMiddleware())" in server_content
@@ -206,25 +207,25 @@ class MetricsMiddleware(Middleware):
             "name": "TestProject",
             "health_check_enabled": True,
             "health_check_path": "/health",
-            "health_check_response": "OK"
+            "health_check_response": "OK",
         }
         config_file.write_text(json.dumps(config))
 
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from golf.middleware import Middleware
 
 class HealthMiddleware(Middleware):
     async def on_message(self, context, call_next):
         return await call_next(context)
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
         build_project(sample_project, settings, output_dir, build_env="dev", copy_env=False)
 
         server_content = (output_dir / "server.py").read_text()
-        
+
         # Both health checks and custom middleware should be present
         assert "from middleware import HealthMiddleware" in server_content
         assert "mcp.add_middleware(HealthMiddleware())" in server_content
@@ -247,10 +248,10 @@ class CopyTestMiddleware(Middleware):
     
     async def on_call_tool(self, context, call_next):
         # Tool call middleware
-        print(f"Tool: {context.message.params.name}")
+        print(f"Tool: {context.message.name}")
         return await call_next(context)
 '''
-        
+
         middleware_file = sample_project / "middleware.py"
         middleware_file.write_text(original_content)
 
@@ -268,14 +269,14 @@ class CopyTestMiddleware(Middleware):
         assert "from middleware import CopyTestMiddleware" in server_content
         assert "mcp.add_middleware(CopyTestMiddleware())" in server_content
 
-    def test_middleware_duck_typing_in_build(self, sample_project: Path, temp_dir: Path):
-        """Test that duck-typed middleware (without base class) works in build."""
+    def test_middleware_duck_typing_rejected_in_build(self, sample_project: Path, temp_dir: Path):
+        """Method-name duck typing must not register protocol middleware."""
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 # No import of Middleware base class - pure duck typing
 class DuckTypedLogging:
     async def on_call_tool(self, context, call_next):
-        print(f"Calling tool: {context.message.params.name}")
+        print(f"Calling tool: {context.message.name}")
         return await call_next(context)
 
 class DuckTypedAuth:
@@ -286,22 +287,16 @@ class DuckTypedAuth:
 class NotMiddleware:
     def some_method(self):
         pass
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
         build_project(sample_project, settings, output_dir, build_env="dev", copy_env=False)
 
         server_content = (output_dir / "server.py").read_text()
-        
-        # Duck-typed middleware should be discovered and registered
-        # Check that both are imported (order doesn't matter)
-        assert "DuckTypedLogging" in server_content
-        assert "DuckTypedAuth" in server_content
-        assert "from middleware import" in server_content
-        assert "mcp.add_middleware(DuckTypedLogging())" in server_content
-        assert "mcp.add_middleware(DuckTypedAuth())" in server_content
-        # Non-middleware class should not be included
+
+        assert "DuckTypedLogging" not in server_content
+        assert "DuckTypedAuth" not in server_content
         assert "NotMiddleware" not in server_content
 
     def test_starlette_http_middleware_build(self, sample_project: Path, temp_dir: Path):
@@ -355,7 +350,7 @@ class LoggingMiddleware(FastMCPMiddleware):
     """FastMCP middleware for logging MCP operations."""
 
     async def on_call_tool(self, context, call_next):
-        print(f"Calling tool: {context.message.params.name}")
+        print(f"Calling tool: {context.message.name}")
         return await call_next(context)
 
 

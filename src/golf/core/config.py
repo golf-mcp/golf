@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     port: int = Field(3000, description="Server port")
     transport: str = Field(
         "streamable-http",
-        description="Transport protocol (streamable-http, sse, stdio)",
+        description="Transport protocol (streamable-http, stdio, or deprecated legacy sse)",
     )
 
     # Auth settings
@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     # HTTP session behaviour
     stateless_http: bool = Field(
         False,
-        description="Make Streamable-HTTP transport stateless (new session per request)",
+        description=("Optional legacy Streamable-HTTP stateless behavior; MCP 2026-07-28 is intrinsically sessionless"),
     )
 
     # Metrics configuration

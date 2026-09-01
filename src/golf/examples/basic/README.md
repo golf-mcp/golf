@@ -6,6 +6,11 @@ This is a basic template for creating MCP servers with Golf. It includes develop
 
 Golf is a Python framework for building MCP (Model Context Protocol) servers with minimal boilerplate. Define your server's capabilities as simple Python files, and Golf automatically discovers and compiles them into a runnable FastMCP server.
 
+The generated server targets FastMCP 4.0.0 and MCP 2026-07-28, with legacy
+clients supported by FastMCP's negotiation compatibility. Modern elicitation
+and sampling are explicit multi-round-trip control flow: when a utility returns
+`InputRequiredResult`, the containing tool must return it unchanged.
+
 ## Getting Started
 
 After initializing your project:

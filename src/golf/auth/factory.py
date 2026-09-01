@@ -103,7 +103,7 @@ def _create_jwt_provider(config: JWTAuthConfig) -> "JWTVerifier":
     try:
         from fastmcp.server.auth import JWTVerifier
     except ImportError as e:
-        raise ImportError("JWTVerifier not available. Please install fastmcp==3.4.7") from e
+        raise ImportError("JWTVerifier not available. Please install fastmcp==4.0.0") from e
 
     return JWTVerifier(
         public_key=public_key,
@@ -123,7 +123,7 @@ def _create_static_provider(config: StaticTokenConfig) -> "StaticTokenVerifier":
     try:
         from fastmcp.server.auth import StaticTokenVerifier
     except ImportError as e:
-        raise ImportError("StaticTokenVerifier not available. Please install fastmcp==3.4.7") from e
+        raise ImportError("StaticTokenVerifier not available. Please install fastmcp==4.0.0") from e
 
     return StaticTokenVerifier(
         tokens=config.tokens,
@@ -136,9 +136,7 @@ def _create_oauth_server_provider(config: OAuthServerConfig) -> "AuthProvider":
     try:
         from fastmcp.server.auth import OAuthProvider
     except ImportError as e:
-        raise ImportError(
-            "OAuthProvider not available. Please install fastmcp==3.4.7."
-        ) from e
+        raise ImportError("OAuthProvider not available. Please install fastmcp==4.0.0.") from e
 
     # Resolve runtime values from environment variables with validation
     base_url = config.base_url
@@ -216,9 +214,7 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
     try:
         from fastmcp.server.auth import RemoteAuthProvider
     except ImportError as e:
-        raise ImportError(
-            "RemoteAuthProvider not available. Please install fastmcp==3.4.7."
-        ) from e
+        raise ImportError("RemoteAuthProvider not available. Please install fastmcp==4.0.0.") from e
 
     # Resolve runtime values from environment variables
     authorization_servers = config.authorization_servers
@@ -246,8 +242,7 @@ def _create_remote_provider(config: RemoteAuthConfig) -> "AuthProvider":
         audiences = [audience] if isinstance(audience, str) else audience or []
         if resource_server_url not in audiences:
             raise ValueError(
-                "Resolved JWT audience must include resource_server_url "
-                "to bind accepted tokens to this MCP resource"
+                "Resolved JWT audience must include resource_server_url to bind accepted tokens to this MCP resource"
             )
 
     return RemoteAuthProvider(

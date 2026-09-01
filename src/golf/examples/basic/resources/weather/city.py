@@ -17,7 +17,7 @@ async def get_weather_for_city(city: str) -> dict[str, Any]:
     1. Resource templates with URI parameters ({city})
     2. Dynamic resource access based on parameters
     3. Using shared client from the client.py file
-    4. FastMCP 3.4.7 ResourceTemplate.from_function() usage
+    4. FastMCP 4.0.0 ResourceTemplate.from_function() usage
 
     Args:
         city: The city name to get weather for

@@ -1,4 +1,4 @@
-"""Modern authentication for Golf MCP servers using FastMCP 3.4.7 providers.
+"""Authentication for Golf MCP servers using FastMCP 4.0.0 providers.
 
 This module provides authentication configuration and utilities for Golf servers,
 leveraging FastMCP's built-in authentication system with JWT verification,

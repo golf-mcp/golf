@@ -8,12 +8,13 @@ Golf is a Python framework for building MCP (Model Context Protocol) servers wit
 
 ## Authentication Compatibility
 
-Golf 0.3.x targets FastMCP 3.4.7:
+Golf 0.3.x targets FastMCP 4.0.0 and MCP 2026-07-28 while retaining
+FastMCP's legacy-client compatibility:
 
 - **Authentication System**: Complete rewrite using FastMCP's built-in auth providers (JWT, OAuth, Static tokens)
 - **Legacy OAuth Removed**: Custom OAuth implementation replaced with standards-compliant FastMCP providers  
 - **Configuration Changes**: `auth.py` configuration must be updated to use new auth configs (legacy `pre_build.py` supported)
-- **Dependency Updates**: Requires exactly FastMCP 3.4.7, Python >=3.10, and Pydantic >=2.12
+- **Dependency Updates**: Requires exactly FastMCP 4.0.0, Python >=3.10, and Pydantic >=2.12
 - **Removed Files**: Legacy `oauth.py` and `provider.py` files removed from auth module
 - **Deprecated Functions**: `get_provider_token()` and OAuth-related helpers return None (legacy compatibility)
 
@@ -23,7 +24,7 @@ Golf 0.3.x targets FastMCP 3.4.7:
 - **Code Generation**: The `ManifestBuilder` in `src/golf/core/builder.py` generates FastMCP server code from parsed components
 - **CLI Interface**: Entry point is `src/golf/cli/main.py` with commands: `init`, `build`, `run`
 - **Configuration**: Project settings managed via `golf.json` files, parsed by `src/golf/core/config.py`
-- **Authentication**: Modern JWT/OAuth auth using FastMCP 3.4.7 providers in `src/golf/auth/`
+- **Authentication**: JWT/OAuth auth using FastMCP 4.0.0 providers in `src/golf/auth/`
 - **Telemetry**: Anonymous usage tracking with OpenTelemetry support in `src/golf/telemetry/`
 
 ## Common Development Commands
@@ -117,7 +118,7 @@ Component IDs are derived from file paths: `tools/payments/charge.py` becomes `c
 
 ## Authentication in Golf 0.3.x
 
-Golf 0.3.x uses FastMCP 3.4.7's built-in authentication providers. JWT
+Golf 0.3.x uses FastMCP 4.0.0's built-in authentication providers. JWT
 configurations require an audience/resource binding; inbound MCP resource
 tokens must never be forwarded to upstream APIs.
 

@@ -52,6 +52,12 @@ class MetricsCollector:
                 ["method", "path"],
             )
 
+            self._metrics["mcp_messages"] = Counter(
+                "golf_mcp_messages_total",
+                "MCP messages handled (requests and notifications)",
+                ["method", "message_type", "status"],
+            )
+
             # Resource access metrics
             self._metrics["resource_reads"] = Counter(
                 "golf_resource_reads_total",
@@ -169,6 +175,17 @@ class MetricsCollector:
 
         self._metrics["http_duration"].labels(method=method, path=path).observe(duration)
 
+    def increment_mcp_message(self, method: str, message_type: str, status: str) -> None:
+        """Record a protocol message without assuming session state."""
+        if not self.enabled or "mcp_messages" not in self._metrics:
+            return
+
+        self._metrics["mcp_messages"].labels(
+            method=method,
+            message_type=message_type,
+            status=status,
+        ).inc()
+
     def increment_resource_read(self, resource_uri: str) -> None:
         """Record a resource read.
 
@@ -205,7 +222,7 @@ class MetricsCollector:
         self._metrics["errors"].labels(component_type=component_type, error_type=error_type).inc()
 
     def increment_session(self) -> None:
-        """Record a new session."""
+        """Record a legacy initialize-handshake session."""
         if not self.enabled or "sessions_total" not in self._metrics:
             return
 

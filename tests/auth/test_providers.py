@@ -217,12 +217,12 @@ class TestRemoteAuthCreation:
                 token_verifier_config=jwt_config,
             )
 
-    def test_remote_auth_constructs_with_fastmcp_3_4_7(self) -> None:
+    def test_remote_auth_constructs_with_fastmcp_4_0_0(self) -> None:
         """Exercise the real pinned RemoteAuthProvider constructor."""
         import fastmcp
         from fastmcp.server.auth import RemoteAuthProvider
 
-        assert fastmcp.__version__ == "3.4.7"
+        assert fastmcp.__version__ == "4.0.0"
         config = RemoteAuthConfig(
             authorization_servers=["https://auth.example.com"],
             resource_server_url="https://api.example.com",

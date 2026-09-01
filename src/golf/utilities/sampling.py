@@ -1,11 +1,26 @@
-"""Sampling utilities for Golf MCP tools.
+"""Sampling helpers for legacy and MCP 2026-07-28 connections.
 
-This module provides simplified LLM sampling functions that Golf tool authors
-can use without needing to manage FastMCP Context objects directly.
+Modern MCP sampling is caller-owned multi-round-trip (MRTR) control flow. A
+tool must return the ``InputRequiredResult`` produced by these helpers and will
+be invoked again with the answer in ``Context.input_responses``.
 """
 
-from typing import Any
+import hashlib
+import json
 from collections.abc import Callable
+from typing import Any
+
+from mcp_types import (
+    CreateMessageRequest,
+    CreateMessageRequestParams,
+    CreateMessageResult,
+    InputRequiredResult,
+    ModelHint,
+    ModelPreferences,
+    SamplingMessage,
+    TextContent,
+)
+from mcp_types.version import MODERN_PROTOCOL_VERSIONS
 
 from .context import get_current_context
 
@@ -28,11 +43,16 @@ async def sample(
     temperature: float | None = None,
     max_tokens: int | None = None,
     model_preferences: str | list[str] | None = None,
-) -> str:
+    *,
+    request_key: str | None = None,
+) -> str | InputRequiredResult:
     """Request an LLM completion from the MCP client.
 
-    This is a simplified wrapper around FastMCP's Context.sample() method
-    that automatically handles context retrieval and response processing.
+    On legacy connections this sends the imperative server-to-client sampling
+    request and returns text. On MCP 2026-07-28 it returns an
+    ``InputRequiredResult`` on the first leg. The containing tool must return
+    that value unchanged; on the next leg this helper reads
+    ``ctx.input_responses`` and returns text.
 
     Args:
         messages: The message(s) to send to the LLM:
@@ -49,16 +69,19 @@ async def sample(
         The LLM's response as a string
 
     Raises:
-        RuntimeError: If called outside MCP context or sampling fails
+        RuntimeError: If sampling fails or a modern response is invalid
         ValueError: If parameters are invalid
 
     Examples:
         ```python
         from golf.utilities import sample
+        from mcp_types import InputRequiredResult
 
         async def analyze_data(data: str):
             # Simple completion
             analysis = await sample(f"Analyze this data: {data}")
+            if isinstance(analysis, InputRequiredResult):
+                return analysis
 
             # With system prompt and temperature
             creative_response = await sample(
@@ -67,12 +90,16 @@ async def sample(
                 temperature=0.8,
                 max_tokens=1000
             )
+            if isinstance(creative_response, InputRequiredResult):
+                return creative_response
 
             # With model preferences
             technical_analysis = await sample(
                 f"Provide technical analysis: {data}",
                 model_preferences=["gpt-4", "claude-3-sonnet"]
             )
+            if isinstance(technical_analysis, InputRequiredResult):
+                return technical_analysis
 
             return {
                 "analysis": analysis,
@@ -82,34 +109,68 @@ async def sample(
         ```
     """
     try:
-        # Get the current FastMCP context
         ctx = get_current_context()
-
-        # Call the context's sample method
-        result = await ctx.sample(
-            messages=messages,
+        sampling_messages = [
+            SamplingMessage(role="user", content=TextContent(type="text", text=message))
+            for message in ([messages] if isinstance(messages, str) else messages)
+        ]
+        preferences = _model_preferences(model_preferences)
+        params = CreateMessageRequestParams(
+            messages=sampling_messages,
             system_prompt=system_prompt,
             temperature=temperature,
-            max_tokens=max_tokens,
-            model_preferences=model_preferences,
+            max_tokens=max_tokens or 512,
+            model_preferences=preferences,
         )
 
-        # Extract text content from the ContentBlock response
-        if hasattr(result, "text"):
-            return result.text
-        elif hasattr(result, "content"):
-            # Handle different content block types
-            if isinstance(result.content, str):
-                return result.content
-            elif hasattr(result.content, "text"):
-                return result.content.text
-            else:
-                return str(result.content)
-        else:
-            return str(result)
+        request_context = ctx.request_context
+        protocol_version = request_context.protocol_version if request_context is not None else None
+        if protocol_version in MODERN_PROTOCOL_VERSIONS:
+            key = request_key or _request_key("sample", params)
+            responses = ctx.input_responses or {}
+            response = responses.get(key)
+            if response is None:
+                return InputRequiredResult(input_requests={key: CreateMessageRequest(params=params)})
+            if not isinstance(response, CreateMessageResult):
+                raise RuntimeError(f"Sampling response {key!r} was not a CreateMessageResult")
+            return _response_text(response)
+
+        result = await ctx.session.create_message(
+            messages=sampling_messages,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens or 512,
+            model_preferences=preferences,
+            related_request_id=ctx.request_id,
+        )
+        return _response_text(result)
 
     except Exception as e:
         raise RuntimeError(f"LLM sampling failed: {str(e)}") from e
+
+
+def _model_preferences(
+    preferences: str | list[str] | None,
+) -> ModelPreferences | None:
+    if preferences is None:
+        return None
+    names = [preferences] if isinstance(preferences, str) else preferences
+    return ModelPreferences(hints=[ModelHint(name=name) for name in names])
+
+
+def _request_key(prefix: str, params: CreateMessageRequestParams) -> str:
+    payload = params.model_dump(mode="json", by_alias=True, exclude_none=True)
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16]
+    return f"golf.{prefix}.{digest}"
+
+
+def _response_text(result: CreateMessageResult) -> str:
+    content = result.content
+    if isinstance(content, list):
+        return "\n".join(block.text for block in content if isinstance(block, TextContent))
+    if isinstance(content, TextContent):
+        return content.text
+    raise RuntimeError("Sampling response did not contain text content")
 
 
 async def sample_structured(
@@ -118,7 +179,7 @@ async def sample_structured(
     system_prompt: str | None = None,
     temperature: float = 0.1,
     max_tokens: int | None = None,
-) -> str:
+) -> str | InputRequiredResult:
     """Request a structured LLM completion with specific formatting.
 
     This is a convenience function for requesting structured responses
@@ -137,6 +198,7 @@ async def sample_structured(
     Example:
         ```python
         from golf.utilities import sample_structured
+        from mcp_types import InputRequiredResult
 
         async def extract_entities(text: str):
             entities = await sample_structured(
@@ -145,6 +207,8 @@ async def sample_structured(
                 "organizations, locations",
                 system_prompt="You are an expert at named entity recognition"
             )
+            if isinstance(entities, InputRequiredResult):
+                return entities
             return entities
         ```
     """
@@ -167,7 +231,7 @@ async def sample_with_context(
     context_data: dict[str, Any],
     system_prompt: str | None = None,
     **kwargs: Any,
-) -> str:
+) -> str | InputRequiredResult:
     """Request an LLM completion with additional context data.
 
     This convenience function formats context data and includes it
@@ -185,6 +249,7 @@ async def sample_with_context(
     Example:
         ```python
         from golf.utilities import sample_with_context
+        from mcp_types import InputRequiredResult
 
         async def generate_report(topic: str, user_data: dict):
             report = await sample_with_context(
@@ -196,6 +261,8 @@ async def sample_with_context(
                 },
                 system_prompt="You are a professional report writer"
             )
+            if isinstance(report, InputRequiredResult):
+                return report
             return report
         ```
     """

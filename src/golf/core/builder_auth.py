@@ -2,7 +2,7 @@
 
 This module adds support for injecting authentication configuration
 into the generated FastMCP application during the build process using
-FastMCP 3.4.7 built-in auth providers.
+FastMCP 4.0.0 built-in auth providers.
 """
 
 from golf.auth import get_auth_config
@@ -83,7 +83,7 @@ def generate_auth_code(
         ]
 
         setup_code_lines = [
-            "# FastMCP 3.4.7 authentication setup (runtime config with callables)",
+            "# FastMCP 4.0.0 authentication setup (runtime config with callables)",
             "# Auth config registered by auth.py import above",
             "auth_config = get_auth_config()",
             "auth_provider = create_auth_provider(auth_config)",
@@ -106,14 +106,14 @@ def generate_auth_code(
         auth_config_repr = repr(auth_config)
 
         setup_code_lines = [
-            "# FastMCP 3.4.7 authentication setup with embedded configuration",
+            "# FastMCP 4.0.0 authentication setup with embedded configuration",
             f"auth_config = {auth_config_repr}",
             "auth_provider = create_auth_provider(auth_config)",
             f"# Authentication configured with {auth_config.provider_type} provider",
             "",
         ]
 
-    # FastMCP 3.4.7 registers the provider and its routes via auth=
+    # FastMCP registers the provider and its routes via auth=
     fastmcp_args = {"auth": "auth_provider"}
 
     return {
@@ -223,5 +223,5 @@ def generate_api_key_auth_components(
 
 
 def generate_auth_routes() -> str:
-    """Return no route code; FastMCP 3.4.7 registers auth routes via ``auth=``."""
+    """Return no route code; FastMCP registers auth routes via ``auth=``."""
     return ""

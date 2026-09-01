@@ -1,6 +1,6 @@
 """Authentication configuration for the basic Golf MCP server example.
 
-This example shows authentication options available with FastMCP 3.4.7:
+This example shows authentication options available with FastMCP 4.0.0:
 - JWT authentication with static keys or JWKS endpoints (production)
 - Static token authentication (development/testing)
 - OAuth Server mode (full OAuth 2.0 server)

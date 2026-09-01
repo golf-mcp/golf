@@ -28,7 +28,7 @@ def test_generated_configured_auth_fails_closed(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_fastmcp_registers_auth_routes_once() -> None:
-    """Golf relies solely on FastMCP 3.4.7 auth route registration."""
+    """Golf relies solely on FastMCP 4.0.0 auth route registration."""
     provider = _create_remote_provider(
         RemoteAuthConfig(
             authorization_servers=["https://auth.example.com"],

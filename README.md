@@ -30,6 +30,9 @@
 
 Golf is a **framework** designed to streamline the creation of MCP server applications. It allows developers to define server's capabilities—*tools*, *prompts*, and *resources*—as simple Python files within a conventional directory structure. Golf then automatically discovers, parses, and compiles these components into a runnable MCP server, minimizing boilerplate and accelerating development.
 
+Golf targets FastMCP 4.0.0 and the current MCP 2026-07-28 protocol.
+FastMCP also negotiates legacy MCP clients through its compatibility mode.
+
 With Golf v0.2.0, you get **enterprise-grade authentication** (JWT, OAuth Server, API key, development tokens), **built-in utilities** for LLM interactions, and **automatic telemetry** integration. Focus on implementing your agent's logic while Golf handles authentication, monitoring, and server infrastructure.
 
 ## Quick Start
@@ -153,7 +156,24 @@ configure_auth(JWTAuthConfig(
 # ))
 
 # Built-in utilities available in all tools
-from golf.utils import elicit, sample, get_context
+from golf.utilities import elicit, sample, get_current_context
+```
+
+On MCP 2026-07-28, elicitation and sampling use caller-owned multi-round-trip
+control flow. A nested helper cannot transparently continue the containing
+tool: declare `InputRequiredResult` in the tool's return type and return any
+such result unchanged. The tool is then re-entered with the answer. Legacy
+connections continue to use imperative requests.
+
+```python
+from mcp_types import InputRequiredResult
+from golf.utilities import sample
+
+async def explain(topic: str) -> str | InputRequiredResult:
+    result = await sample(f"Explain {topic}")
+    if isinstance(result, InputRequiredResult):
+        return result
+    return result
 ```
 
 JWT authentication requires an audience so tokens are bound to this MCP
@@ -179,13 +199,16 @@ Basic configuration in `golf.json`:
   "name": "My Golf Server",
   "host": "localhost",
   "port": 3000,
-  "transport": "sse",
+  "transport": "streamable-http",
   "opentelemetry_enabled": false,
   "detailed_tracing": false
 }
 ```
 
-- **`transport`**: Choose `"sse"`, `"streamable-http"`, or `"stdio"`
+- **`transport`**: Use `"streamable-http"` or `"stdio"`. SSE remains available
+  only as a deprecated legacy transport.
+- **`stateless_http`**: Optional legacy Streamable HTTP behavior. MCP
+  2026-07-28 is intrinsically sessionless and does not depend on this setting.
 - **`opentelemetry_enabled`**: Enable OpenTelemetry tracing
 - **`detailed_tracing`**: Capture input/output (use carefully with sensitive data)
 

@@ -1,6 +1,6 @@
 """Modern authentication provider configurations for Golf MCP servers.
 
-This module provides configuration classes for FastMCP 3.4.7 authentication providers,
+This module provides configuration classes for FastMCP 4.0.0 authentication providers,
 replacing the legacy custom OAuth implementation with the new built-in auth system.
 """
 

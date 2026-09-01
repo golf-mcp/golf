@@ -2,6 +2,7 @@
 
 from typing import Annotated
 
+from mcp_types import InputRequiredResult
 from pydantic import BaseModel, Field
 from golf.utilities import sample
 
@@ -29,7 +30,7 @@ async def calculate(
             default=False,
         ),
     ] = False,
-) -> CalculationResult:
+) -> CalculationResult | InputRequiredResult:
     """Evaluate a mathematical expression with optional LLM explanation.
 
     This enhanced calculator can:
@@ -65,6 +66,10 @@ async def calculate(
                     system_prompt="You are a helpful math tutor. Provide clear, step-by-step explanations.",
                     max_tokens=200,
                 )
+                if isinstance(explanation, InputRequiredResult):
+                    # MCP 2026-07-28 ends this request and re-enters the tool
+                    # with the sampling answer; propagation must be explicit.
+                    return explanation
                 result_expression = f"{expression}\n\nExplanation: {explanation}"
             except Exception:
                 # If sampling fails, continue without explanation

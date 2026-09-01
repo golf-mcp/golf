@@ -12,6 +12,7 @@ env:
   # Ensure telemetry is disabled in CI
   GOLF_TELEMETRY: "0"
   GOLF_TEST_MODE: "1"
+  FASTMCP_MCP_CAMELCASE_COMPAT: "false"
 
 jobs:
   test:
