@@ -1,11 +1,16 @@
-"""Elicitation utilities for Golf MCP tools.
+"""Elicitation helpers for legacy and MCP 2026-07-28 connections."""
 
-This module provides simplified elicitation functions that Golf tool authors
-can use without needing to manage FastMCP Context objects directly.
-"""
-
-from typing import Any, TypeVar, overload
+import hashlib
+import json
 from collections.abc import Callable
+from typing import Any, TypeVar, overload
+
+from fastmcp.server.elicitation import (
+    handle_elicit_accept,
+    parse_elicit_response_type,
+)
+from mcp_types import ElicitRequest, ElicitRequestFormParams, ElicitResult, InputRequiredResult
+from mcp_types.version import MODERN_PROTOCOL_VERSIONS
 
 from .context import get_current_context
 
@@ -27,17 +32,8 @@ except ImportError:
 @overload
 async def elicit(
     message: str,
-    response_type: None = None,
-) -> dict[str, Any]:
-    """Elicit with no response type returns empty dict."""
-    ...
-
-
-@overload
-async def elicit(
-    message: str,
     response_type: type[T],
-) -> T:
+) -> T | InputRequiredResult:
     """Elicit with response type returns typed data."""
     ...
 
@@ -46,26 +42,31 @@ async def elicit(
 async def elicit(
     message: str,
     response_type: list[str],
-) -> str:
+) -> str | InputRequiredResult:
     """Elicit with list of options returns selected string."""
     ...
 
 
 async def elicit(
     message: str,
-    response_type: type[T] | list[str] | None = None,
-) -> T | dict[str, Any] | str:
+    response_type: type[T] | list[str],
+    *,
+    request_key: str | None = None,
+) -> T | str | InputRequiredResult:
     """Request additional information from the user via MCP elicitation.
 
-    This is a simplified wrapper around FastMCP's Context.elicit() method
-    that automatically handles context retrieval and response processing.
+    Legacy connections use imperative ``ctx.elicit``. MCP 2026-07-28 uses the
+    MRTR guard pattern: the first call returns ``InputRequiredResult`` and the
+    containing tool must return it unchanged. FastMCP re-runs the tool with the
+    answer available through ``ctx.input_responses``.
 
     Args:
         message: Human-readable message explaining what information is needed
         response_type: The type of response expected:
-            - None: Returns empty dict (for confirmation prompts)
             - type[T]: Returns validated instance of T (BaseModel, dataclass, etc.)
             - list[str]: Returns selected string from the options
+        request_key: Stable key for this question. By default a deterministic
+            key is derived from the rendered request.
 
     Returns:
         The user's response in the requested format
@@ -77,6 +78,7 @@ async def elicit(
     Examples:
         ```python
         from golf.utilities import elicit
+        from mcp_types import InputRequiredResult
         from pydantic import BaseModel
 
         class UserInfo(BaseModel):
@@ -86,27 +88,50 @@ async def elicit(
         async def collect_user_info():
             # Structured elicitation
             info = await elicit("Please provide your details:", UserInfo)
+            if isinstance(info, InputRequiredResult):
+                return info
 
             # Simple text elicitation
             reason = await elicit("Why do you need this?", str)
+            if isinstance(reason, InputRequiredResult):
+                return reason
 
             # Multiple choice elicitation
             priority = await elicit("Select priority:", ["low", "medium", "high"])
+            if isinstance(priority, InputRequiredResult):
+                return priority
 
             # Confirmation elicitation
-            await elicit("Proceed with the action?")
+            confirmed = await elicit("Proceed with the action?", bool)
+            if isinstance(confirmed, InputRequiredResult):
+                return confirmed
 
             return f"User {info.name} requested {reason} with {priority} priority"
         ```
     """
     try:
-        # Get the current FastMCP context
         ctx = get_current_context()
+        config = parse_elicit_response_type(response_type)
 
-        # Call the context's elicit method
-        result = await ctx.elicit(message, response_type)
+        request_context = ctx.request_context
+        protocol_version = request_context.protocol_version if request_context is not None else None
+        if protocol_version in MODERN_PROTOCOL_VERSIONS:
+            params = ElicitRequestFormParams(
+                message=message,
+                requested_schema=config.schema,
+            )
+            key = request_key or _request_key(params)
+            response = (ctx.input_responses or {}).get(key)
+            if response is None:
+                return InputRequiredResult(input_requests={key: ElicitRequest(params=params)})
+            if not isinstance(response, ElicitResult):
+                raise RuntimeError(f"Elicitation response {key!r} was not an ElicitResult")
+            result = response
+            if result.action == "accept":
+                return handle_elicit_accept(config, result.content).data
+        else:
+            result = await ctx.elicit(message, response_type)
 
-        # Handle the response based on the action
         if hasattr(result, "action"):
             if result.action == "accept":
                 return result.data
@@ -126,7 +151,13 @@ async def elicit(
         raise RuntimeError(f"Elicitation failed: {str(e)}") from e
 
 
-async def elicit_confirmation(message: str) -> bool:
+def _request_key(params: ElicitRequestFormParams) -> str:
+    payload = params.model_dump(mode="json", by_alias=True, exclude_none=True)
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16]
+    return f"golf.elicit.{digest}"
+
+
+async def elicit_confirmation(message: str) -> bool | InputRequiredResult:
     """Request a simple yes/no confirmation from the user.
 
     This is a convenience function for common confirmation prompts.
@@ -143,11 +174,14 @@ async def elicit_confirmation(message: str) -> bool:
     Example:
         ```python
         from golf.utilities import elicit_confirmation
+        from mcp_types import InputRequiredResult
 
-        async def delete_file(filename: str):
+        async def delete_file(filename: str) -> str | InputRequiredResult:
             confirmed = await elicit_confirmation(
                 f"Are you sure you want to delete {filename}?"
             )
+            if isinstance(confirmed, InputRequiredResult):
+                return confirmed
             if confirmed:
                 # Proceed with deletion
                 return f"Deleted {filename}"
@@ -156,9 +190,10 @@ async def elicit_confirmation(message: str) -> bool:
         ```
     """
     try:
-        # Use elicitation with boolean choice
-        choice = await elicit(message, ["yes", "no"])
-        return choice.lower() == "yes"
+        result = await elicit(message, bool)
+        if isinstance(result, InputRequiredResult):
+            return result
+        return result
     except RuntimeError as e:
         if "declined" in str(e):
             return False

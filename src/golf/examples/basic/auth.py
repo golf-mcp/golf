@@ -1,6 +1,6 @@
 """Authentication configuration for the basic Golf MCP server example.
 
-This example shows different authentication options available in Golf 0.2.x:
+This example shows authentication options available with FastMCP 4.0.0:
 - JWT authentication with static keys or JWKS endpoints (production)
 - Static token authentication (development/testing)
 - OAuth Server mode (full OAuth 2.0 server)
@@ -51,7 +51,8 @@ This example shows different authentication options available in Golf 0.2.x:
 #         authorization_servers_env_var="AUTH_SERVERS",    # Comma-separated: "https://auth1.com,https://auth2.com"
 #         resource_server_url_env_var="RESOURCE_URL",     # This server's URL
 #         token_verifier_config=JWTAuthConfig(
-#             jwks_uri_env_var="JWKS_URI"
+#             jwks_uri_env_var="JWKS_URI",
+#             audience_env_var="RESOURCE_URL",
 #         ),
 #     )
 # )

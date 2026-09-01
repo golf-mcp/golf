@@ -181,34 +181,43 @@ def generate_metrics_instrumentation() -> list[str]:
 
 
 def generate_session_tracking() -> list[str]:
-    """Generate session tracking using FastMCP middleware (2.14+ compatible).
+    """Generate protocol accounting with legacy-session compatibility.
 
     Returns:
         List of code lines for session tracking via middleware
     """
     return [
-        "# Session tracking via FastMCP middleware (2.14+ compatible)",
+        "# Protocol accounting; initialize is a legacy-only handshake",
         "from fastmcp.server.middleware import Middleware as FastMCPMiddleware, MiddlewareContext, CallNext",
         "from typing import Any",
         "",
         "class SessionTrackingMiddleware(FastMCPMiddleware):",
-        '    """Middleware to track MCP session lifecycle for metrics."""',
+        '    """Count all MCP messages and legacy initialize handshakes."""',
         "    ",
+        "    async def on_message(",
+        "        self,",
+        "        context: MiddlewareContext[Any],",
+        "        call_next: CallNext[Any, Any],",
+        "    ) -> Any:",
+        "        status = 'success'",
+        "        try:",
+        "            return await call_next(context)",
+        "        except Exception:",
+        "            status = 'error'",
+        "            raise",
+        "        finally:",
+        "            get_metrics_collector().increment_mcp_message(",
+        "                context.method or 'unknown', context.type, status",
+        "            )",
+        "",
         "    async def on_initialize(",
         "        self,",
         "        context: MiddlewareContext[Any],",
         "        call_next: CallNext[Any, Any],",
         "    ) -> Any:",
-        '        """Track session initialization."""',
-        "        # Track session start",
+        '        """Count a legacy initialize-handshake session."""',
         "        track_session_start()",
-        "        ",
-        "        try:",
-        "            result = await call_next(context)",
-        "            return result",
-        "        except Exception:",
-        "            # Session initialization failed",
-        "            raise",
+        "        return await call_next(context)",
         "",
         "# Add session tracking middleware",
         "mcp.add_middleware(SessionTrackingMiddleware())",

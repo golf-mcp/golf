@@ -1,4 +1,4 @@
-"""Modern authentication for Golf MCP servers using FastMCP 2.11+ providers.
+"""Authentication for Golf MCP servers using FastMCP 4.0.0 providers.
 
 This module provides authentication configuration and utilities for Golf servers,
 leveraging FastMCP's built-in authentication system with JWT verification,
@@ -36,9 +36,10 @@ from .registry import (
 # Re-export for backward compatibility
 from .api_key import configure_api_key, get_api_key_config, is_api_key_configured
 from .helpers import (
+    CallerAuth,
     extract_token_from_header,
     get_api_key,
-    get_auth_token,
+    get_caller_auth,
     set_api_key,
 )
 
@@ -76,9 +77,10 @@ __all__ = [
     "get_api_key_config",
     "is_api_key_configured",
     # Helper functions
+    "CallerAuth",
     "extract_token_from_header",
     "get_api_key",
-    "get_auth_token",
+    "get_caller_auth",
     "set_api_key",
 ]
 
@@ -284,7 +286,8 @@ def configure_oauth_proxy(
         client_id: Your registered client ID with the OAuth provider
         client_secret: Your registered client secret with the OAuth provider
         base_url: Public URL of this OAuth proxy server
-        token_verifier_config: JWT or Static token configuration for verifying tokens
+        token_verifier_config: Deprecated optional source of default scopes or upstream audience hints.
+            Proxy-owned client tokens are validated by the enterprise proxy itself.
         scopes_supported: List of OAuth scopes this proxy supports
         revocation_endpoint: Optional token revocation endpoint
         redirect_path: OAuth callback path (default: "/oauth/callback")
@@ -304,14 +307,10 @@ def configure_oauth_proxy(
             - allowed_redirect_schemes_env_var: Env var for redirect schemes
 
     Raises:
-        ValueError: If token_verifier_config is not provided or invalid
+        ValueError: If token_verifier_config is invalid
         ValueError: If required fields lack both direct value and env var
     """
-    # Validate token_verifier_config is provided (always required)
-    if token_verifier_config is None:
-        raise ValueError("token_verifier_config is required and must be JWTAuthConfig or StaticTokenConfig")
-
-    if not isinstance(token_verifier_config, (JWTAuthConfig, StaticTokenConfig)):
+    if token_verifier_config is not None and not isinstance(token_verifier_config, (JWTAuthConfig, StaticTokenConfig)):
         raise ValueError(
             f"token_verifier_config must be JWTAuthConfig or StaticTokenConfig, "
             f"got {type(token_verifier_config).__name__}"

@@ -2,6 +2,7 @@
 
 from typing import Annotated
 
+from mcp_types import InputRequiredResult
 from pydantic import BaseModel, Field
 from golf.utilities import elicit
 
@@ -22,7 +23,7 @@ async def hello(
             default=False,
         ),
     ] = False,
-) -> Output:
+) -> Output | InputRequiredResult:
     """Say hello with optional personalized elicitation.
 
     This enhanced tool can:
@@ -45,6 +46,10 @@ async def hello(
                 "How are you feeling today?",
                 ["happy", "excited", "calm", "focused", "creative"],
             )
+            if isinstance(mood, InputRequiredResult):
+                # Modern MCP input is caller-owned control flow. Returning this
+                # value lets the client answer and FastMCP re-enter the tool.
+                return mood
 
             # Create personalized message
             personalized_message = f"{greeting}, {name}! Hope you're having a {mood} day!"

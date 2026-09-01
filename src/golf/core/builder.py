@@ -10,9 +10,8 @@ from typing import Any
 
 from rich.console import Console
 
-from golf.auth import is_auth_configured
 from golf.auth.api_key import get_api_key_config
-from golf.core.builder_auth import generate_auth_code, generate_auth_routes
+from golf.core.builder_auth import generate_auth_code
 from golf.core.builder_telemetry import (
     generate_telemetry_imports,
 )
@@ -171,11 +170,7 @@ class ManifestBuilder:
         return output_path
 
     def _get_fastmcp_version(self) -> str | None:
-        """Get the installed FastMCP version.
-
-        Returns:
-            FastMCP version string (e.g., "2.12.0") or None if not available
-        """
+        """Return the installed FastMCP version when available."""
         try:
             import fastmcp
 
@@ -184,25 +179,13 @@ class ManifestBuilder:
             return None
 
     def _is_fastmcp_version_gte(self, target_version: str) -> bool:
-        """Check if installed FastMCP version is >= target version.
-
-        Args:
-            target_version: Version string to compare against (e.g., "2.12.0")
-
-        Returns:
-            True if FastMCP version >= target_version, False otherwise
-        """
+        """Compare the installed FastMCP version for diagnostic callers."""
         try:
             from packaging import version
 
             current_version = self._get_fastmcp_version()
-            if current_version is None:
-                # Default to older behavior for safety
-                return False
-
-            return version.parse(current_version) >= version.parse(target_version)
+            return current_version is not None and version.parse(current_version) >= version.parse(target_version)
         except (ImportError, ValueError):
-            # Default to older behavior for safety
             return False
 
 
@@ -586,11 +569,7 @@ class CodeGenerator:
         )
 
     def _get_fastmcp_version(self) -> str | None:
-        """Get the installed FastMCP version.
-
-        Returns:
-            FastMCP version string (e.g., "2.12.0") or None if not available
-        """
+        """Return the installed FastMCP version when available."""
         try:
             import fastmcp
 
@@ -599,25 +578,13 @@ class CodeGenerator:
             return None
 
     def _is_fastmcp_version_gte(self, target_version: str) -> bool:
-        """Check if installed FastMCP version is >= target version.
-
-        Args:
-            target_version: Version string to compare against (e.g., "2.12.0")
-
-        Returns:
-            True if FastMCP version >= target_version, False otherwise
-        """
+        """Compare the installed FastMCP version for diagnostic callers."""
         try:
             from packaging import version
 
             current_version = self._get_fastmcp_version()
-            if current_version is None:
-                # Default to older behavior for safety
-                return False
-
-            return version.parse(current_version) >= version.parse(target_version)
+            return current_version is not None and version.parse(current_version) >= version.parse(target_version)
         except (ImportError, ValueError):
-            # Default to older behavior for safety
             return False
 
     def _generate_startup_section(self, project_path: Path) -> list[str]:
@@ -942,10 +909,6 @@ class CodeGenerator:
             imports.append("from starlette.requests import Request")
             imports.append("from starlette.responses import JSONResponse")
 
-        # Get transport-specific configuration
-        transport_config = self._get_transport_config(self.settings.transport)
-        endpoint_path = transport_config["endpoint_path"]
-
         # Track component modules to register
         component_registrations = []
 
@@ -1023,14 +986,13 @@ class CodeGenerator:
 
                     if component_type == ComponentType.TOOL:
                         registration = f"# Register the tool '{component.name}'"
+                        annotations_arg = f", annotations={component.annotations}" if component.annotations else ""
                         registration += (
                             f"\n_tool = Tool.from_function({full_module_path}.{entry_func}, "
                             f'name="{component.name}", '
-                            f"description={repr(component.docstring or '')})"
+                            f"description={repr(component.docstring or '')}"
+                            f"{annotations_arg})"
                         )
-                        # Add annotations if present
-                        if hasattr(component, "annotations") and component.annotations:
-                            registration += f".with_annotations({component.annotations})"
                         registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
                         registration = f"# Register the resource '{component.name}'"
@@ -1071,14 +1033,13 @@ class CodeGenerator:
                     )
 
                     if component_type == ComponentType.TOOL:
+                        annotations_arg = f", annotations={component.annotations}" if component.annotations else ""
                         registration += (
                             f"\n_tool = Tool.from_function(_wrapped_func, "
                             f'name="{component.name}", '
-                            f"description={repr(component.docstring or '')})"
+                            f"description={repr(component.docstring or '')}"
+                            f"{annotations_arg})"
                         )
-                        # Add annotations if present
-                        if hasattr(component, "annotations") and component.annotations:
-                            registration += f".with_annotations({component.annotations})"
                         registration += "\nmcp.add_tool(_tool)"
                     elif component_type == ComponentType.RESOURCE:
                         if self._is_resource_template(component):
@@ -1124,11 +1085,9 @@ class CodeGenerator:
                             # Use repr() for proper escaping of quotes, newlines, etc.
                             registration += f", description={repr(component.docstring)}"
 
+                        if component.annotations:
+                            registration += f", annotations={component.annotations}"
                         registration += ")"
-
-                        # Add annotations if present
-                        if hasattr(component, "annotations") and component.annotations:
-                            registration += f"\n_tool = _tool.with_annotations({component.annotations})"
 
                         registration += "\nmcp.add_tool(_tool)"
 
@@ -1357,40 +1316,20 @@ class CodeGenerator:
                 main_code.extend(middleware_setup)
                 main_code.append(f"    middleware = [{', '.join(middleware_list)}]")
                 main_code.append("")
-                if self._is_fastmcp_version_gte("2.12.0"):
-                    main_code.extend(
-                        [
-                            "    # Run SSE server with middleware using FastMCP's run method",
-                            '    mcp.run(transport="sse", host=host, port=port, '
-                            'log_level="info", middleware=middleware, show_banner=False)',
-                        ]
-                    )
-                else:
-                    main_code.extend(
-                        [
-                            "    # Run SSE server with middleware using FastMCP's run method",
-                            f'    mcp.run(transport="sse", host=host, port=port, '
-                            f'path="{endpoint_path}", log_level="info", '
-                            f"middleware=middleware, show_banner=False)",
-                        ]
-                    )
+                main_code.extend(
+                    [
+                        "    # Run SSE server with middleware using FastMCP's run method",
+                        '    mcp.run(transport="sse", host=host, port=port, '
+                        'log_level="info", middleware=middleware, show_banner=False)',
+                    ]
+                )
             else:
-                if self._is_fastmcp_version_gte("2.12.0"):
-                    main_code.extend(
-                        [
-                            "    # Run SSE server using FastMCP's run method",
-                            '    mcp.run(transport="sse", host=host, port=port, log_level="info", show_banner=False)',
-                        ]
-                    )
-                else:
-                    main_code.extend(
-                        [
-                            "    # Run SSE server using FastMCP's run method",
-                            f'    mcp.run(transport="sse", host=host, port=port, '
-                            f'path="{endpoint_path}", log_level="info", '
-                            f"show_banner=False)",
-                        ]
-                    )
+                main_code.extend(
+                    [
+                        "    # Run SSE server using FastMCP's run method",
+                        '    mcp.run(transport="sse", host=host, port=port, log_level="info", show_banner=False)',
+                    ]
+                )
 
         elif self.settings.transport in ["streamable-http", "http"]:
             # Check if we need middleware for streamable-http
@@ -1426,41 +1365,21 @@ class CodeGenerator:
                 main_code.extend(middleware_setup)
                 main_code.append(f"    middleware = [{', '.join(middleware_list)}]")
                 main_code.append("")
-                if self._is_fastmcp_version_gte("2.12.0"):
-                    main_code.extend(
-                        [
-                            "    # Run HTTP server with middleware using FastMCP's run method",
-                            f'    mcp.run(transport="streamable-http", host=host, '
-                            f'port=port, log_level="info", middleware=middleware, show_banner=False{stateless_kwarg})',
-                        ]
-                    )
-                else:
-                    main_code.extend(
-                        [
-                            "    # Run HTTP server with middleware using FastMCP's run method",
-                            f'    mcp.run(transport="streamable-http", host=host, '
-                            f'port=port, path="{endpoint_path}", log_level="info", '
-                            f"middleware=middleware, show_banner=False{stateless_kwarg})",
-                        ]
-                    )
+                main_code.extend(
+                    [
+                        "    # Run HTTP server with middleware using FastMCP's run method",
+                        f'    mcp.run(transport="streamable-http", host=host, '
+                        f'port=port, log_level="info", middleware=middleware, show_banner=False{stateless_kwarg})',
+                    ]
+                )
             else:
-                if self._is_fastmcp_version_gte("2.12.0"):
-                    main_code.extend(
-                        [
-                            "    # Run HTTP server using FastMCP's run method",
-                            f'    mcp.run(transport="streamable-http", host=host, '
-                            f'port=port, log_level="info", show_banner=False{stateless_kwarg})',
-                        ]
-                    )
-                else:
-                    main_code.extend(
-                        [
-                            "    # Run HTTP server using FastMCP's run method",
-                            f'    mcp.run(transport="streamable-http", host=host, '
-                            f'port=port, path="{endpoint_path}", log_level="info", '
-                            f"show_banner=False{stateless_kwarg})",
-                        ]
-                    )
+                main_code.extend(
+                    [
+                        "    # Run HTTP server using FastMCP's run method",
+                        f'    mcp.run(transport="streamable-http", host=host, '
+                        f'port=port, log_level="info", show_banner=False{stateless_kwarg})',
+                    ]
+                )
         else:
             # For stdio transport, use mcp.run()
             main_code.extend(["    # Run with stdio transport", '    mcp.run(transport="stdio", show_banner=False)'])
@@ -1550,30 +1469,21 @@ class CodeGenerator:
             fastmcp_middleware = []
             starlette_middleware = []
 
-            # FastMCP middleware methods (MCP protocol level)
-            fastmcp_methods = [
-                "on_message",
-                "on_request",
-                "on_call_tool",
-                "on_read_resource",
-                "on_get_prompt",
-                "on_initialize",
-            ]
             # Starlette/ASGI middleware method (HTTP level)
             starlette_method = "dispatch"
+
+            from fastmcp.server.middleware import Middleware as FastMCPMiddleware
 
             for name, obj in inspect.getmembers(middleware_module, inspect.isclass):
                 # Skip classes that are not defined in this module (imported classes)
                 if obj.__module__ != middleware_module.__name__:
                     continue
 
-                # Check if class implements FastMCP middleware methods
-                has_fastmcp_method = any(method in obj.__dict__ for method in fastmcp_methods)
+                is_fastmcp_middleware = callable(obj) and issubclass(obj, FastMCPMiddleware)
                 # Check if class implements Starlette dispatch method
                 has_dispatch_method = starlette_method in obj.__dict__
 
-                if has_fastmcp_method and not has_dispatch_method:
-                    # Pure FastMCP middleware
+                if is_fastmcp_middleware:
                     fastmcp_middleware.append(name)
                     console.print(f"[green]Discovered FastMCP middleware: {name}[/green]")
                 elif has_dispatch_method:
@@ -1851,7 +1761,7 @@ This is a standalone FastMCP server generated by GolfMCP.
             """\"\"\"Auth module for GolfMCP.\"\"\"
 
 # Legacy ProviderConfig removed in Golf 0.2.x - use modern auth configurations
-# Legacy OAuth imports removed in Golf 0.2.x - use FastMCP 2.11+ auth providers
+# Legacy OAuth imports removed; use FastMCP 4.0.0 auth providers
 from golf.auth.helpers import extract_token_from_header, get_api_key, set_api_key
 from golf.auth.api_key import configure_api_key, get_api_key_config
 from golf.auth.factory import create_auth_provider
@@ -1893,43 +1803,6 @@ from golf.auth.providers import RemoteAuthConfig, JWTAuthConfig, StaticTokenConf
         dst_errors = telemetry_dir / "errors.py"
         if src_errors.exists():
             shutil.copy(src_errors, dst_errors)
-
-    # Check if auth routes need to be added
-    if is_auth_configured() or get_api_key_config():
-        auth_routes_code = generate_auth_routes()
-
-        server_file = output_dir / "server.py"
-        if server_file.exists():
-            with open(server_file) as f:
-                server_code_content = f.read()
-
-            # Add auth routes before the main block
-            app_marker = 'if __name__ == "__main__":'
-            app_pos = server_code_content.find(app_marker)
-            if app_pos != -1:
-                modified_code = (
-                    server_code_content[:app_pos] + auth_routes_code + "\n\n" + server_code_content[app_pos:]
-                )
-
-                # Format with black before writing (build-time dep)
-                final_code_to_write = modified_code
-                try:
-                    import black
-
-                    final_code_to_write = black.format_str(modified_code, mode=black.Mode())
-                except ImportError:
-                    pass  # already warned above when generating server.py
-                except Exception as e:
-                    console.print(
-                        f"[yellow]Warning: Could not format server.py after auth routes injection: {e}[/yellow]"
-                    )
-
-                with open(server_file, "w") as f:
-                    f.write(final_code_to_write)
-            else:
-                console.print(
-                    f"[yellow]Warning: Could not find main block marker '{app_marker}' in {server_file} to inject auth routes.[/yellow]"
-                )
 
 
 def discover_root_files(project_path: Path) -> dict[str, Path]:

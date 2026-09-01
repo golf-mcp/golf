@@ -2,10 +2,10 @@
 
 This module adds support for injecting authentication configuration
 into the generated FastMCP application during the build process using
-FastMCP 2.11+ built-in auth providers.
+FastMCP 4.0.0 built-in auth providers.
 """
 
-from golf.auth import get_auth_config, is_auth_configured
+from golf.auth import get_auth_config
 from golf.auth.api_key import get_api_key_config
 from golf.auth.providers import AuthConfig
 
@@ -76,7 +76,6 @@ def generate_auth_code(
         # auth.py is copied to dist and imported to register the config
         auth_imports = [
             "import os",
-            "import sys",
             "from golf.auth import get_auth_config",
             "from golf.auth.factory import create_auth_provider",
             "# Import auth module to execute configure_*() and register auth config",
@@ -84,22 +83,17 @@ def generate_auth_code(
         ]
 
         setup_code_lines = [
-            "# Modern FastMCP 2.11+ authentication setup (runtime config with callables)",
+            "# FastMCP 4.0.0 authentication setup (runtime config with callables)",
             "# Auth config registered by auth.py import above",
             "auth_config = get_auth_config()",
-            "try:",
-            "    auth_provider = create_auth_provider(auth_config)",
-            f"    # Authentication configured with {auth_config.provider_type} provider",
-            "except Exception as e:",
-            "    print(f'Authentication setup failed: {{e}}', file=sys.stderr)",
-            "    auth_provider = None",
+            "auth_provider = create_auth_provider(auth_config)",
+            f"# Authentication configured with {auth_config.provider_type} provider",
             "",
         ]
     else:
         # For configs without callables, embed the configuration directly
         auth_imports = [
             "import os",
-            "import sys",
             "from golf.auth.factory import create_auth_provider",
             "from golf.auth.providers import (",
             "    RemoteAuthConfig, JWTAuthConfig, StaticTokenConfig,",
@@ -112,18 +106,14 @@ def generate_auth_code(
         auth_config_repr = repr(auth_config)
 
         setup_code_lines = [
-            "# Modern FastMCP 2.11+ authentication setup with embedded configuration",
+            "# FastMCP 4.0.0 authentication setup with embedded configuration",
             f"auth_config = {auth_config_repr}",
-            "try:",
-            "    auth_provider = create_auth_provider(auth_config)",
-            f"    # Authentication configured with {auth_config.provider_type} provider",
-            "except Exception as e:",
-            "    print(f'Authentication setup failed: {{e}}', file=sys.stderr)",
-            "    auth_provider = None",
+            "auth_provider = create_auth_provider(auth_config)",
+            f"# Authentication configured with {auth_config.provider_type} provider",
             "",
         ]
 
-    # FastMCP constructor arguments - FastMCP 2.11+ uses auth parameter
+    # FastMCP registers the provider and its routes via auth=
     fastmcp_args = {"auth": "auth_provider"}
 
     return {
@@ -233,46 +223,5 @@ def generate_api_key_auth_components(
 
 
 def generate_auth_routes() -> str:
-    """Generate code for auth routes in the FastMCP app.
-
-    In FastMCP 2.14+, auth providers automatically register their routes
-    when passed to the FastMCP constructor via the auth= parameter.
-    This function uses the public custom_route API as a fallback.
-    """
-    # API key auth doesn't need special routes
-    api_key_config = get_api_key_config()
-    if api_key_config:
-        return ""
-
-    # Check if auth is configured
-    if not is_auth_configured():
-        return ""
-
-    # Auth providers in FastMCP 2.14+ auto-register routes when passed to constructor.
-    # This code provides fallback registration using the public custom_route API.
-    return """
-# Add OAuth metadata routes from auth provider (FastMCP 2.14+ compatible)
-# Note: FastMCP 2.14+ automatically registers auth routes when auth provider
-# is passed to the constructor. This is a fallback for explicit route registration.
-if auth_provider and hasattr(auth_provider, 'get_routes'):
-    auth_routes = auth_provider.get_routes()
-    if auth_routes:
-        # Register routes using FastMCP's public custom_route API
-        for route in auth_routes:
-            try:
-                path = route.path if hasattr(route, 'path') else str(route)
-                methods = list(getattr(route, 'methods', ['GET']))
-                endpoint = getattr(route, 'endpoint', None)
-
-                if endpoint:
-                    # Create a closure to capture the endpoint
-                    def make_handler(ep):
-                        async def handler(request):
-                            return await ep(request)
-                        return handler
-
-                    # Register using public API
-                    mcp.custom_route(path, methods=methods)(make_handler(endpoint))
-            except Exception as e:
-                print(f"Warning: Failed to add OAuth route {path}: {e}")
-"""
+    """Return no route code; FastMCP registers auth routes via ``auth=``."""
+    return ""

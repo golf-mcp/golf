@@ -144,9 +144,17 @@ class TestJWTProviderCreation:
                 jwks_uri="https://auth.example.com/.well-known/jwks.json",
             )
 
+    def test_jwt_config_requires_resource_audience(self) -> None:
+        """JWT authentication must reject unbound MCP resource tokens."""
+        with pytest.raises(ValidationError, match="audience or audience_env_var is required"):
+            JWTAuthConfig(jwks_uri="https://auth.example.com/.well-known/jwks.json")
+
     def test_jwt_creation_fastmcp_import_error(self) -> None:
         """Test JWT verifier creation handles FastMCP import errors."""
-        config = JWTAuthConfig(jwks_uri="https://auth.example.com/.well-known/jwks.json")
+        config = JWTAuthConfig(
+            jwks_uri="https://auth.example.com/.well-known/jwks.json",
+            audience="https://api.example.com",
+        )
 
         with patch("fastmcp.server.auth.JWTVerifier", side_effect=ImportError("FastMCP not available")):
             with pytest.raises(ImportError, match="FastMCP not available"):
@@ -158,7 +166,10 @@ class TestRemoteAuthCreation:
 
     def test_remote_auth_creation_basic(self) -> None:
         """Test basic remote auth provider creation."""
-        jwt_config = JWTAuthConfig(jwks_uri="https://auth.example.com/.well-known/jwks.json")
+        jwt_config = JWTAuthConfig(
+            jwks_uri="https://auth.example.com/.well-known/jwks.json",
+            audience="https://api.example.com",
+        )
         config = RemoteAuthConfig(
             authorization_servers=["https://auth1.example.com", "https://auth2.example.com"],
             resource_server_url="https://api.example.com",
@@ -171,6 +182,7 @@ class TestRemoteAuthCreation:
         ):
             mock_token_verifier = Mock()
             mock_token_verifier.verify_token = Mock()  # Add verify_token method for duck typing
+            mock_token_verifier.audience = "https://api.example.com"
             mock_create_auth.return_value = mock_token_verifier
 
             mock_remote_instance = Mock()
@@ -185,14 +197,54 @@ class TestRemoteAuthCreation:
             mock_remote_provider.assert_called_once_with(
                 token_verifier=mock_token_verifier,
                 authorization_servers=["https://auth1.example.com", "https://auth2.example.com"],
-                resource_server_url="https://api.example.com",
+                base_url="https://api.example.com",
+                scopes_supported=None,
             )
 
             assert provider == mock_remote_instance
 
+    def test_remote_auth_rejects_mismatched_resource_audience(self) -> None:
+        """Remote auth must bind JWT verification to its resource URL."""
+        jwt_config = JWTAuthConfig(
+            jwks_uri="https://auth.example.com/.well-known/jwks.json",
+            audience="https://different-api.example.com",
+        )
+
+        with pytest.raises(ValidationError, match="audience must include resource_server_url"):
+            RemoteAuthConfig(
+                authorization_servers=["https://auth.example.com"],
+                resource_server_url="https://api.example.com",
+                token_verifier_config=jwt_config,
+            )
+
+    def test_remote_auth_constructs_with_fastmcp_4_0_0(self) -> None:
+        """Exercise the real pinned RemoteAuthProvider constructor."""
+        import fastmcp
+        from fastmcp.server.auth import RemoteAuthProvider
+
+        assert fastmcp.__version__ == "4.0.0"
+        config = RemoteAuthConfig(
+            authorization_servers=["https://auth.example.com"],
+            resource_server_url="https://api.example.com",
+            token_verifier_config=JWTAuthConfig(
+                jwks_uri="https://auth.example.com/.well-known/jwks.json",
+                audience="https://api.example.com",
+            ),
+            scopes_supported=["mcp:read"],
+        )
+
+        provider = _create_remote_provider(config)
+
+        assert isinstance(provider, RemoteAuthProvider)
+        assert str(provider.base_url) == "https://api.example.com/"
+        assert provider._scopes_supported == ["mcp:read"]
+
     def test_remote_auth_with_env_variables(self) -> None:
         """Test remote auth creation with environment variable resolution."""
-        jwt_config = JWTAuthConfig(jwks_uri="https://auth.example.com/.well-known/jwks.json")
+        jwt_config = JWTAuthConfig(
+            jwks_uri="https://auth.example.com/.well-known/jwks.json",
+            audience="https://default-api.com",
+        )
         config = RemoteAuthConfig(
             authorization_servers=["https://default1.com", "https://default2.com"],
             resource_server_url="https://default-api.com",
@@ -213,6 +265,7 @@ class TestRemoteAuthCreation:
         ):
             mock_token_verifier = Mock()
             mock_token_verifier.verify_token = Mock()
+            mock_token_verifier.audience = "https://env-api.com"
             mock_create_auth.return_value = mock_token_verifier
 
             mock_remote_instance = Mock()
@@ -224,12 +277,16 @@ class TestRemoteAuthCreation:
             mock_remote_provider.assert_called_once_with(
                 token_verifier=mock_token_verifier,
                 authorization_servers=["https://env-auth1.com", "https://env-auth2.com", "https://env-auth3.com"],
-                resource_server_url="https://env-api.com",
+                base_url="https://env-api.com",
+                scopes_supported=None,
             )
 
     def test_remote_auth_invalid_token_verifier(self) -> None:
         """Test remote auth creation fails with invalid token verifier."""
-        jwt_config = JWTAuthConfig(jwks_uri="https://auth.example.com/.well-known/jwks.json")
+        jwt_config = JWTAuthConfig(
+            jwks_uri="https://auth.example.com/.well-known/jwks.json",
+            audience="https://api.example.com",
+        )
         config = RemoteAuthConfig(
             authorization_servers=["https://auth1.example.com"],
             resource_server_url="https://api.example.com",
@@ -249,7 +306,10 @@ class TestRemoteAuthCreation:
 
     def test_remote_auth_fastmcp_import_error(self) -> None:
         """Test remote auth creation handles FastMCP import errors."""
-        jwt_config = JWTAuthConfig(jwks_uri="https://auth.example.com/.well-known/jwks.json")
+        jwt_config = JWTAuthConfig(
+            jwks_uri="https://auth.example.com/.well-known/jwks.json",
+            audience="https://api.example.com",
+        )
         config = RemoteAuthConfig(
             authorization_servers=["https://auth1.example.com"],
             resource_server_url="https://api.example.com",
@@ -262,7 +322,10 @@ class TestRemoteAuthCreation:
 
     def test_get_routes_presence_passthrough(self) -> None:
         """Test that get_routes method is available on created remote auth provider."""
-        jwt_config = JWTAuthConfig(jwks_uri="https://auth.example.com/.well-known/jwks.json")
+        jwt_config = JWTAuthConfig(
+            jwks_uri="https://auth.example.com/.well-known/jwks.json",
+            audience="https://api.example.com",
+        )
         config = RemoteAuthConfig(
             authorization_servers=["https://auth1.example.com"],
             resource_server_url="https://api.example.com",
@@ -275,6 +338,7 @@ class TestRemoteAuthCreation:
         ):
             mock_token_verifier = Mock()
             mock_token_verifier.verify_token = Mock()
+            mock_token_verifier.audience = "https://api.example.com"
             mock_create_auth.return_value = mock_token_verifier
 
             # Mock remote provider with get_routes method
@@ -413,6 +477,18 @@ class TestOAuthProxyDynamicRedirectUris:
         }
         defaults.update(kwargs)
         return OAuthProxyConfig(**defaults)
+
+    def test_token_verifier_config_is_optional_legacy_metadata(self) -> None:
+        config = OAuthProxyConfig(
+            authorization_endpoint="https://auth.example.com/authorize",
+            token_endpoint="https://auth.example.com/token",
+            client_id="test-client",
+            client_secret="test-secret",
+            base_url="https://proxy.example.com",
+            scopes_supported=["read"],
+        )
+
+        assert config.token_verifier_config is None
 
     def test_config_with_static_redirect_patterns(self) -> None:
         """Test config creation with static redirect patterns list."""

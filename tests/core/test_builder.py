@@ -849,9 +849,10 @@ export = annotated_tool
         # Read the generated server code
         server_code = server_file.read_text()
 
-        # Should contain the tool registration with annotations using .with_annotations()
+        # FastMCP 4 receives annotations during construction.
         assert "mcp.add_tool(" in server_code
-        assert ".with_annotations(" in server_code
+        assert "annotations=" in server_code
+        assert ".with_annotations(" not in server_code
         assert '"readOnlyHint": False' in server_code or "'readOnlyHint': False" in server_code
         assert '"destructiveHint": True' in server_code or "'destructiveHint': True" in server_code
 
@@ -1651,8 +1652,8 @@ export = simple_tool
             assert 'transport="sse"' in server_content
             assert "mcp.run(" in server_content
 
-    def test_sse_transport_with_path_for_fastmcp_2_11(self, sample_project: Path, temp_dir: Path) -> None:
-        """Test that SSE transport includes path parameter for FastMCP 2.11.x."""
+    def test_sse_transport_ignores_obsolete_version_branch(self, sample_project: Path, temp_dir: Path) -> None:
+        """Pinned FastMCP code generation must not restore the legacy path argument."""
         with patch("fastmcp.__version__", "2.11.5"):
             # Update project config for SSE transport
             config_file = sample_project / "golf.json"
@@ -1690,8 +1691,8 @@ export = simple_tool
 
             server_content = server_file.read_text()
 
-            # Verify path parameter is included for FastMCP 2.11.x
-            assert 'path="/sse"' in server_content
+            # The pinned FastMCP 4.0.0 API is generated regardless of a patched ambient version.
+            assert 'path="/sse"' not in server_content
             assert 'transport="sse"' in server_content
             assert "mcp.run(" in server_content
 
@@ -1739,8 +1740,8 @@ export = simple_tool
             assert 'transport="streamable-http"' in server_content
             assert "mcp.run(" in server_content
 
-    def test_http_transport_with_path_for_fastmcp_2_11(self, sample_project: Path, temp_dir: Path) -> None:
-        """Test that HTTP transport includes path parameter for FastMCP 2.11.x."""
+    def test_http_transport_ignores_obsolete_version_branch(self, sample_project: Path, temp_dir: Path) -> None:
+        """Pinned FastMCP code generation must not restore the legacy path argument."""
         with patch("fastmcp.__version__", "2.11.5"):
             # Update project config for HTTP transport
             config_file = sample_project / "golf.json"
@@ -1778,8 +1779,8 @@ export = simple_tool
 
             server_content = server_file.read_text()
 
-            # Verify path parameter is included for FastMCP 2.11.x
-            assert 'path="/mcp/"' in server_content
+            # The pinned FastMCP 4.0.0 API is generated regardless of a patched ambient version.
+            assert 'path="/mcp/"' not in server_content
             assert 'transport="streamable-http"' in server_content
             assert "mcp.run(" in server_content
 
@@ -1841,21 +1842,21 @@ export = simple_tool
 
 class TestAutomaticRootFileDiscovery:
     """Test automatic discovery and inclusion of root-level Python files."""
-    
+
     def test_discover_root_files_finds_custom_files(self, sample_project: Path) -> None:
         """Test that discover_root_files finds custom Python files in project root."""
         # Create some custom root files
         (sample_project / "env.py").write_text("API_KEY = 'test'")
         (sample_project / "config.py").write_text("DEBUG = True")
         (sample_project / "utils.py").write_text("def helper(): pass")
-        
+
         discovered = discover_root_files(sample_project)
-        
+
         assert "env.py" in discovered
         assert "config.py" in discovered
         assert "utils.py" in discovered
         assert discovered["env.py"] == sample_project / "env.py"
-        
+
     def test_discover_root_files_excludes_reserved_files(self, sample_project: Path) -> None:
         """Test that reserved/special files are excluded from discovery."""
         # Create reserved files that should be excluded
@@ -1863,38 +1864,38 @@ class TestAutomaticRootFileDiscovery:
         (sample_project / "auth.py").write_text("# auth config")
         (sample_project / "server.py").write_text("# should not be included")
         (sample_project / "__init__.py").write_text("# package file")
-        
+
         # Create files that should be included
         (sample_project / "custom.py").write_text("# custom file")
-        
+
         discovered = discover_root_files(sample_project)
-        
+
         # Should exclude reserved files
         assert "startup.py" not in discovered
         assert "auth.py" not in discovered
         assert "server.py" not in discovered
         assert "__init__.py" not in discovered
-        
+
         # Should include custom files
         assert "custom.py" in discovered
-        
+
     def test_discover_root_files_excludes_hidden_and_temp_files(self, sample_project: Path) -> None:
         """Test that hidden and temporary files are excluded."""
         # Create files that should be excluded
         (sample_project / ".hidden.py").write_text("# hidden")
         (sample_project / "_private.py").write_text("# private")
         (sample_project / "backup.py~").write_text("# backup")
-        
+
         # Create file that should be included
         (sample_project / "visible.py").write_text("# visible")
-        
+
         discovered = discover_root_files(sample_project)
-        
+
         # Should exclude hidden/temp files
         assert ".hidden.py" not in discovered
         assert "_private.py" not in discovered
         assert "backup.py~" not in discovered
-        
+
         # Should include visible file
         assert "visible.py" in discovered
 
@@ -1903,12 +1904,12 @@ class TestAutomaticRootFileDiscovery:
         # Create custom root files
         (sample_project / "constants.py").write_text("API_URL = 'https://api.example.com'")
         (sample_project / "helpers.py").write_text("def format_date(): pass")
-        
-        # Build project  
+
+        # Build project
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
         build_project(sample_project, settings, output_dir)
-        
+
         # Verify files were automatically copied
         assert (output_dir / "constants.py").exists()
         assert (output_dir / "helpers.py").exists()
@@ -1919,12 +1920,12 @@ class TestAutomaticRootFileDiscovery:
         # Create root files
         (sample_project / "environment.py").write_text("ENV = 'production'")
         (sample_project / "settings.py").write_text("DEBUG = False")
-        
+
         # Generate server
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
-        
+
         # Verify imports in generated server.py
         server_content = (temp_dir / "server.py").read_text()
         assert "import environment" in server_content
@@ -1934,12 +1935,12 @@ class TestAutomaticRootFileDiscovery:
     def test_components_can_use_auto_discovered_root_files(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that components can import and use automatically discovered root files."""
         # Create root file with shared constants
-        (sample_project / "shared.py").write_text('''
+        (sample_project / "shared.py").write_text("""
 API_ENDPOINT = "https://api.service.com"
 TIMEOUT = 30
 VERSION = "1.0"
-''')
-        
+""")
+
         # Create component that uses the shared constants
         tool_code = '''"""Tool that uses shared constants."""
 import shared
@@ -1950,17 +1951,17 @@ def run():
 export = run
 '''
         (sample_project / "tools" / "api_tool.py").write_text(tool_code)
-        
+
         # Build project
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build_output"
         build_project(sample_project, settings, output_dir)
-        
+
         # Verify shared.py was copied
-        shared_file = output_dir / "shared.py"  
+        shared_file = output_dir / "shared.py"
         assert shared_file.exists()
         assert "API_ENDPOINT" in shared_file.read_text()
-        
+
         # Verify the import is in the server file
         server_content = (output_dir / "server.py").read_text()
         assert "import shared" in server_content
@@ -1968,8 +1969,10 @@ export = run
     def test_includes_any_readable_python_file(self, sample_project: Path) -> None:
         """Test that any readable Python file is included without syntax validation."""
         # Create file that would have syntax errors but is still a readable text file
-        (sample_project / "template.py").write_text("# This is a template file\nAPI_URL = {api_url}\nAPI_KEY = {api_key}")
-        
+        (sample_project / "template.py").write_text(
+            "# This is a template file\nAPI_URL = {api_url}\nAPI_KEY = {api_key}"
+        )
+
         # Should discover and include the file without validation
         discovered = discover_root_files(sample_project)
         assert "template.py" in discovered
@@ -1977,11 +1980,11 @@ export = run
     def test_root_file_imports_transformed_correctly(self, sample_project: Path, temp_dir: Path) -> None:
         """Test that imports from root files are correctly transformed in components."""
         # Create a root file
-        (sample_project / "config.py").write_text('''
+        (sample_project / "config.py").write_text("""
 API_URL = "https://api.example.com"
 TIMEOUT = 30
-''')
-        
+""")
+
         # Create a tool that imports from the root file using different import styles
         tool_code = '''"""Test tool with root file imports."""
 import config
@@ -1998,31 +2001,32 @@ def run() -> dict:
 export = run
 '''
         (sample_project / "tools" / "import_test.py").write_text(tool_code)
-        
+
         # Build the project
         settings = load_settings(sample_project)
         generator = CodeGenerator(sample_project, settings, temp_dir)
         generator.generate()
-        
+
         # Check the transformed component file
         component_file = temp_dir / "components" / "tools" / "import_test.py"
         assert component_file.exists()
-        
+
         component_content = component_file.read_text()
-        
+
         # The imports should be preserved as direct imports (not transformed to relative)
         assert "import config" in component_content  # Direct import preserved
         assert "from config import API_URL, TIMEOUT" in component_content  # From-import preserved
         assert "from ..." not in component_content  # No relative imports
-        
+
         # Validate the generated code is syntactically correct
         import ast
+
         ast.parse(component_content)  # Should not raise SyntaxError
 
 
 class TestFunctionDocstringBuilderIntegration:
     """Test builder integration with function docstring extraction."""
-    
+
     def test_builder_uses_function_docstring_in_tool_manifest(self, sample_project: Path) -> None:
         """Test that builder includes function docstrings in tool manifest."""
         # Create tool with function docstring taking priority
@@ -2040,17 +2044,17 @@ def test_action() -> Output:
 
 export = test_action
 ''')
-        
+
         settings = load_settings(sample_project)
         manifest = build_manifest(sample_project, settings)
-        
+
         assert len(manifest["tools"]) == 1
         tool = manifest["tools"][0]
-        
+
         # Verify function docstring is used, not module docstring
         assert tool["description"] == "Execute test action with detailed function description."
         assert tool["name"] == "function_doc_tool"
-    
+
     def test_builder_uses_module_docstring_fallback(self, sample_project: Path) -> None:
         """Test that builder falls back to module docstring when function docstring missing."""
         tool_file = sample_project / "tools" / "module_fallback_tool.py"
@@ -2067,16 +2071,16 @@ def test_action() -> Output:
 
 export = test_action
 ''')
-        
+
         settings = load_settings(sample_project)
         manifest = build_manifest(sample_project, settings)
-        
+
         assert len(manifest["tools"]) == 1
         tool = manifest["tools"][0]
-        
+
         # Verify module docstring is used as fallback
         assert tool["description"] == "Module docstring used as fallback."
-        
+
     def test_builder_uses_function_docstring_for_resource(self, sample_project: Path) -> None:
         """Test that builder uses function docstring for resources."""
         resource_file = sample_project / "resources" / "function_doc_resource.py"
@@ -2090,17 +2094,17 @@ def get_resource(id: str) -> dict:
 
 export = get_resource
 ''')
-        
+
         settings = load_settings(sample_project)
         manifest = build_manifest(sample_project, settings)
-        
+
         assert len(manifest["resources"]) == 1
         resource = manifest["resources"][0]
-        
+
         # Verify function docstring is used for resource
         assert resource["description"] == "Get resource with detailed function description."
         assert resource["name"] == "function_doc_resource"
-        
+
     def test_builder_uses_function_docstring_for_prompt(self, sample_project: Path) -> None:
         """Test that builder uses function docstring for prompts."""
         prompt_file = sample_project / "prompts" / "function_doc_prompt.py"
@@ -2115,13 +2119,13 @@ def generate_prompt(name: str) -> list:
 
 export = generate_prompt
 ''')
-        
+
         settings = load_settings(sample_project)
         manifest = build_manifest(sample_project, settings)
-        
+
         assert len(manifest["prompts"]) == 1
         prompt = manifest["prompts"][0]
-        
+
         # Verify function docstring is used for prompt
         assert prompt["description"] == "Generate greeting prompt with detailed function description."
         assert prompt["name"] == "function_doc_prompt"
@@ -2134,7 +2138,7 @@ class TestAbsoluteImportsIntegration:
         """Test complete build process with absolute imports for root files."""
         # Create root file
         (sample_project / "testfile.py").write_text('API_KEY = "test-key"')
-        
+
         # Create nested component that imports root file
         nested_dir = sample_project / "tools" / "api" / "v1"
         nested_dir.mkdir(parents=True)
@@ -2153,16 +2157,16 @@ def handle() -> Output:
 
 export = handle
 ''')
-        
+
         # Build project
         builder = CodeGenerator(sample_project, load_settings(sample_project), temp_dir)
         builder.generate()
-        
+
         # Verify server.py has sys.path setup
         server_file = temp_dir / "server.py"
         server_content = server_file.read_text()
         assert "sys.path.insert(0, _build_root)" in server_content
-        
+
         # Verify component uses direct imports (not transformed)
         component_file = temp_dir / "components" / "tools" / "api" / "v1" / "handler.py"
         component_content = component_file.read_text()
@@ -2176,14 +2180,14 @@ class TestMiddlewareBuildIntegration:
 
     def test_middleware_copied_and_imported(self, sample_project: Path, temp_dir: Path):
         """Test middleware.py is copied to build dir and imported."""
-        middleware_content = '''
+        middleware_content = """
 from fastmcp.server.middleware import Middleware
 
 class BuildTestMiddleware(Middleware):
     async def on_call_tool(self, context, call_next):
         return await call_next(context)
-'''
-        
+"""
+
         middleware_file = sample_project / "middleware.py"
         middleware_file.write_text(middleware_content)
 
@@ -2207,27 +2211,27 @@ class BuildTestMiddleware(Middleware):
         """Test middleware works alongside auth.py."""
         # Create auth.py
         auth_file = sample_project / "auth.py"
-        auth_file.write_text('''
+        auth_file.write_text("""
 from golf.auth import configure_api_key
 configure_api_key()
-''')
+""")
 
         # Create middleware.py
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from golf.middleware import Middleware
 
 class AuthTestMiddleware(Middleware):
     async def on_message(self, context, call_next):
         return await call_next(context)
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
         build_project(sample_project, settings, output_dir)
 
         server_content = (output_dir / "server.py").read_text()
-        
+
         # Both auth and middleware should be present
         assert "# Configure authentication" in server_content or "ApiKeyMiddleware" in server_content
         assert "from middleware import AuthTestMiddleware" in server_content
@@ -2236,12 +2240,12 @@ class AuthTestMiddleware(Middleware):
     def test_multiple_middleware_classes_integration(self, sample_project: Path, temp_dir: Path):
         """Test integration with multiple middleware classes."""
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from golf.middleware import Middleware
 
 class LoggingMiddleware(Middleware):
     async def on_call_tool(self, context, call_next):
-        print(f"Tool called: {context.message.params.name}")
+        print(f"Tool called: {context.message.name}")
         return await call_next(context)
 
 class TimingMiddleware(Middleware):
@@ -2251,14 +2255,14 @@ class TimingMiddleware(Middleware):
         result = await call_next(context)
         print(f"Request took: {time.time() - start:.2f}s")
         return result
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
         build_project(sample_project, settings, output_dir)
 
         server_content = (output_dir / "server.py").read_text()
-        
+
         # Verify both middleware classes are imported and registered
         assert "from middleware import LoggingMiddleware, TimingMiddleware" in server_content
         assert "mcp.add_middleware(LoggingMiddleware())" in server_content
@@ -2273,7 +2277,7 @@ class TimingMiddleware(Middleware):
         # Build should succeed
         server_file = output_dir / "server.py"
         assert server_file.exists()
-        
+
         # Should not contain middleware code
         server_content = server_file.read_text()
         assert "from middleware import" not in server_content
@@ -2282,21 +2286,21 @@ class TimingMiddleware(Middleware):
     def test_build_with_broken_middleware_file(self, sample_project: Path, temp_dir: Path):
         """Test build succeeds gracefully with broken middleware.py."""
         middleware_file = sample_project / "middleware.py"
-        middleware_file.write_text('''
+        middleware_file.write_text("""
 from nonexistent_module import SomeClass
 syntax error here!
-''')
+""")
 
         settings = load_settings(sample_project)
         output_dir = temp_dir / "build"
-        
+
         # Build should succeed despite broken middleware.py
         build_project(sample_project, settings, output_dir)
 
         # Server file should be created
         server_file = output_dir / "server.py"
         assert server_file.exists()
-        
+
         # Should not contain middleware code due to error
         server_content = server_file.read_text()
         assert "from middleware import" not in server_content

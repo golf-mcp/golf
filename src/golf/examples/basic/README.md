@@ -6,6 +6,11 @@ This is a basic template for creating MCP servers with Golf. It includes develop
 
 Golf is a Python framework for building MCP (Model Context Protocol) servers with minimal boilerplate. Define your server's capabilities as simple Python files, and Golf automatically discovers and compiles them into a runnable FastMCP server.
 
+The generated server targets FastMCP 4.0.0 and MCP 2026-07-28, with legacy
+clients supported by FastMCP's negotiation compatibility. Modern elicitation
+and sampling are explicit multi-round-trip control flow: when a utility returns
+`InputRequiredResult`, the containing tool must return it unchanged.
+
 ## Getting Started
 
 After initializing your project:
@@ -46,6 +51,7 @@ async def add(a: int, b: int) -> int:
     """Add two numbers together."""
     return a + b
 
+
 export = add
 ```
 
@@ -56,9 +62,11 @@ Create `.py` files in `resources/` directory with a `resource_uri` and export fu
 # resources/status.py
 resource_uri = "status://server"
 
+
 async def status() -> dict:
     """Get server status information."""
     return {"status": "running", "timestamp": "2024-01-01T00:00:00Z"}
+
 
 export = status
 ```
@@ -69,13 +77,9 @@ Create `.py` files in `prompts/` directory that return message lists:
 ```python
 # prompts/assistant.py
 async def assistant() -> list[dict]:
-    """System prompt for a helpful assistant."""
-    return [
-        {
-            "role": "system", 
-            "content": "You are a helpful assistant for {{project_name}}."
-        }
-    ]
+    """Prompt for a helpful assistant."""
+    return [{"role": "assistant", "content": "You are a helpful assistant for {{project_name}}."}]
+
 
 export = assistant
 ```
@@ -86,15 +90,15 @@ export = assistant
 Leave `auth.py` empty or remove it entirely.
 
 ### API Key Authentication
+This is an explicitly non-MCP custom API-key mode. If the key is also used
+with an upstream API, it must have been issued for that upstream API. Never
+forward an MCP JWT/OAuth resource token to another service.
+
 ```python
 # auth.py
 from golf.auth import configure_api_key
 
-configure_api_key(
-    header_name="Authorization",
-    header_prefix="Bearer ",
-    required=True
-)
+configure_api_key(header_name="Authorization", header_prefix="Bearer ", required=True)
 ```
 
 ### JWT Authentication  
@@ -105,23 +109,16 @@ from golf.auth import configure_jwt_auth
 configure_jwt_auth(
     jwks_uri="https://your-domain.auth0.com/.well-known/jwks.json",
     issuer="https://your-domain.auth0.com/",
-    audience="https://your-api.example.com"
+    audience="https://your-api.example.com",
 )
 ```
 
 ### Development Tokens
 ```python
-# auth.py  
+# auth.py
 from golf.auth import configure_dev_auth
 
-configure_dev_auth(
-    tokens={
-        "dev-token-123": {
-            "client_id": "dev-client",
-            "scopes": ["read", "write"]
-        }
-    }
-)
+configure_dev_auth(tokens={"dev-token-123": {"client_id": "dev-client", "scopes": ["read", "write"]}})
 ```
 
 ## Documentation

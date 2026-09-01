@@ -1,6 +1,7 @@
 """Helper functions for working with authentication in MCP context."""
 
 from contextvars import ContextVar
+from dataclasses import dataclass
 
 
 # Context variable to store the current request's API key
@@ -8,7 +9,10 @@ _current_api_key: ContextVar[str | None] = ContextVar("current_api_key", default
 
 
 def extract_token_from_header(auth_header: str) -> str | None:
-    """Extract bearer token from Authorization header.
+    """Extract a bearer value for custom API-key authentication only.
+
+    Do not use this helper to forward an MCP resource token to another API.
+    MCP tokens are audience-bound credentials for this resource server.
 
     Args:
         auth_header: Authorization header value
@@ -38,10 +42,11 @@ def set_api_key(api_key: str | None) -> None:
 
 
 def get_api_key() -> str | None:
-    """Get the API key from the current request context.
+    """Get a caller-provided key in explicit custom API-key mode.
 
-    This function should be used in tools to retrieve the API key
-    that was sent in the request headers.
+    This helper does not expose credentials verified by FastMCP JWT/OAuth
+    authentication. A custom API key may be used upstream only when that key
+    was explicitly issued for the upstream API.
 
     Returns:
         The API key if available, None otherwise
@@ -109,67 +114,36 @@ def get_api_key() -> str | None:
     return None
 
 
-def get_auth_token() -> str | None:
-    """Get the authorization token from the current request context.
+@dataclass(frozen=True)
+class CallerAuth:
+    """Non-secret identity metadata from a verified MCP access token."""
 
-    This function should be used in tools to retrieve the authorization token
-    (typically a JWT or OAuth token) that was sent in the request headers.
+    client_id: str
+    scopes: tuple[str, ...]
+    subject: str | None
+    resource: str | None
 
-    Unlike get_api_key(), this function extracts the raw token from the Authorization
-    header without stripping any prefix, making it suitable for passing through
-    to upstream APIs that expect the full Authorization header value.
 
-    Returns:
-        The authorization token if available, None otherwise
+def get_caller_auth() -> CallerAuth | None:
+    """Inspect verified caller identity without exposing the bearer token.
 
-    Example:
-        # In a tool file
-        from golf.auth import get_auth_token
-
-        async def call_upstream_api():
-            auth_token = get_auth_token()
-            if not auth_token:
-                return {"error": "No authorization token provided"}
-
-            # Use the full token in upstream request
-            headers = {"Authorization": f"Bearer {auth_token}"}
-            async with httpx.AsyncClient() as client:
-                response = await client.get("https://api.example.com/data", headers=headers)
-            ...
+    The inbound MCP resource token is intentionally omitted and must never be
+    forwarded to an upstream API. Use a separately configured upstream
+    credential or an OAuth token-exchange/delegation flow instead.
     """
-    # Try to get directly from HTTP request if available (FastMCP pattern)
     try:
-        # This follows the FastMCP pattern for accessing HTTP requests
-        from fastmcp.server.dependencies import get_http_request
+        from fastmcp.server.dependencies import get_access_token
 
-        request = get_http_request()
-
-        if request and hasattr(request, "state") and hasattr(request.state, "auth_token"):
-            return request.state.auth_token
-
-        if request:
-            # Extract authorization token from Authorization header
-            auth_header = None
-            for k, v in request.headers.items():
-                if k.lower() == "authorization":
-                    auth_header = v
-                    break
-
-            if auth_header:
-                # Extract the token part (everything after "Bearer ")
-                token = extract_token_from_header(auth_header)
-                if token:
-                    return token
-
-                # If not Bearer format, return the whole header value minus "Bearer " prefix if present
-                if auth_header.lower().startswith("bearer "):
-                    return auth_header[7:]  # Remove "Bearer " prefix
-                return auth_header
-
+        access_token = get_access_token()
     except (ImportError, RuntimeError):
-        # FastMCP not available or not in HTTP context
-        pass
-    except Exception:
-        pass
+        return None
 
-    return None
+    if access_token is None:
+        return None
+
+    return CallerAuth(
+        client_id=access_token.client_id,
+        scopes=tuple(access_token.scopes),
+        subject=access_token.subject,
+        resource=access_token.resource,
+    )

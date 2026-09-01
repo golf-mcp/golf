@@ -35,7 +35,7 @@ def get_current_context() -> "Context":
         ```
     """
     try:
-        # Use FastMCP's public context API (2.14+)
+        # Use FastMCP's public context API
         from fastmcp.server.dependencies import get_context
 
         # Get the current context using public API
@@ -50,4 +50,4 @@ def get_current_context() -> "Context":
         return context
 
     except ImportError as e:
-        raise ImportError("FastMCP is not available. Please ensure fastmcp>=2.14.0 is installed.") from e
+        raise ImportError("FastMCP is not available. Please ensure fastmcp==4.0.0 is installed.") from e

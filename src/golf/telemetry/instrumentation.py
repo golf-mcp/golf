@@ -1229,9 +1229,9 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
     This middleware wraps tool calls, resource reads, and prompt gets with
     proper OpenTelemetry spans that are correctly parented to the current context.
 
-    Supports FastMCP 2.14+ hooks including:
-    - on_initialize: Session initialization tracing
-    - on_message: Request-level tracing
+    Supports FastMCP 4 hooks including:
+    - on_initialize: legacy handshake tracing only
+    - on_message: modern and legacy request/notification tracing
     - on_call_tool: Tool execution tracing
     - on_read_resource: Resource read tracing
     - on_get_prompt: Prompt generation tracing
@@ -1242,7 +1242,11 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
         context: MiddlewareContext[Any],
         call_next: CallNext[Any, Any],
     ) -> Any:
-        """Trace MCP session initialization (FastMCP 2.13+)."""
+        """Trace the legacy initialize handshake.
+
+        MCP 2026-07-28 uses discovery and is intrinsically sessionless, so
+        modern request accounting belongs in ``on_message``.
+        """
         global _provider
         if _provider is None:
             return await call_next(context)
@@ -1256,8 +1260,8 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
             # Extract client info from initialize message if available
             if hasattr(context.message, "params"):
                 params = context.message.params
-                if hasattr(params, "clientInfo"):
-                    client_info = params.clientInfo
+                if hasattr(params, "client_info"):
+                    client_info = params.client_info
                     if hasattr(client_info, "name"):
                         span.set_attribute("mcp.client.name", client_info.name)
                     if hasattr(client_info, "version"):
@@ -1426,7 +1430,7 @@ class OpenTelemetryMiddleware(FastMCPMiddleware):
             return await call_next(context)
 
         tracer = get_tracer()
-        method = context.method or "unknown"
+        method = context.method if isinstance(context.method, str) else "unknown"
 
         # Try to get the HTTP span context that was stored by our ASGI middleware
         parent_context = _http_span_context.get()
