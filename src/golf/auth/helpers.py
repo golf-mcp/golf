@@ -9,7 +9,7 @@ _current_api_key: ContextVar[str | None] = ContextVar("current_api_key", default
 
 
 def extract_token_from_header(auth_header: str) -> str | None:
-    """Extract a bearer value for custom API-key authentication only.
+    """Extract a bearer value for custom API-key forwarding only.
 
     Do not use this helper to forward an MCP resource token to another API.
     MCP tokens are audience-bound credentials for this resource server.
@@ -42,11 +42,13 @@ def set_api_key(api_key: str | None) -> None:
 
 
 def get_api_key() -> str | None:
-    """Get a caller-provided key in explicit custom API-key mode.
+    """Get a caller-provided key for forwarding to an upstream API.
 
-    This helper does not expose credentials verified by FastMCP JWT/OAuth
-    authentication. A custom API key may be used upstream only when that key
-    was explicitly issued for the upstream API.
+    This helper does not authenticate the MCP client and does not expose
+    credentials verified by FastMCP JWT/OAuth authentication. The returned
+    value is whatever the caller sent; the upstream API is responsible for
+    validating it. Use it only when that key was explicitly issued for the
+    upstream API.
 
     Returns:
         The API key if available, None otherwise
@@ -64,54 +66,26 @@ def get_api_key() -> str | None:
             headers = {"Authorization": f"Bearer {api_key}"}
             ...
     """
-    # Try to get directly from HTTP request if available (FastMCP pattern)
     try:
-        # This follows the FastMCP pattern for accessing HTTP requests
         from fastmcp.server.dependencies import get_http_request
+        from golf.auth.api_key import extract_api_key_from_headers, get_api_key_config
 
         request = get_http_request()
 
         if request and hasattr(request, "state") and hasattr(request.state, "api_key"):
-            api_key = request.state.api_key
-            return api_key
-
-        # Get the API key configuration
-        from golf.auth.api_key import get_api_key_config
+            return request.state.api_key
 
         api_key_config = get_api_key_config()
-
         if api_key_config and request:
-            # Extract API key from headers
-            header_name = api_key_config.header_name
-            header_prefix = api_key_config.header_prefix
-
-            # Case-insensitive header lookup
-            api_key = None
-            for k, v in request.headers.items():
-                if k.lower() == header_name.lower():
-                    api_key = v
-                    break
-
-            # Strip prefix if configured
-            if api_key and header_prefix and api_key.startswith(header_prefix):
-                api_key = api_key[len(header_prefix) :]
-
-            if api_key:
-                return api_key
+            return extract_api_key_from_headers(request.headers, api_key_config)
     except (ImportError, RuntimeError):
-        # FastMCP not available or not in HTTP context
         pass
     except Exception:
         pass
 
-    # Final fallback: environment variable (for development/testing)
     import os
 
-    env_api_key = os.environ.get("API_KEY")
-    if env_api_key:
-        return env_api_key
-
-    return None
+    return os.environ.get("API_KEY")
 
 
 @dataclass(frozen=True)

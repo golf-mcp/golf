@@ -151,14 +151,9 @@ configure_dev_auth(
 )
 ```
 
-### API Key Authentication
-```python
-# In auth.py  
-from golf.auth import configure_api_key
-
-configure_api_key(
-    header_name="Authorization",
-    header_prefix="Bearer ",
-    required=True,
-)
-```
+### API Key header extraction (deprecated)
+`configure_api_key()` is not MCP authentication. It only extracts a
+caller-provided header for `get_api_key()` so tools can forward that
+credential to an upstream API, which validates it. Golf does not check
+the key value. Use JWT, OAuth, or development tokens to authenticate
+MCP clients. This helper will be removed in a future release.

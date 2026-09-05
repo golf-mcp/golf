@@ -34,7 +34,13 @@ from .registry import (
 )
 
 # Re-export for backward compatibility
-from .api_key import configure_api_key, get_api_key_config, is_api_key_configured
+from .api_key import (
+    ApiKeyMiddleware,
+    configure_api_key,
+    get_api_key_config,
+    is_api_key_configured,
+    reset_api_key_config,
+)
 from .helpers import (
     CallerAuth,
     extract_token_from_header,
@@ -51,6 +57,7 @@ __all__ = [
     "configure_dev_auth",
     "configure_oauth_proxy",
     "get_auth_config",
+    "reset_auth_config",
     # Provider configurations
     "AuthConfig",
     "JWTAuthConfig",
@@ -73,9 +80,11 @@ __all__ = [
     "register_provider_factory",
     "register_provider_plugin",
     # API key functions (backward compatibility)
+    "ApiKeyMiddleware",
     "configure_api_key",
     "get_api_key_config",
     "is_api_key_configured",
+    "reset_api_key_config",
     # Helper functions
     "CallerAuth",
     "extract_token_from_header",
@@ -355,6 +364,16 @@ def is_auth_configured() -> bool:
         True if authentication is configured, False otherwise
     """
     return _auth_config is not None
+
+
+def reset_auth_config() -> None:
+    """Clear process-global FastMCP auth configuration.
+
+    The builder calls this before loading a project's auth.py so one project
+    cannot inherit another project's provider settings.
+    """
+    global _auth_config
+    _auth_config = None
 
 
 # Breaking change in Golf 0.2.x: Legacy auth system removed

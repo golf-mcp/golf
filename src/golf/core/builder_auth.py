@@ -130,94 +130,35 @@ def generate_api_key_auth_components(
     opentelemetry_enabled: bool = False,
     transport: str = "streamable-http",
 ) -> dict:
-    """Generate authentication components for API key authentication.
+    """Generate deprecated API-key header extraction components.
 
-    Returns a dictionary with:
-        - imports: List of import statements
-        - setup_code: Auth setup code (middleware setup)
-        - fastmcp_args: Dict of arguments to add to FastMCP constructor
-        - has_auth: Whether auth is configured
+    This is not MCP authentication. The middleware extracts a caller-provided
+    header for tools to forward upstream; Golf does not verify the value.
     """
     api_key_config = get_api_key_config()
     if not api_key_config:
         return {"imports": [], "setup_code": [], "fastmcp_args": {}, "has_auth": False}
 
     auth_imports = [
-        "# API key authentication setup",
-        "from golf.auth.api_key import get_api_key_config, configure_api_key",
-        "from golf.auth import set_api_key",
-        "from starlette.middleware.base import BaseHTTPMiddleware",
-        "from starlette.requests import Request",
-        "from starlette.responses import JSONResponse",
-        "import os",
+        "# Deprecated: API key header extraction (not MCP authentication)",
+        "from golf.auth.api_key import ApiKeyMiddleware, configure_api_key",
     ]
 
     setup_code_lines = [
-        "# Recreate API key configuration from auth.py",
+        "# Recreate API key header extraction from auth.py.",
+        "# Golf does not validate the key value; the upstream API does.",
         "configure_api_key(",
         f"    header_name={repr(api_key_config.header_name)},",
         f"    header_prefix={repr(api_key_config.header_prefix)},",
-        f"    required={repr(api_key_config.required)}",
+        f"    required={repr(api_key_config.required)},",
         ")",
         "",
-        "# Simplified API key middleware that validates presence",
-        "class ApiKeyMiddleware(BaseHTTPMiddleware):",
-        "    async def dispatch(self, request: Request, call_next):",
-        "        # Debug mode from environment",
-        "        debug = os.environ.get('API_KEY_DEBUG', '').lower() == 'true'",
-        "        ",
-        "        # Skip auth for monitoring endpoints",
-        "        path = request.url.path",
-        "        if path in ['/metrics', '/health']:",
-        "            return await call_next(request)",
-        "        ",
-        "        api_key_config = get_api_key_config()",
-        "        ",
-        "        if api_key_config:",
-        "            # Extract API key from the configured header",
-        "            header_name = api_key_config.header_name",
-        "            header_prefix = api_key_config.header_prefix",
-        "            ",
-        "            # Case-insensitive header lookup",
-        "            api_key = None",
-        "            for k, v in request.headers.items():",
-        "                if k.lower() == header_name.lower():",
-        "                    api_key = v",
-        "                    break",
-        "            ",
-        "            # Process the API key if found",
-        "            if api_key:",
-        "                # Strip prefix if configured",
-        "                if header_prefix and api_key.startswith(header_prefix):",
-        "                    api_key = api_key[len(header_prefix):]",
-        "                ",
-        "                # Store the API key in request state for tools to access",
-        "                request.state.api_key = api_key",
-        "                ",
-        "                # Also store in context variable for tools",
-        "                set_api_key(api_key)",
-        "            ",
-        "            # Check if API key is required but missing",
-        "            if api_key_config.required and not api_key:",
-        "                return JSONResponse(",
-        "                    {'error': 'unauthorized', "
-        "'detail': f'Missing required {header_name} header'},"
-        "                    status_code=401,",
-        "                    headers={'WWW-Authenticate': f'{header_name} realm=\"MCP Server\"'}",
-        "                )",
-        "        ",
-        "        # Continue with the request",
-        "        return await call_next(request)",
-        "",
     ]
-
-    # API key auth is handled via middleware, not FastMCP constructor args
-    fastmcp_args = {}
 
     return {
         "imports": auth_imports,
         "setup_code": setup_code_lines,
-        "fastmcp_args": fastmcp_args,
+        "fastmcp_args": {},
         "has_auth": True,
     }
 
