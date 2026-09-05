@@ -21,7 +21,7 @@ After initializing your project:
    ```
 
 2. **Configure authentication (optional):**
-   This template includes development authentication in `auth.py` with sample tokens. Edit the file to set up JWT, OAuth, or API key authentication for production use.
+   This template includes development authentication in `auth.py` with sample tokens. Edit the file to set up JWT or OAuth authentication for production use.
 
 3. **Build and run your server:**
    ```bash
@@ -89,13 +89,15 @@ export = assistant
 ### No Authentication (Default)
 Leave `auth.py` empty or remove it entirely.
 
-### API Key Authentication
-This is an explicitly non-MCP custom API-key mode. If the key is also used
-with an upstream API, it must have been issued for that upstream API. Never
-forward an MCP JWT/OAuth resource token to another service.
+### API Key header extraction (deprecated)
+This helper is not MCP authentication. It extracts a caller-provided
+header so tools can forward that credential to an upstream API, which
+is responsible for validating it. Golf never checks the key value.
+Use JWT or OAuth to authenticate MCP clients. This helper will be
+removed in a future release.
 
 ```python
-# auth.py
+# auth.py — prefer configure_jwt_auth() / configure_dev_auth() instead
 from golf.auth import configure_api_key
 
 configure_api_key(header_name="Authorization", header_prefix="Bearer ", required=True)

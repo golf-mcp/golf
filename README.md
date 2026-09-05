@@ -33,7 +33,7 @@ Golf is a **framework** designed to streamline the creation of MCP server applic
 Golf targets FastMCP 4.0.0 and the current MCP 2026-07-28 protocol.
 FastMCP also negotiates legacy MCP clients through its compatibility mode.
 
-With Golf v0.2.0, you get **enterprise-grade authentication** (JWT, OAuth Server, API key, development tokens), **built-in utilities** for LLM interactions, and **automatic telemetry** integration. Focus on implementing your agent's logic while Golf handles authentication, monitoring, and server infrastructure.
+With Golf v0.2.0, you get **enterprise-grade authentication** (JWT, OAuth Server, development tokens), **built-in utilities** for LLM interactions, and **automatic telemetry** integration. Focus on implementing your agent's logic while Golf handles authentication, monitoring, and server infrastructure.
 
 ## Quick Start
 

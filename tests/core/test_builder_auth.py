@@ -1,13 +1,22 @@
 """Release A authentication code-generation integration tests."""
 
+from collections.abc import Generator
 from unittest.mock import patch
 
 import pytest
 from fastmcp import FastMCP
 
+from golf.auth.api_key import configure_api_key, reset_api_key_config
 from golf.auth.factory import _create_remote_provider
 from golf.auth.providers import JWTAuthConfig, RemoteAuthConfig, StaticTokenConfig
 from golf.core.builder_auth import generate_auth_code, generate_auth_routes
+
+
+@pytest.fixture(autouse=True)
+def _reset_api_key_state() -> Generator[None, None, None]:
+    reset_api_key_config()
+    yield
+    reset_api_key_config()
 
 
 def test_generated_configured_auth_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -46,3 +55,19 @@ def test_fastmcp_registers_auth_routes_once() -> None:
 
     assert protected_resource_routes == ["/.well-known/oauth-protected-resource/mcp"]
     assert generate_auth_routes() == ""
+
+
+def test_generated_api_key_code_is_extraction_not_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Generated API-key servers extract a header for upstream forwarding, not local auth."""
+    configure_api_key()
+    monkeypatch.setattr("golf.core.builder_auth.get_auth_config", lambda: None)
+
+    components = generate_auth_code("test")
+    generated = "\n".join([*components["imports"], *components["setup_code"]])
+
+    assert components["has_auth"] is True
+    assert "ApiKeyMiddleware" in generated
+    assert "not MCP authentication" in generated
+    assert "does not validate the key value" in generated
+    assert "resolve_valid_keys" not in generated
+    assert "keys_env_var" not in generated
