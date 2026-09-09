@@ -196,6 +196,59 @@ export = delete_file
         assert component.annotations["idempotentHint"] is False
         assert component.annotations["openWorldHint"] is False
 
+    def test_parses_typed_annotations_assignment(self, sample_project: Path) -> None:
+        """Typed `annotations: dict = {...}` must not be silently dropped."""
+        tool_file = sample_project / "tools" / "typed_annotations.py"
+        tool_file.write_text(
+            '''"""Typed annotations tool."""
+
+from typing import Any
+
+annotations: dict[str, Any] = {
+    "readOnlyHint": True,
+    "idempotentHint": True,
+}
+
+
+async def run() -> str:
+    """Read data."""
+    return "ok"
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        assert components[0].annotations == {"readOnlyHint": True, "idempotentHint": True}
+
+    def test_parses_dict_constructor_annotations(self, sample_project: Path) -> None:
+        """`annotations = dict(readOnlyHint=True)` should be parsed."""
+        tool_file = sample_project / "tools" / "dict_ctor_annotations.py"
+        tool_file.write_text(
+            '''"""Dict constructor annotations tool."""
+
+annotations = dict(readOnlyHint=True, destructiveHint=False)
+
+
+async def run() -> str:
+    """Read data."""
+    return "ok"
+
+
+export = run
+'''
+        )
+
+        parser = AstParser(sample_project)
+        components = parser.parse_file(tool_file)
+
+        assert len(components) == 1
+        assert components[0].annotations == {"readOnlyHint": True, "destructiveHint": False}
+
     def test_parses_tool_with_readonly_annotations(self, sample_project: Path) -> None:
         """Test parsing a tool with read-only annotations."""
         tool_file = sample_project / "tools" / "read_file.py"

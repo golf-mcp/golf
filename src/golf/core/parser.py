@@ -10,6 +10,7 @@ from typing import Any
 from rich.console import Console
 
 console = Console()
+_UNSET = object()
 
 
 class ComponentType(str, Enum):
@@ -629,13 +630,8 @@ class AstParser:
                     input_class = node
                 elif node.name == "Output":
                     output_class = node
-            # Look for annotations assignment
-            elif isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == "annotations":
-                        if isinstance(node.value, ast.Dict):
-                            annotations = self._extract_dict_from_ast(node.value)
-                        break
+            elif extracted := self._extract_annotations_assignment(node, component.name):
+                annotations = extracted
 
         # Process Input class if found
         if input_class:
@@ -886,6 +882,73 @@ class AstParser:
             return "object"
         else:
             return "string"
+
+    def _extract_annotations_assignment(self, node: ast.AST, component_name: str) -> dict[str, Any] | None:
+        """Extract a module-level `annotations` dict from an assignment node.
+
+        Accepts `annotations = {...}` and typed forms such as
+        `annotations: dict = {...}`, plus `dict(...)` constructors. Returns
+        None when this node is not an annotations assignment.
+        """
+        value = self._annotations_value_node(node)
+        if value is None:
+            return None
+
+        extracted = self._extract_mapping_from_ast(value)
+        if extracted is None:
+            console.print(
+                f"[yellow]Warning: Could not parse `annotations` in tool "
+                f"'{component_name}'; expected a dict literal "
+                f"(e.g. annotations = {{'readOnlyHint': True}}).[/yellow]"
+            )
+            return None
+        return extracted
+
+    def _annotations_value_node(self, node: ast.AST) -> ast.expr | None:
+        """Return the RHS of a module-level `annotations` assignment, if any."""
+        if isinstance(node, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == "annotations" for target in node.targets):
+                return node.value
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "annotations"
+        ):
+            return node.value
+        return None
+
+    def _extract_mapping_from_ast(self, value: ast.expr) -> dict[str, Any] | None:
+        """Extract a literal mapping from a dict display or `dict(...)` call."""
+        if isinstance(value, ast.Dict):
+            return self._extract_dict_from_ast(value)
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and value.func.id == "dict"
+            and not value.args
+        ):
+            result: dict[str, Any] = {}
+            for keyword in value.keywords:
+                if keyword.arg is None:
+                    if isinstance(keyword.value, ast.Dict):
+                        result.update(self._extract_dict_from_ast(keyword.value))
+                    else:
+                        return None
+                    continue
+                extracted = self._literal_from_ast(keyword.value)
+                if extracted is _UNSET:
+                    return None
+                result[keyword.arg] = extracted
+            return result
+        return None
+
+    def _literal_from_ast(self, value: ast.expr) -> Any:
+        """Extract a simple literal from an AST expression, or `_UNSET`."""
+        if isinstance(value, ast.Constant):
+            return value.value
+        if isinstance(value, ast.Name) and value.id in ("True", "False", "None"):
+            return {"True": True, "False": False, "None": None}[value.id]
+        return _UNSET
 
     def _extract_dict_from_ast(self, dict_node: ast.Dict) -> dict[str, Any]:
         """Extract a dictionary from an AST Dict node.
