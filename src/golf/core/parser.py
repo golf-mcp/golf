@@ -909,11 +909,7 @@ class AstParser:
         if isinstance(node, ast.Assign):
             if any(isinstance(target, ast.Name) and target.id == "annotations" for target in node.targets):
                 return node.value
-        elif (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == "annotations"
-        ):
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "annotations":
             return node.value
         return None
 
