@@ -1245,6 +1245,30 @@ class CodeGenerator:
         server_code_lines.append(mcp_instance_line)
         server_code_lines.append("")
 
+        # FastMCP validates initialize params before negotiating the connection.
+        # Preserve compatibility with legacy clients that omit protocolVersion.
+        server_code_lines.extend(
+            [
+                "# Default the MCP handshake for clients that omit protocolVersion",
+                "from mcp_types.version import LATEST_HANDSHAKE_VERSION",
+                "",
+                "class _LegacyInitializeProtocolVersion:",
+                "    async def __call__(self, ctx, call_next):",
+                "        params = ctx.params",
+                "        if (",
+                '            ctx.method == "initialize"',
+                "            and isinstance(params, dict)",
+                '            and "protocolVersion" not in params',
+                "        ):",
+                '            params["protocolVersion"] = LATEST_HANDSHAKE_VERSION',
+                "        return await call_next(ctx)",
+                "",
+                "",
+                "mcp._mcp_server.middleware.insert(0, _LegacyInitializeProtocolVersion())",
+                "",
+            ]
+        )
+
         # Add early telemetry initialization if enabled (before component registration)
         early_telemetry_init = []
         if self.settings.opentelemetry_enabled:

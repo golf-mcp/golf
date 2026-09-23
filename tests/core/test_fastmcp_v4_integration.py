@@ -2,7 +2,11 @@
 
 import importlib.util
 import json
+import os
+import queue
+import subprocess
 import sys
+import threading
 from pathlib import Path
 from types import ModuleType
 
@@ -90,6 +94,79 @@ def _load_server(build_dir: Path, module_name: str) -> ModuleType:
     finally:
         sys.path.remove(str(build_dir))
     return module
+
+
+def _run_stdio_initialize(server_path: Path, params: dict[str, object]) -> dict[str, object]:
+    """Send one initialize request to a generated stdio server and read its response."""
+    env = os.environ.copy()
+    env["GOLF_TELEMETRY"] = "0"
+    env["PYTHONIOENCODING"] = "utf-8"
+    process = subprocess.Popen(
+        [sys.executable, str(server_path)],
+        cwd=server_path.parent,
+        env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )
+    assert process.stdin is not None and process.stdout is not None
+    response_lines: queue.Queue[str] = queue.Queue()
+    threading.Thread(
+        target=lambda: response_lines.put(process.stdout.readline()),
+        daemon=True,
+    ).start()
+    request = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": params,
+    }
+    process.stdin.write(json.dumps(request) + "\n")
+    process.stdin.flush()
+    try:
+        line = response_lines.get(timeout=5)
+    except queue.Empty as exc:
+        process.kill()
+        stderr = process.stderr.read() if process.stderr is not None else ""
+        raise AssertionError(f"generated server did not answer initialize: {stderr}") from exc
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=5)
+    assert line, "generated server closed stdout without an initialize response"
+    return json.loads(line)
+
+
+def test_generated_stdio_server_defaults_missing_protocol_version(tmp_path: Path) -> None:
+    project = tmp_path / "versionless-initialize"
+    build_dir = tmp_path / "versionless-build"
+    _write_project(project)
+    config_path = project / "golf.json"
+    config = json.loads(config_path.read_text())
+    config["transport"] = "stdio"
+    config_path.write_text(json.dumps(config))
+
+    build_project(project, load_settings(project), build_dir)
+    response = _run_stdio_initialize(
+        build_dir / "server.py",
+        {"capabilities": {}, "clientInfo": {"name": "legacy-client", "version": "1"}},
+    )
+
+    assert "error" not in response, response
+    assert response["result"]["protocolVersion"] == "2025-11-25"
+
+    versioned_response = _run_stdio_initialize(
+        build_dir / "server.py",
+        {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "versioned-client", "version": "1"},
+        },
+    )
+    assert "error" not in versioned_response, versioned_response
+    assert versioned_response["result"]["protocolVersion"] == "2025-11-25"
 
 
 @pytest.mark.parametrize(
